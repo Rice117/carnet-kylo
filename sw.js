@@ -4,11 +4,15 @@
 // Une nouvelle version change le nom VERSION : l'appareil la range a la prochaine
 // ouverture avec Internet, puis jette l'ancienne. Les achats, eux, ne sont jamais ici :
 // ils restent dans la memoire du carnet et dans votre fichier.
-const VERSION = 'carnet-kylo-1.0.0-d8f8f82d47';
-const FICHIERS = ["./","./index.html","./manifest.webmanifest","./icones/icone-180.png","./icones/icone-192.png","./icones/icone-512-masquable.png","./icones/icone-512.png"];
+const VERSION = 'carnet-kylo-1.0.1-bb2c791771';
+const FICHIERS = ["./","./index.html","./manifest.webmanifest","./lecteur-codes.js","./icones/icone-180.png","./icones/icone-192.png","./icones/icone-512-masquable.png","./icones/icone-512.png"];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FICHIERS)).then(() => self.skipWaiting()));
+  // cache: 'reload' : on va chercher les fichiers NEUFS sur Internet, jamais une vieille copie
+  // gardee par le navigateur (sinon une nouvelle version pourrait ranger l'ancienne page).
+  e.waitUntil(caches.open(VERSION)
+    .then((c) => c.addAll(FICHIERS.map((f) => new Request(f, { cache: 'reload' }))))
+    .then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys()

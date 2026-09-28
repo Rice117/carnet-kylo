@@ -466,7 +466,7 @@ function oublierVideosDe(a) {
 // fonctionne comme une application ». Le carnet est donc servi depuis une adresse SECURISEE
 // (https) : le telephone accepte alors de l'installer (icone), de le garder hors ligne
 // (sw.js) et d'ouvrir la camera. Ses achats restent dans l'appareil, jamais en ligne.
-window.KYLO_APPLICATION = '1.0.0';
+window.KYLO_APPLICATION = '1.0.1';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -492,7 +492,7 @@ function contenuCarteApplication() {
     ? '<span class="pastille p-ok etat-hors-ligne">✓ prête sans Internet</span>'
     : '<span class="pastille p-att etat-hors-ligne">préparation pour le hors-ligne…</span>';
   if (kyloInstallee()) {
-    return '<div class="alerte a-vert carte-installee"><b>Application installée.</b> ' + etat
+    return '<div class="alerte a-vert carte-installee"><b>Application installée</b> (version ' + window.KYLO_APPLICATION + '). ' + etat
       + '<br>Elle s\'ouvre depuis son icône, marche en Chine sans réseau, et garde vos achats dans cet appareil. '
       + 'Touchez « Enregistrer » de temps en temps : le fichier est votre sauvegarde.</div>';
   }
@@ -530,6 +530,62 @@ if ('serviceWorker' in navigator) {
       .catch(function (e) { console.log('hors-ligne indisponible : ' + e.message); });
   });
 }
+
+// ---------- Lecteur de codes-barres pour l'iPhone (29/09/2026) ----------
+// Riche, 29/09, sur son iPhone : « il scan pas ». Le carnet lit les codes-barres avec le
+// lecteur INTEGRE au navigateur (BarcodeDetector) : Chrome sur Android l'a, Safari sur iPhone
+// NON. Quand il manque, l'application charge son propre lecteur (ZXing, licence Apache 2.0,
+// fichier lecteur-codes.js range hors ligne avec le carnet) et le presente sous le meme nom :
+// le reste du carnet (scannerCodeBarres) ne change pas d'une ligne.
+var kyloLecteurCharge = null;
+function kyloChargerLecteurCodes() {
+  if ('BarcodeDetector' in window) return Promise.resolve(true);
+  if (kyloLecteurCharge) return kyloLecteurCharge;
+  kyloLecteurCharge = new Promise(function (ok, ko) {
+    var s = document.createElement('script');
+    s.src = 'lecteur-codes.js';
+    s.onload = function () {
+      if (!window.ZXing) { ko(new Error('lecteur absent')); return; }
+      window.BarcodeDetector = KyloLecteurCodes;
+      ok(true);
+    };
+    s.onerror = function () { kyloLecteurCharge = null; ko(new Error('le lecteur de codes-barres ne s\'est pas chargé')); };
+    document.head.appendChild(s);
+  });
+  return kyloLecteurCharge;
+}
+function KyloLecteurCodes() {
+  var Z = window.ZXing, indices = new Map();
+  indices.set(Z.DecodeHintType.POSSIBLE_FORMATS, [Z.BarcodeFormat.EAN_13, Z.BarcodeFormat.EAN_8,
+    Z.BarcodeFormat.UPC_A, Z.BarcodeFormat.UPC_E, Z.BarcodeFormat.CODE_128]);
+  indices.set(Z.DecodeHintType.TRY_HARDER, true);
+  this.lecteur = new Z.MultiFormatReader();
+  this.lecteur.setHints(indices);
+  this.toile = document.createElement('canvas');
+  this.dessin = this.toile.getContext('2d', { willReadFrequently: true });
+  this.dernier = 0;
+}
+KyloLecteurCodes.prototype.detect = function (source) {
+  var soi = this, Z = window.ZXing;
+  return new Promise(function (ok) {
+    // Une image toutes les 120 ms suffit, et le telephone ne chauffe pas.
+    var attente = Math.max(0, 120 - (Date.now() - soi.dernier));
+    setTimeout(function () {
+      soi.dernier = Date.now();
+      var l = source.videoWidth || source.naturalWidth || source.width;
+      var h = source.videoHeight || source.naturalHeight || source.height;
+      if (!l || !h) { ok([]); return; }
+      var e = Math.min(1, 1280 / l);
+      soi.toile.width = Math.round(l * e); soi.toile.height = Math.round(h * e);
+      soi.dessin.drawImage(source, 0, 0, soi.toile.width, soi.toile.height);
+      try {
+        var lum = new Z.HTMLCanvasElementLuminanceSource(soi.toile);
+        var r = soi.lecteur.decode(new Z.BinaryBitmap(new Z.HybridBinarizer(lum)));
+        ok([{ rawValue: r.getText(), format: String(r.getBarcodeFormat()) }]);
+      } catch (err) { ok([]); }
+    }, attente);
+  });
+};
 </script>
 </head>
 <body>
@@ -3306,6 +3362,9 @@ async function recupererBlocDuMagasin() {
 // Quand le navigateur ne sait pas le faire, on le dit et on laisse taper a la main : on ne fait
 // jamais semblant d'avoir lu quelque chose.
 async function scannerCodeBarres(champId) {
+  if (!('BarcodeDetector' in window) && window.KYLO_APPLICATION) {
+    try { await kyloChargerLecteurCodes(); } catch (e) { /* on le dira juste en dessous */ }
+  }
   if (!('BarcodeDetector' in window)) {
     avertir("Ce téléphone ne sait pas lire un code-barres depuis le navigateur.\nTapez le code à la main, ou laissez le carnet en fabriquer un.");
     return;

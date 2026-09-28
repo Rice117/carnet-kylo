@@ -1,0 +1,34 @@
+{
+  "id": "./",
+  "name": "KYLO Achats — carnet de voyage",
+  "short_name": "KYLO Achats",
+  "description": "Le carnet d'achats de KYLO EURGUINE : achats, frais, vrai prix de revient. Marche sans Internet.",
+  "lang": "fr",
+  "dir": "ltr",
+  "start_url": "./?ouvert=application",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f2f6fc",
+  "theme_color": "#0d3f85",
+  "icons": [
+    {
+      "src": "icones/icone-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icones/icone-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icones/icone-512-masquable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

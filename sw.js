@@ -4,7 +4,7 @@
 // Une nouvelle version change le nom VERSION : l'appareil la range a la prochaine
 // ouverture avec Internet, puis jette l'ancienne. Les achats, eux, ne sont jamais ici :
 // ils restent dans la memoire du carnet et dans votre fichier.
-const VERSION = 'carnet-kylo-1.0.1-bb2c791771';
+const VERSION = 'carnet-kylo-1.0.2-10b425c755';
 const FICHIERS = ["./","./index.html","./manifest.webmanifest","./lecteur-codes.js","./icones/icone-180.png","./icones/icone-192.png","./icones/icone-512-masquable.png","./icones/icone-512.png"];
 
 self.addEventListener('install', (e) => {

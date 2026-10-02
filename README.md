@@ -8,4 +8,4 @@ Le carnet d'achats de KYLO EURGUINE, en application pour téléphone et ordinate
 - Ce programme est fabriqué à partir du carnet du magasin (`KYLO-Achats.html`) par l'outil
   `construire.js`. Ne pas le modifier à la main : refaire une version.
 
-Version 1.0.2 — 29/09/2026 (écran de scan visible sur iPhone, avec cadre de visée).
+Version 1.0.3 — 02/10/2026 (mémoire pleine : plus aucun achat perdu en silence ; corrections des deux vérifications indépendantes).

@@ -305,6 +305,34 @@ dialog.voile-scan::backdrop{background:#000}
 .scan-lu .scan-ligne{background:#34c759;box-shadow:0 0 10px #34c759}
 .scan-etat{color:#fff;font-size:17px;font-weight:600;text-align:center;min-height:24px;line-height:1.35}
 .voile-scan .scan-annuler{width:80%;max-width:420px;min-height:52px;font-size:17px}
+/* ---------- 1.0.3 (02/10/2026) : la memoire pleine se VOIT ---------- */
+#alerteMemoire{position:relative;z-index:5;padding:12px 14px;font-size:16px;line-height:1.45;box-shadow:0 6px 18px rgba(0,0,0,.22)}
+#alerteMemoire.memoire-rouge{background:var(--rouge);color:#fff}
+#alerteMemoire.memoire-ambre{background:var(--ambre-pale);color:var(--ambre);border-bottom:2px solid var(--ambre)}
+.am-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.am-actions .b{flex:1 1 160px;min-height:48px;font-size:16px;width:auto}
+#alerteMemoire.memoire-rouge .am-enregistrer{background:#fff;color:var(--rouge)}
+.alerte-memoire-fiche{font-size:15px;line-height:1.45}
+.carte-videos .b{margin-top:10px;min-height:48px;font-size:16px}
+.videos-orphelines{font-size:15px;line-height:1.45}
+/* ---------- 1.0.3 : rien ne deborde sur un petit telephone (360 px) ----------
+   Les cartes de chiffres (Frais, Articles, Bénéfice...) poussaient la page hors de l'ecran, et le
+   tableau des familles de codes-barres ne passait pas a la ligne. Defauts deja dans l'origine.
+   Regle DECSIL 2.6 : les textes ne rapetissent JAMAIS, et un montant n'est jamais coupe au
+   milieu. Donc les chiffres gardent leur taille ; c'est la CARTE qui passe a la ligne suivante
+   quand deux cartes ne tiennent plus cote a cote (et « GNF » peut passer sous le nombre). */
+/* Sur grand ecran (700 px et plus), rien ne change : les 4 colonnes d'origine. */
+@media(max-width:699.98px){
+  .stats{display:flex;flex-wrap:wrap;gap:10px}
+  .stats>.stat{flex:1 1 calc(50% - 5px);box-sizing:border-box}
+}
+table.recap td:only-child{white-space:normal}
+/* L'ouverture : le voile retient l'ecran le temps de lire la reserve (invisible si c'est rapide). */
+#voileOuverture{position:fixed;inset:0;z-index:3000;background:transparent}
+#voileOuverture .vo-boite{display:none}
+#voileOuverture.vo-visible{background:rgba(242,246,252,.92);display:flex;align-items:center;justify-content:center;padding:24px}
+#voileOuverture.vo-visible .vo-boite{display:block;max-width:420px;text-align:center;font-size:17px;line-height:1.5;color:#1f2937;font-weight:600}
+#voileOuverture .vo-boite .b{margin-top:16px;min-height:48px;font-size:16px}
 </style>
 <script>
 // ---------- Videos des achats (28/09/2026) ----------
@@ -344,6 +372,7 @@ function kvEffacer(id) { return kvOperation('readwrite', function (t) { return t
 function moVideo(octets) {
   var o = Number(octets) || 0, mo = o / 1048576;
   if (mo < 1) return Math.max(1, Math.round(o / 1024)) + ' Ko';
+  if (mo >= 1024) return (mo / 1024 < 10 ? (mo / 1024).toFixed(1).replace('.', ',') : String(Math.round(mo / 1024))) + ' Go';
   return (mo < 10 ? mo.toFixed(1).replace('.', ',') : String(Math.round(mo))) + ' Mo';
 }
 function dateVideo(iso) {
@@ -359,7 +388,7 @@ function pastilleVideos(a) {
 }
 function blocVideos(a) {
   setTimeout(function () { remplirVideos(a.id); }, 0);
-  return '<div class="bloc-videos">'
+  return '<div class="bloc-videos" data-achat="' + E(a.id) + '">'
     + '<label class="b contour" for="videoInput" style="cursor:pointer">🎥 Filmer / choisir une vidéo</label>'
     + '<input type="file" id="videoInput" accept="video/*" class="champ-cache" onchange="chargerVideo(\'' + a.id + '\', this)">'
     + '<div id="etatVideo" class="etat-video" role="status"></div>'
@@ -408,29 +437,70 @@ function rafraichirVideos(a) {
   if (l) l.innerHTML = listeVideosHtml(a);
   remplirVideos(a.id);
 }
+// 1.0.3 : la fiche ouverte est-elle encore celle de cet achat ? (Verification du 01/10 : si le
+// rangement etait lent et qu'on passait a l'achat B, la fiche B montrait la video de A.)
+function ficheVideosOuverte(idA) {
+  var b = document.querySelector('.bloc-videos[data-achat]');
+  return !!b && b.getAttribute('data-achat') === idA && !!b.closest('dialog[open]');
+}
+var KV_REPLI_MAX = 50 * 1048576;   // au-dela, recopier la video en memoire peut faire planter l'iPhone
+// Les videos en train d'etre rangees, par achat (2e verification, 02/10) : un achat neuf dont la
+// video se range n'est PAS vide (sinon « Fermer » le jetait, et la video avec) ; et l'application
+// ne se recharge pas pour une mise a jour tant qu'un rangement n'est pas fini.
+var kvEnCours = {}, kvSupprimes = {};
+function kvRangementsEnCours() { return Object.keys(kvEnCours).some(function (k) { return kvEnCours[k] > 0; }); }
 function chargerVideo(idA, input) {
   var f = input.files && input.files[0]; if (!f) return;
-  var a = trouverAchat(idA); if (!a) return;
-  var z = document.getElementById('etatVideo');
+  if (!trouverAchat(idA)) return;
+  kvEnCours[idA] = (kvEnCours[idA] || 0) + 1;
+  var etat = function (html) {
+    if (!ficheVideosOuverte(idA)) return false;
+    var z = document.getElementById('etatVideo'); if (z) z.innerHTML = html;
+    return true;
+  };
   var v = { id: 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     type: f.type || 'video/mp4', taille: f.size || 0, le: new Date().toISOString() };
-  if (z) z.innerHTML = '<div class="alerte a-info">Rangement de la vidéo (' + moVideo(v.taille) + ')…</div>';
+  etat('<div class="alerte a-info">Rangement de la vidéo (' + moVideo(v.taille) + ')…</div>');
   var plein = function (err) { return !!err && (err.name === 'QuotaExceededError' || /quota/i.test(String(err.message || ''))); };
   kvEcrire(v.id, f).catch(function (err) {
-    // Certains iPhone refusent de ranger le fichier tel quel : on range son contenu.
-    if (plein(err) || typeof f.arrayBuffer !== 'function') throw err;
+    // Certains iPhone refusent de ranger le fichier tel quel : on range son contenu
+    // (seulement pour une video de moins de 50 Mo : au-dela, la memoire du telephone ne suit pas).
+    if (plein(err) || typeof f.arrayBuffer !== 'function' || !(f.size <= KV_REPLI_MAX)) throw err;
     return f.arrayBuffer().then(function (buf) { return kvEcrire(v.id, new Blob([buf], { type: v.type })); });
   }).then(function () {
+    var a = trouverAchat(idA);
+    if (!a) {
+      // L'achat a ete SUPPRIME pendant le rangement : sa video part avec lui.
+      if (kvSupprimes[idA]) { kvEffacer(v.id).catch(function () {}); return; }
+      // Le carnet a ete remplace (efface, autre fichier ouvert) : la video est gardee, sans
+      // achat, et on dit ou la retrouver.
+      avertir('La vidéo est rangée, mais son achat n\'est plus dans le carnet ouvert. Elle est dans l\'onglet Voyage, carte « Vidéos dans cet appareil ».', 9000);
+      return;
+    }
     a.videos = ((a && a.videos) || []).concat([v]);
     sauverLocal();
     try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
-    rafraichirVideos(a);
-    if (z) z.innerHTML = '<div class="alerte a-vert">Vidéo rangée avec cet achat.</div>';
+    // Carnet ouvert en LECTURE (la reserve n'a pas repondu) : la video est dans l'appareil, mais
+    // son lien avec l'achat ne sera pas garde. On le dit au lieu d'un faux « rangée avec cet achat ».
+    var lecture = typeof kyloModeLecture !== 'undefined' && kyloModeLecture;
+    if (lecture) {
+      var t = 'Vidéo gardée dans l\'appareil, mais le carnet est ouvert en LECTURE : elle ne restera pas reliée à cet achat. '
+        + 'Vous la retrouverez dans l\'onglet Voyage, carte « Vidéos dans cet appareil ».';
+      if (!etat('<div class="alerte a-ambre">' + E(t) + '</div>')) avertir(t, 9000);
+    } else if (ficheVideosOuverte(idA)) {
+      rafraichirVideos(a);
+      etat('<div class="alerte a-vert">Vidéo rangée avec cet achat.</div>');
+    } else avertir('Vidéo rangée avec l\'achat « ' + (a.nom || 'sans nom') + ' ».');
   }).catch(function (err) {
-    if (z) z.innerHTML = '<div class="alerte a-rouge">' + (plein(err)
+    var texte = plein(err)
       ? 'Plus assez de place dans cet appareil pour cette vidéo. Libérez de la place, ou filmez plus court.'
-      : 'La vidéo n\'a pas pu être rangée : ' + E((err && err.message) || 'erreur inconnue') + '.') + '</div>';
-  }).then(function () { try { input.value = ''; } catch (e) {} });
+      : 'La vidéo n\'a pas pu être rangée : ' + ((err && err.message) || 'erreur inconnue') + '.';
+    if (!etat('<div class="alerte a-rouge">' + E(texte) + '</div>')) avertir(texte);
+  }).then(function () {
+    kvEnCours[idA] = Math.max(0, (kvEnCours[idA] || 1) - 1);
+    if (!kvEnCours[idA]) delete kvEnCours[idA];
+    try { input.value = ''; } catch (e) {}
+  });
 }
 function garderVideo(idA, idV) {
   var a = trouverAchat(idA); if (!a) return;
@@ -453,7 +523,345 @@ function supprimerVideo(idA, idV) {
   rafraichirVideos(a);
 }
 function oublierVideosDe(a) {
+  if (a && a.id) kvSupprimes[a.id] = true;
   ((a && a.videos) || []).forEach(function (v) { kvEffacer(v.id).catch(function () {}); });
+}
+
+// ---------- Les videos de cet appareil, et celles qui n'ont plus d'achat (1.0.3) ----------
+// Verification du 01/10 : apres « Effacer le carnet », « voyage d'exemple » ou l'ouverture d'un
+// autre fichier, les videos restaient dans l'appareil, invisibles, et prenaient de la place.
+// On ne les jette PAS toutes seules : elles reviennent si on rouvre le carnet d'ou elles viennent.
+// L'onglet Voyage les montre, avec la place occupee, pour les garder ou les supprimer.
+function idsVideosDuCarnet() {
+  var s = {};
+  (C.achats || []).forEach(function (a) { ((a && a.videos) || []).forEach(function (v) { s[v.id] = true; }); });
+  return s;
+}
+function videosSansAchat() {
+  return kvOperation('readonly', function (t) { return t.getAllKeys(); }).then(function (cles) {
+    var connus = idsVideosDuCarnet();
+    return { toutes: (cles || []).map(String), orphelines: (cles || []).map(String).filter(function (k) { return !connus[k]; }) };
+  });
+}
+function carteVideosAppareil() {
+  setTimeout(remplirCarteVideos, 0);
+  return '<div id="carteVideos"></div>';
+}
+function remplirCarteVideos() {
+  var z = document.getElementById('carteVideos'); if (!z || !window.indexedDB) return;
+  videosSansAchat().then(function (r) {
+    if (!r.toutes.length) { z.innerHTML = ''; return null; }
+    var est = (navigator.storage && navigator.storage.estimate) ? navigator.storage.estimate() : Promise.resolve(null);
+    return est.catch(function () { return null; }).then(function (e) {
+      var zz = document.getElementById('carteVideos'); if (!zz) return;
+      var n = r.toutes.length, no = r.orphelines.length;
+      zz.innerHTML = '<div class="carte carte-videos"><h2>🎥 Vidéos dans cet appareil</h2>'
+        + '<p class="note-video">' + n + ' vidéo' + (n > 1 ? 's' : '') + ' rangée' + (n > 1 ? 's' : '') + ' dans ce téléphone.'
+        + (e && e.usage ? ' Place utilisée par le carnet : <b>' + moVideo(e.usage) + '</b>'
+          + (e.quota ? ' (le téléphone en permet ' + moVideo(e.quota) + ')' : '') + '.' : '') + '</p>'
+        + (no ? '<div class="alerte a-ambre videos-orphelines">' + no + ' vidéo' + (no > 1 ? 's ne sont' : ' n\'est')
+          + ' reliée' + (no > 1 ? 's' : '') + ' à aucun achat de ce carnet (carnet effacé, autre fichier ouvert, achat supprimé). '
+          + 'Si elle' + (no > 1 ? 's viennent' : ' vient') + ' d\'un autre carnet, rouvrez-le : elle' + (no > 1 ? 's y reviendront' : ' y reviendra') + '.</div>'
+          + '<button type="button" class="b contour" onclick="voirVideosSansAchat()">Voir les vidéos sans achat</button>' : '')
+        + '</div>';
+    });
+  }).catch(function () {});
+}
+function voirVideosSansAchat() {
+  videosSansAchat().then(function (r) {
+    var liste = r.orphelines.filter(function (k) { return /^[A-Za-z0-9_-]+$/.test(k); });
+    var d = document.getElementById('boite');
+    var montrer = (d && d.open) ? function (h) { document.getElementById('contenuBoite').innerHTML = h; } : boite;
+    montrer('<h3>Vidéos sans achat</h3>'
+      + '<p class="note-video">Elles ne sont reliées à aucun achat du carnet ouvert. Gardez celles qui comptent '
+      + '(« Garder dans le téléphone »), supprimez les autres pour libérer de la place.</p>'
+      + (liste.length ? liste.map(function (k, i) {
+        return '<div class="video-item" data-orpheline="' + k + '">'
+          + '<video controls playsinline preload="metadata"></video>'
+          + '<div class="video-infos">Vidéo ' + (i + 1) + '</div>'
+          + '<div class="video-actions">'
+          + '<button type="button" class="b contour" onclick="garderVideoSansAchat(\'' + k + '\',' + (i + 1) + ')">📥 Garder dans le téléphone</button>'
+          + '<button type="button" class="b gris" onclick="supprimerVideoSansAchat(\'' + k + '\')">🗑 Supprimer</button>'
+          + '</div></div>';
+      }).join('') : '<p class="note-video">Il n\'y en a plus.</p>')
+      + '<div style="height:12px"></div><button type="button" class="b gris" onclick="fermerBoite();dessiner()">Fermer</button>');
+    kvUrls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} });
+    kvUrls = [];
+    liste.forEach(function (k) {
+      kvLire(k).then(function (blob) {
+        var el = document.querySelector('.video-item[data-orpheline="' + k + '"]'); if (!el || !blob) return;
+        var u = URL.createObjectURL(blob); kvUrls.push(u);
+        el.querySelector('video').src = u;
+        el.querySelector('.video-infos').textContent += ' · ' + moVideo(blob.size);
+      }).catch(function () {});
+    });
+  }).catch(function (e) { avertir('Les vidéos de cet appareil ne peuvent pas être lues : ' + ((e && e.message) || 'erreur')); });
+}
+function garderVideoSansAchat(k, n) {
+  kvLire(k).then(function (blob) {
+    if (!blob) { avertir('Cette vidéo n\'est plus dans cet appareil.'); return; }
+    var t = blob.type || '';
+    var ext = /quicktime/.test(t) ? 'mov' : (/webm/.test(t) ? 'webm' : 'mp4');
+    return remettreFichier(blob, 'video-sans-achat-' + (n || 1) + '.' + ext);
+  }).catch(function (e) { avertir('La vidéo n\'a pas pu être relue : ' + ((e && e.message) || 'erreur')); });
+}
+function supprimerVideoSansAchat(k) {
+  if (!confirmerEnDeuxTemps('orpheline-' + k, 'Supprimer cette vidéo de l\'appareil ?')) return;
+  kvEffacer(k).then(voirVideosSansAchat, voirVideosSansAchat);
+}
+
+// ---------- La memoire du carnet ne se perd plus EN SILENCE (1.0.3, 02/10/2026) ----------
+// Verification independante du 01/10 : quand la memoire du carnet (localStorage, environ 5 Mo)
+// est pleine - beaucoup d'achats avec photo -, l'enregistrement echouait SANS RIEN DIRE : le 81e
+// achat photographie disparaissait a la fermeture. Defaut deja present dans le carnet d'origine.
+// Desormais, si la memoire refuse :
+//   1. le carnet range sa copie dans la RESERVE du telephone (IndexedDB, bien plus grande) ;
+//   2. a l'ouverture, il reprend la copie la plus recente ;
+//   3. il le DIT : un bandeau, et le meme avis dans la fiche ouverte.
+// Si meme la reserve refuse (ou ne repond pas en 5 s) : bandeau ROUGE « PAS gardes ».
+//
+// Deuxieme verification (02/10) : comparer des HEURES ne suffit pas (l'heure du telephone peut
+// reculer ; le menage du demarrage reecrivait une vieille copie avec l'heure du jour, qui passait
+// alors pour la plus recente). Donc :
+//   - chaque enregistrement porte un NUMERO qui ne fait que monter (rang_enregistrement) : la
+//     copie au plus grand numero est la plus recente, quelle que soit l'heure ;
+//   - a l'ouverture, RIEN ne s'ecrit tant que la reserve n'a pas ete lue, et l'ecran attend
+//     (voile invisible ; un message si c'est long) : personne ne modifie un carnet qui va etre
+//     remplace.
+var KS_BASE = 'kylo-carnet-reserve', KS_TABLE = 'carnet', KS_CLE = 'carnet';
+var ksAttente = null, ksEnCours = null;
+var kyloEtatMemoire = '';          // '' tout va bien · 'reserve' garde dans la reserve · 'perdu' pas garde
+var kyloTour = 0, kyloBandeauFerme = false, kyloDernierFichier = null;
+var kyloRang = 0;                  // le plus grand numero d'enregistrement connu sur cet appareil
+var kyloRangLocal = 0, kyloLocalExiste = false;   // poses par chargerLocal (carnet lu dans la memoire)
+var kyloReserveLue = false, kyloEcritureDifferee = false, kyloReservePeutExister = false;
+var kyloModeLecture = false;       // « Ouvrir quand meme » : la reserve n'a pas repondu, on n'ecrit RIEN
+// Un numero d'enregistrement valable : un entier sur, positif, raisonnable. Sinon 0.
+function kyloRangSur(x) { x = Number(x); return Number.isSafeInteger(x) && x >= 0 && x < 1e12 ? x : 0; }
+
+function ksOperation(mode, travail) {
+  return new Promise(function (ok, ko) {
+    if (!window.indexedDB) { ko(new Error('pas de réserve dans ce navigateur')); return; }
+    var r;
+    try { r = indexedDB.open(KS_BASE, 1); } catch (e) { ko(e); return; }
+    r.onupgradeneeded = function () { r.result.createObjectStore(KS_TABLE); };
+    r.onerror = function () { ko(r.error || new Error('la réserve ne s\'ouvre pas')); };
+    r.onsuccess = function () {
+      var db = r.result, resultat;
+      try {
+        var tx = db.transaction(KS_TABLE, mode);
+        var req = travail(tx.objectStore(KS_TABLE));
+        if (req) req.onsuccess = function () { resultat = req.result; };
+        tx.oncomplete = function () { db.close(); ok(resultat); };
+        tx.onerror = tx.onabort = function () { db.close(); ko(tx.error || new Error('la réserve refuse')); };
+      } catch (e) { try { db.close(); } catch (e2) {} ko(e); }
+    };
+  });
+}
+// Les ecritures passent une par une ; si plusieurs attendent, seule la DERNIERE copie compte.
+// texte === null : vider la reserve (la memoire du carnet a de nouveau tout).
+function ksEcrire(texte) {
+  ksAttente = { texte: texte };
+  if (!ksEnCours) ksEnCours = ksVider();
+  return ksEnCours;
+}
+function ksVider() {
+  var t = ksAttente.texte; ksAttente = null;
+  return ksOperation('readwrite', function (s) { return t === null ? s.delete(KS_CLE) : s.put(t, KS_CLE); })
+    .then(function () {
+      if (ksAttente) return ksVider();
+      ksEnCours = null; return true;
+    }, function (err) {
+      if (ksAttente) return ksVider();
+      ksEnCours = null; throw err;
+    });
+}
+
+// Remplace l'ancien « try { localStorage.setItem(...) } catch (e) {} » qui ne disait rien.
+function kyloGarderCarnet() {
+  if (!kyloReserveLue) { kyloEcritureDifferee = true; return false; }   // ouverture : on attend la reserve
+  // La reserve n'a pas pu etre lue : on n'ecrit NI dans la memoire NI dans la reserve, pour ne
+  // jamais faire passer cette ouverture-ci devant une copie plus recente qu'on n'a pas vue.
+  if (kyloModeLecture) { kyloMemoire('lecture'); return false; }
+  var tour = ++kyloTour, texte;
+  // Le numero vient de CET appareil (memoire et reserve lues a l'ouverture), jamais d'un fichier.
+  kyloRang = kyloRangSur(kyloRang) + 1;
+  C.rang_enregistrement = kyloRang;
+  try { texte = JSON.stringify(C); } catch (e) { kyloMemoire('perdu'); return false; }
+  try {
+    localStorage.setItem(CLE, texte);
+  } catch (e) {
+    kyloReservePeutExister = true;
+    var repondu = false;
+    // La reserve ne repond pas en 5 s : on ne fait pas croire que c'est garde.
+    setTimeout(function () { if (!repondu && tour === kyloTour) kyloMemoire('perdu'); }, 5000);
+    ksEcrire(texte).then(function () { repondu = true; if (tour === kyloTour) kyloMemoire('reserve'); },
+      function () { repondu = true; if (tour === kyloTour) kyloMemoire('perdu'); });
+    return false;
+  }
+  // La memoire a tout, avec le plus grand numero : une reserve eventuelle est plus vieille.
+  if (kyloReservePeutExister) {
+    ksEcrire(null).then(function () { if (tour === kyloTour) kyloReservePeutExister = false; }, function () {});
+  }
+  if (kyloEtatMemoire) kyloMemoire('');
+  return true;
+}
+
+// A l'ouverture : lire la reserve AVANT toute ecriture, et reprendre la copie la plus recente.
+function kyloVerifierReserve() {
+  var fini = false;
+  var voile = kyloVoileOuverture(function () { terminer(null, true); });
+  var terminer = function (texteReserve, sansReserve) {
+    if (fini) return; fini = true;
+    if (voile && voile.parentNode) voile.remove();
+    kyloReserveLue = true;
+    if (sansReserve) {
+      // « Ouvrir quand même » : la reserve n'a pas repondu. Cette ouverture se fait en LECTURE :
+      // rien ne s'ecrit (2e verification : en ecrivant, elle passait devant la copie non lue et
+      // la faisait perdre). On le dit, en rouge, tant que l'application reste ouverte.
+      kyloModeLecture = true; kyloEcritureDifferee = false;
+      kyloMemoire('lecture');
+      return;
+    }
+    var c = null, illisible = false;
+    if (texteReserve) { try { c = JSON.parse(texteReserve); } catch (e) { c = null; } }
+    if (texteReserve && (!c || c.format !== 'kylo-carnet-achats')) { c = null; illisible = true; }
+    var rangReserve = c ? kyloRangSur(c.rang_enregistrement) : 0;
+    kyloRang = Math.max(kyloRangSur(kyloRang), kyloRangSur(kyloRangLocal), rangReserve);
+    if (c && (!kyloLocalExiste || rangReserve > kyloRangSur(kyloRangLocal))) {
+      // La reserve a le carnet le plus recent : c'est lui qu'on ouvre.
+      try {
+        if (c.voyage && !c.voyage.taux) {
+          c.voyage.taux = Object.fromEntries(DEVISES_BASE.map(function (d) { return [d[0], d[2]]; }));
+          if (c.voyage.devise && c.voyage.taux_gnf) c.voyage.taux[c.voyage.devise] = c.voyage.taux_gnf;
+        }
+        C = completerCarnet(c);
+        kyloReservePeutExister = true;
+        kyloEcritureDifferee = false;
+        kyloEtatMemoire = 'reserve';
+        try { nettoyerAchatsVides(); } catch (e) {}
+        kyloGarderCarnet();
+        majEtat(); dessiner();
+      } catch (e) { console.log('réserve illisible : ' + e.message); }
+      return;
+    }
+    if (illisible) {
+      // Une reserve qu'on ne sait pas lire n'est JAMAIS videe : on la laisse, on le note.
+      console.log('réserve illisible, laissée en place');
+    } else if (c) {                                // une vieille reserve, deja depassee : on la vide
+      kyloReservePeutExister = true;
+      ksEcrire(null).then(function () { kyloReservePeutExister = false; }, function () {});
+    }
+    if (kyloEcritureDifferee) { kyloEcritureDifferee = false; kyloGarderCarnet(); }
+  };
+  ksOperation('readonly', function (s) { return s.get(KS_CLE); })
+    .then(function (t) { terminer(t || null, false); }, function () { terminer(null, false); });
+}
+// Un voile transparent retient l'ecran le temps de lire la reserve (quelques millisecondes).
+// Si c'est long, il le dit ; au bout de 8 s, il propose d'ouvrir quand meme.
+function kyloVoileOuverture(ouvrirQuandMeme) {
+  var v = document.createElement('div');
+  v.id = 'voileOuverture';
+  // Sur ordinateur, le clavier ne doit pas non plus atteindre le carnet pendant ce temps.
+  var clavier = function (e) {
+    if (!v.parentNode) { window.removeEventListener('keydown', clavier, true); return; }
+    if (!(e.target && e.target.closest && e.target.closest('#voileOuverture'))) { e.preventDefault(); e.stopPropagation(); }
+  };
+  window.addEventListener('keydown', clavier, true);
+  try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
+  v.innerHTML = '<div class="vo-boite" role="status"><div class="vo-texte">Ouverture du carnet…</div></div>';
+  document.body.appendChild(v);
+  setTimeout(function () { if (v.parentNode) v.classList.add('vo-visible'); }, 400);
+  setTimeout(function () {
+    if (!v.parentNode) return;
+    v.querySelector('.vo-texte').textContent = 'Le téléphone met du temps à ouvrir la réserve du carnet. '
+      + 'Attendez encore un peu, ou fermez complètement l\'application et rouvrez-la.';
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'b gris'; b.textContent = 'Ouvrir quand même';
+    b.onclick = ouvrirQuandMeme;
+    v.querySelector('.vo-boite').appendChild(b);
+  }, 8000);
+  return v;
+}
+
+function kyloMemoire(etat) {
+  kyloEtatMemoire = etat;
+  var b = document.getElementById('alerteMemoire');
+  var dansFiche = document.querySelector('#contenuBoite .alerte-memoire-fiche');
+  if (!etat || (etat === 'reserve' && kyloBandeauFerme)) {
+    if (b) b.remove();
+    if (dansFiche) dansFiche.remove();
+    if (!etat) kyloBandeauFerme = false;
+    return;
+  }
+  if (!b) {
+    b = document.createElement('div'); b.id = 'alerteMemoire'; b.setAttribute('role', 'alert');
+    document.body.insertBefore(b, document.body.firstChild);
+  }
+  b.className = etat === 'reserve' ? 'memoire-ambre' : 'memoire-rouge';
+  b.innerHTML = kyloTexteMemoire(etat, true);
+  // La fiche d'un achat passe devant tout : le meme avis y est pose, sinon on ne le voit pas.
+  var fiche = document.querySelector('#boite[open] #contenuBoite');
+  if (fiche) {
+    if (!dansFiche) { dansFiche = document.createElement('div'); fiche.insertBefore(dansFiche, fiche.firstChild); }
+    dansFiche.className = 'alerte alerte-memoire-fiche ' + (etat === 'reserve' ? 'a-ambre' : 'a-rouge');
+    dansFiche.innerHTML = kyloTexteMemoire(etat, false);
+  }
+}
+function kyloTexteMemoire(etat, avecFermer) {
+  var h = kyloDernierFichier
+    ? ' Dernier fichier enregistré à ' + kyloDernierFichier.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + '.'
+    : '';
+  var texte = etat === 'lecture'
+    ? '<b>⛔ La réserve du téléphone n\'a pas répondu : le carnet est ouvert en LECTURE.</b> Rien de ce que '
+      + 'vous changez maintenant n\'est gardé dans le téléphone, et il peut manquer vos derniers achats. '
+      + 'Fermez complètement l\'application et rouvrez-la. « Enregistrer maintenant » garde un fichier de ce qui est affiché.' + h
+    : etat === 'perdu'
+    ? '<b>⛔ Mémoire du téléphone pleine : vos derniers changements ne sont PAS gardés dans le téléphone.</b> '
+      + 'Touchez « Enregistrer maintenant » après chaque changement pour ne rien perdre.' + h
+    : '<b>⚠ La mémoire du carnet est pleine</b> (beaucoup de photos). Vos achats sont gardés dans la '
+      + 'réserve du téléphone. Par sécurité, enregistrez aussi le fichier du carnet.' + h;
+  return '<div class="am-texte">' + texte + '</div><div class="am-actions">'
+    + '<button type="button" class="b am-enregistrer" onclick="enregistrerCarnet()">💾 Enregistrer maintenant</button>'
+    + (avecFermer && etat === 'reserve' ? '<button type="button" class="b gris am-fermer" onclick="kyloFermerBandeau()">J\'ai compris</button>' : '')
+    + '</div>';
+}
+function kyloFermerBandeau() {
+  kyloBandeauFerme = true;
+  var b = document.getElementById('alerteMemoire'); if (b) b.remove();
+}
+
+// ---------- Un fichier .json ne peut pas glisser du programme dans le carnet (1.0.3) ----------
+// Des valeurs du carnet sont placees telles quelles dans la page (numeros dans les boutons, photo,
+// numeros du bloc, etat d'un controle). Une valeur piegee avec une apostrophe, un guillemet ou un
+// chevron executerait du code. Les vraies valeurs du carnet n'en contiennent jamais : un fichier
+// qui en contient est refuse, par securite. (Et ces valeurs sont aussi protegees a l'affichage.)
+var KYLO_INTERDITS = /['"<>&\\`\r\n]/;
+var KYLO_INTERDITS_PHOTO = /['"<>\\`\s]/;
+function kyloIdsSurs(o, profondeur) {
+  profondeur = profondeur || 0;
+  if (!o || typeof o !== 'object') return true;
+  if (profondeur > 60) return false;
+  if (Array.isArray(o)) {
+    for (var i = 0; i < o.length; i++) if (!kyloIdsSurs(o[i], profondeur + 1)) return false;
+    return true;
+  }
+  for (var k in o) {
+    if (!Object.prototype.hasOwnProperty.call(o, k)) continue;
+    var v = o[k];
+    if (typeof v === 'string') {
+      if ((k === 'id' || k === 'cle' || k === 'etat' || /_id$/.test(k)) && KYLO_INTERDITS.test(v)) return false;
+      if (/photo/.test(k) && KYLO_INTERDITS_PHOTO.test(v)) return false;
+    }
+    if (k === 'bloc' && v && typeof v === 'object') {
+      if (['debut', 'fin', 'suivant'].some(function (x) { return v[x] !== undefined && v[x] !== null && v[x] !== '' && !/^\d{1,15}$/.test(String(v[x])); })) return false;
+      if (['prefixe', 'jeton'].some(function (x) { return v[x] !== undefined && v[x] !== null && !/^[A-Za-z0-9_-]*$/.test(String(v[x])); })) return false;
+    }
+    if ((k === 'taux' || k === 'taux_reference') && v && typeof v === 'object'
+        && Object.keys(v).some(function (x) { return KYLO_INTERDITS.test(x); })) return false;
+    if (v && typeof v === 'object' && !kyloIdsSurs(v, profondeur + 1)) return false;
+  }
+  return true;
 }
 </script>
 <link rel="manifest" href="manifest.webmanifest">
@@ -481,7 +889,7 @@ function oublierVideosDe(a) {
 // fonctionne comme une application ». Le carnet est donc servi depuis une adresse SECURISEE
 // (https) : le telephone accepte alors de l'installer (icone), de le garder hors ligne
 // (sw.js) et d'ouvrir la camera. Ses achats restent dans l'appareil, jamais en ligne.
-window.KYLO_APPLICATION = '1.0.2';
+window.KYLO_APPLICATION = '1.0.3';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -536,9 +944,52 @@ function kyloInstaller() {
   kyloInstallation.prompt();
   kyloInstallation.userChoice.then(function () { kyloInstallation = null; majCarteApplication(); });
 }
+// 1.0.3 : demander au telephone de PROTEGER les donnees du carnet des l'ouverture, et pas
+// seulement apres une video (sur iPhone, l'icone a sa propre memoire, separee de Safari).
+function kyloProtegerMemoire() {
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      Promise.resolve(navigator.storage.persisted ? navigator.storage.persisted() : false)
+        .then(function (deja) { if (!deja) return navigator.storage.persist(); })
+        .catch(function () {});
+    }
+  } catch (e) {}
+}
+// 1.0.3 : une nouvelle version vient de prendre la main (mise a jour en ligne) alors que la page
+// ouverte est l'ancienne. On rouvre la page tout de suite SEULEMENT si personne n'y a encore
+// touche depuis l'ouverture (la mise a jour arrive en general dans les secondes qui suivent) :
+// rien a perdre. Des que Riche a touche l'ecran, on ne recharge plus : la nouvelle version
+// s'ouvrira la prochaine fois. Jamais une saisie coupee, jamais une video en cours perdue.
+var kyloAvaitUnGardien = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+var kyloTouche = false;
+['pointerdown', 'touchstart', 'keydown'].forEach(function (t) {
+  window.addEventListener(t, function () { kyloTouche = true; }, { capture: true, passive: true });
+});
+function kyloPeutRecharger() {
+  if (kyloTouche) return false;
+  if (document.querySelector('dialog[open]')) return false;
+  var a = document.activeElement;
+  if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return false;
+  if (typeof kyloEtatMemoire !== 'undefined' && kyloEtatMemoire) return false;
+  if (typeof ksEnCours !== 'undefined' && ksEnCours) return false;
+  if (typeof kyloReserveLue !== 'undefined' && (!kyloReserveLue || kyloEcritureDifferee)) return false;
+  if (typeof kvRangementsEnCours === 'function' && kvRangementsEnCours()) return false;
+  return true;
+}
+function kyloNouvelleVersion() {
+  majCarteApplication();
+  if (!kyloAvaitUnGardien) { kyloAvaitUnGardien = true; return; }   // premiere installation, pas une mise a jour
+  if (kyloPeutRecharger()) {
+    try { modifieDepuisEnregistrement = false; } catch (e) {}       // tout est deja dans la memoire du carnet
+    location.reload();
+  } else {
+    avertir('Une nouvelle version du carnet est prête. Elle s\'ouvrira la prochaine fois que vous ouvrirez l\'application.', 7000);
+  }
+}
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
-    navigator.serviceWorker.addEventListener('controllerchange', majCarteApplication);
+    kyloProtegerMemoire();
+    navigator.serviceWorker.addEventListener('controllerchange', kyloNouvelleVersion);
     navigator.serviceWorker.register('sw.js')
       .then(function () { return navigator.serviceWorker.ready; })
       .then(function () { setTimeout(majCarteApplication, 300); })
@@ -782,7 +1233,7 @@ const id = () => 'a' + Date.now().toString(36) + Math.random().toString(36).slic
 function sauverLocal() {
   C.maj_le = new Date().toISOString();
   modifieDepuisEnregistrement = true;
-  try { localStorage.setItem(CLE, JSON.stringify(C)); } catch (e) {}
+  kyloGarderCarnet();
   majEtat();
 }
 function chargerLocal() {
@@ -796,6 +1247,7 @@ function chargerLocal() {
           if (c.voyage.devise && c.voyage.taux_gnf) c.voyage.taux[c.voyage.devise] = c.voyage.taux_gnf;
         }
         C = completerCarnet(c);
+        kyloRangLocal = Number(C.rang_enregistrement) || 0; kyloLocalExiste = true;
       }
     }
   } catch (e) {}
@@ -986,7 +1438,7 @@ function confirmerEnDeuxTemps(cle, question) {
 function achatVide(a) {
   return !!a && !String(a.nom || '').trim() && !a.photo && !num(a.quantite) && !num(a.prix_unitaire)
     && !num(a.cartons) && !num(a.qte_carton) && !String(a.code_barres || '').trim() && !String(a.note || '').trim()
-    && !(a.videos && a.videos.length);
+    && !(a.videos && a.videos.length) && !(typeof kvEnCours !== 'undefined' && kvEnCours[a.id]);
 }
 function nettoyerAchatsVides() {
   const avant = C.achats.length;
@@ -2412,9 +2864,9 @@ function boiteDossier(idA) {
   </div>
   <h2 style="font-size:15px;margin:14px 0 4px">Les photos qui prouvent</h2>
   <div class="ligne" style="gap:10px;align-items:flex-start">
-    <div style="text-align:center;flex:1"><div class="vignette" style="margin:0 auto">${a.photo ? `<img src="${a.photo}">` : '📦'}</div>
+    <div style="text-align:center;flex:1"><div class="vignette" style="margin:0 auto">${a.photo ? `<img src="${E(a.photo)}">` : '📦'}</div>
       <span class="muet">échantillon validé</span></div>
-    <div style="text-align:center;flex:1"><div class="vignette" style="margin:0 auto" id="apercuChargement">${a.photo_chargement ? `<img src="${a.photo_chargement}">` : '🚚'}</div>
+    <div style="text-align:center;flex:1"><div class="vignette" style="margin:0 auto" id="apercuChargement">${a.photo_chargement ? `<img src="${E(a.photo_chargement)}">` : '🚚'}</div>
       <span class="muet">au chargement</span></div>
   </div>
   <label class="b contour" for="photoChargement" style="display:block;text-align:center;cursor:pointer;margin-top:8px">Photo au chargement</label>
@@ -2807,7 +3259,7 @@ function carteSauvegardeCarnet() {
 
 function ecranVoyage() {
   const v = C.voyage;
-  return `${carteOrigineCarnet()}${carteSauvegardeCarnet()}
+  return `${carteOrigineCarnet()}${carteSauvegardeCarnet()}${carteVideosAppareil()}
   <div class="carte">
     <h2>Le voyage</h2>
     <label>Nom du voyage</label>
@@ -2911,7 +3363,7 @@ function ecranVoyage() {
          <p class="muet">Chaque achat que vous confirmez reçoit son code tout de suite, ici, sans Internet.
          Au retour, les étiquettes s'impriment avant même que le conteneur arrive, et l'entrée en stock
          se fait à la douchette.</p>
-         <p class="muet">Bloc ${E(b.jeton || '')} · préfixe ${E(b.prefixe)} · du ${b.debut} au ${b.fin}</p>`
+         <p class="muet">Bloc ${E(b.jeton || '')} · préfixe ${E(b.prefixe)} · du ${E(b.debut)} au ${E(b.fin)}</p>`
       : `<p>Ce carnet n'a pas de bloc de codes.</p>
          <p class="muet">Sans bloc, les achats partent sans code-barres et le magasin leur en donnera un
          au retour — vous ne pourrez pas imprimer les étiquettes à l'avance.</p>
@@ -3115,7 +3567,7 @@ function ecranAchats() {
   const lignes = C.achats.map(a => {
     const conforme = a.conformite && a.conformite.verifie;
     return `<div class="article" onclick="modifierAchat('${a.id}')">
-      <div class="vignette">${a.photo ? `<img src="${a.photo}" alt="">` : '📦'}</div>
+      <div class="vignette">${a.photo ? `<img src="${E(a.photo)}" alt="">` : '📦'}</div>
       <div class="corps">
         <div class="nom">${E(a.nom || 'Sans nom')}</div>
         <div class="det">${nf(a.quantite)} articles · ${dev(a.prix_unitaire, deviseDe(a))} l'unité${a.fournisseur ? ' · ' + E(a.fournisseur) : ''}</div>
@@ -3357,6 +3809,12 @@ async function recupererBlocDuMagasin() {
     return;
   }
   if (!/^https?:\/\//i.test(adresse)) adresse = 'http://' + adresse;   // le piege du 404 (v3.46)
+  if (location.protocol === 'https:' && /^http:/i.test(adresse)) {
+    if (z) z.innerHTML = '<div class="alerte a-ambre bloc-https"><b>Depuis l\'application, le téléphone refuse d\'appeler le magasin directement</b> (adresse sécurisée). '
+      + 'Avant le départ, au magasin : Administration → Codes-barres → « Préparer un voyage ». '
+      + 'Puis recopiez la ligne affichée dans l\'onglet <b>Voyage</b> de l\'application, carte « Les codes-barres du voyage ».</div>';
+    return;
+  }
   if (z) z.innerHTML = '<p class="muet">Je demande au magasin…</p>';
   try {
     const r = await fetch(adresse.replace(/\/$/, '') + '/api/carnet/bloc');
@@ -3377,6 +3835,15 @@ async function recupererBlocDuMagasin() {
 // Quand le navigateur ne sait pas le faire, on le dit et on laisse taper a la main : on ne fait
 // jamais semblant d'avoir lu quelque chose.
 async function scannerCodeBarres(champId) {
+  // 1.0.3 (verification du 01/10) : deux appuis rapides pendant le premier chargement du lecteur
+  // demandaient deux fois la camera. Un seul scan a la fois.
+  if (scannerCodeBarres.occupe) return;
+  const jeton = {};
+  scannerCodeBarres.occupe = jeton;
+  try { await scannerOuvrirCamera(champId, jeton); }
+  finally { if (scannerCodeBarres.occupe === jeton) scannerCodeBarres.occupe = false; }
+}
+async function scannerOuvrirCamera(champId, jeton) {
   if (!('BarcodeDetector' in window) && window.KYLO_APPLICATION) {
     try { await kyloChargerLecteurCodes(); } catch (e) { /* on le dira juste en dessous */ }
   }
@@ -3394,7 +3861,14 @@ async function scannerCodeBarres(champId) {
   let flux = null, voile = null, fini = false;
   const fermer = () => {
     fini = true;
-    if (voile) { try { if (voile.open && voile.close) voile.close(); } catch (e) {} voile.remove(); voile = null; }
+    // Le verrou est rendu des que l'ecran se ferme (2e verification, 02/10) : si la camera ne
+    // repondait jamais, « Annuler » laissait « Scanner » bloque pour de bon.
+    if (scannerCodeBarres.occupe === jeton) scannerCodeBarres.occupe = false;
+    if (voile) {
+      const vv = voile.querySelector('video'); if (vv) { try { vv.srcObject = null; } catch (e) {} }
+      try { if (voile.open && voile.close) voile.close(); } catch (e) {}
+      voile.remove(); voile = null;
+    }
     if (flux) flux.getTracks().forEach(t => t.stop());
   };
   try {
@@ -3418,7 +3892,9 @@ async function scannerCodeBarres(champId) {
     if (fini) { flux.getTracks().forEach(t => t.stop()); return; }
     v.srcObject = flux;
     await new Promise((ok) => { if (v.readyState >= 1) ok(); else v.addEventListener('loadedmetadata', ok, { once: true }); });
+    if (fini) return;   // Annuler touche pendant que l'image arrivait
     try { await v.play(); } catch (e) { /* muette, l'image s'affiche quand meme */ }
+    if (fini) return;
     const etat = voile.querySelector('.scan-etat');
     etat.textContent = 'Visez le code bien droit, avec de la lumière.';
     const chercher = async () => {
@@ -3443,6 +3919,7 @@ async function scannerCodeBarres(champId) {
     };
     chercher();
   } catch (e) {
+    if (fini) return;   // deja ferme par « Annuler » : pas de faux message d'erreur
     fermer();
     avertir("Impossible d'ouvrir l'appareil photo : " + (e && e.message ? e.message : e) + "\nTapez le code à la main.");
   }
@@ -3462,7 +3939,7 @@ function modifierAchat(idA) {
   const a = trouverAchat(idA); if (!a) return;
   boite(`<h3>Achat</h3>
   <div class="champ-photo">
-    <div class="vignette" id="apercuPhoto">${a.photo ? `<img src="${a.photo}">` : '📦'}</div>
+    <div class="vignette" id="apercuPhoto">${a.photo ? `<img src="${E(a.photo)}">` : '📦'}</div>
     <div style="flex:1">
       <!-- Un LABEL, pas un bouton qui clique un champ cache : sur iPhone, c'est la seule facon
            fiable d'ouvrir l'appareil photo. Et PAS d'attribut capture : avec lui, iPhone saute
@@ -3778,7 +4255,7 @@ function ecranPrix() {
     const releve = num(a.prix_grossiste_gnf) > 0 && num(a.prix_grossiste_gnf) < plancher;
     const marge = detail > 0 ? (detail - cout) / cout : 0;
     return `<div class="carte">
-      <div class="ligne"><div class="vignette">${a.photo ? `<img src="${a.photo}">` : '📦'}</div>
+      <div class="ligne"><div class="vignette">${a.photo ? `<img src="${E(a.photo)}">` : '📦'}</div>
         <div style="flex:1"><div class="nom" style="font-weight:700">${E(a.nom)}</div>
         <div class="muet">Coût rendu magasin : <b>${gnf(cout)}</b> · marge ${nf(marge * 100)} %</div></div></div>
       <div class="duo" style="margin-top:8px">
@@ -4348,6 +4825,7 @@ function carnetPourMagasin() {
   copie.achats = copie.achats.map(a => Object.assign({}, a, { devise: deviseDe(a), taux_utilise: tauxDe(deviseDe(a)) }));
   // Les videos restent dans l'appareil : leur fiche ne part pas au magasin.
   copie.achats.forEach(a => { delete a.videos; });
+  delete copie.rang_enregistrement;
   copie.frais = (copie.frais || []).map(f => Object.assign({}, f,
     { devise: f.devise || C.voyage.devise, taux_utilise: tauxDe(f.devise || C.voyage.devise),
       montant_gnf: Math.round(fraisGnf(f)) }));
@@ -4549,7 +5027,7 @@ async function enregistrerCarnet() {
     // fonctionne plus ? » — le fichier, jamais. La copie du navigateur, elle, peut disparaitre.
     C.enregistre_le = new Date().toISOString();
     modifieDepuisEnregistrement = false;
-    try { localStorage.setItem(CLE, JSON.stringify(C)); } catch (e) {}
+    kyloDernierFichier = new Date(); kyloGarderCarnet();
     majEtat(); dessiner();
   }
 }
@@ -4560,6 +5038,7 @@ document.getElementById('fichierCarnet').addEventListener('change', function () 
   lecteur.onload = () => {
     try {
       const c = JSON.parse(lecteur.result);
+      if (!kyloIdsSurs(c)) throw new Error('il contient des valeurs abîmées (signes interdits). Par sécurité, il n\'est pas ouvert');
       if (c && c.format === 'kylo-liste-courses') {
         if (!chargerListeCourses(c)) throw new Error('Liste de courses illisible.');
         allerA('courses'); return;
@@ -5230,7 +5709,7 @@ function ecranRadarFiche(p) {
   const ctrlHtml = RADAR_CONTROLES.map(c => {
     const e = (p.controles || {})[c[0]] || { etat: 'a_faire', preuve: '' };
     const exig = c[col];
-    return `<div class="rd-ctrl rd-c-${e.etat || 'a_faire'}">
+    return `<div class="rd-ctrl rd-c-${E(e.etat || 'a_faire')}">
       <div class="rd-ctrl-tete"><b>${c[0]}. ${E(c[1])}</b><span class="muet">${E(c[2])} · ${E(exig)}</span></div>
       <div class="duo"><select onchange="radarControle('${p.cle}',${c[0]},'etat',this.value)">
         <option value="a_faire"${e.etat === 'a_faire' || !e.etat ? ' selected' : ''}>à faire</option>
@@ -5643,6 +6122,7 @@ function radarRechargerBase() {
 // On demarre en trois morceaux separes : si la memoire du telephone est refusee, le carnet
 // s'ouvre quand meme, vide, au lieu de rester sur une page blanche.
 try { chargerLocal(); nettoyerAchatsVides(); } catch (err) { console.log('memoire indisponible : ' + err.message); }
+try { kyloVerifierReserve(); } catch (err) { kyloReserveLue = true; console.log('réserve : ' + err.message); }
 try { if (localStorage.getItem('kylo_theme') === 'sombre') appliquerTheme('sombre'); } catch (e) { /* mode clair */ }
 try { appliquerNoteAccueil(); } catch (err) {}
 try { dessiner(); } catch (err) {

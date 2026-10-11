@@ -889,7 +889,10 @@ function kyloIdsSurs(o, profondeur) {
 // fonctionne comme une application ». Le carnet est donc servi depuis une adresse SECURISEE
 // (https) : le telephone accepte alors de l'installer (icone), de le garder hors ligne
 // (sw.js) et d'ouvrir la camera. Ses achats restent dans l'appareil, jamais en ligne.
-window.KYLO_APPLICATION = '1.0.3';
+// 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
+// dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
+// déjà remplis quand le carnet est téléchargé depuis le magasin.
+window.KYLO_APPLICATION = '1.1.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -986,7 +989,7 @@ function kyloNouvelleVersion() {
     avertir('Une nouvelle version du carnet est prête. Elle s\'ouvrira la prochaine fois que vous ouvrirez l\'application.', 7000);
   }
 }
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
   window.addEventListener('load', function () {
     kyloProtegerMemoire();
     navigator.serviceWorker.addEventListener('controllerchange', kyloNouvelleVersion);
@@ -1310,6 +1313,7 @@ function partFraisGnf(a) {
   const total = totalAchatsGnf(), quantite = totalQuantite();
   return C.frais.reduce((s, f) => {
     const m = fraisGnf(f);
+    if (f.repartition === 'aucune') return s;   // 1.1.0 : dépense du voyage, mais PAS dans le coût des produits
     if (f.repartition === 'quantite') return s + (quantite > 0 ? m * num(a.quantite) / quantite : 0);
     if (f.repartition === 'produit') return s + (f.produit_id === a.id ? m : 0);
     return s + (total > 0 ? m * coutAchatGnf(a) / total : 0);  // par defaut : au prorata de la valeur
@@ -1570,7 +1574,7 @@ function ecartTaux(code) {
 // Riche : « ca pourrait eviter d'avoir des depenses par imagination ». Tant que le pourcentage de
 // frais est devine, le prix de revient est devine aussi. Ici on liste les vraies depenses du
 // voyage et le carnet en deduit le pourcentage lui-meme.
-const DEPENSES_HABITUELLES = ['Billet d\'avion', 'Hôtel', 'Repas et transport sur place',
+const DEPENSES_HABITUELLES = ['Passeport / visa', 'Billet d\'avion', 'Hôtel', 'Repas et transport sur place',
   'Transport maritime (conteneur)', 'Douane', 'Transitaire', 'Port → magasin',
   'Déchargement', 'Loyer du magasin', 'Salaires des employés', 'Frais bancaires / transfert'];
 function ajouterDepenseType(libelle) {
@@ -2961,7 +2965,7 @@ function acheterCourse(i) {
   const art = C.liste_courses && C.liste_courses.articles[i]; if (!art) return;
   const a = { id: id(), reference: art.reference || '', nom: art.nom || '', fournisseur: '', categorie: '',
     famille: '', code_barres: art.code_barres || '', devise: C.voyage.devise || 'USD',
-    qte_carton: 0, cartons: 0, quantite: num(art.conseille) || 0, prix_unitaire: 0, photo: '', marge: 0,
+    qte_carton: 0, cartons: 0, quantite: num(art.conseille) || 0, prix_unitaire: 0, photo: '', photo_liste: photoDeListe(art.photo), marge: 0,
     prix_detail_gnf: 0, prix_grossiste_gnf: 0, note: 'Liste de courses du magasin',
     conformite: { requise: false, verifie: false, documents: '', note: '' } };
   C.achats.push(a); art.fait = true; sauverLocal(); allerA('achats'); modifierAchat(a.id);
@@ -2984,13 +2988,23 @@ function ecranCourses() {
     directement la fiche d'achat, pré-remplie avec le nom et le code du magasin.</p>
     ${lc.articles.map((art, i) => `<div class="article" style="${art.fait ? 'opacity:.55' : ''}">
       <button class="b gris m-x" onclick="cocherCourse(${i})">${art.fait ? '☑' : '☐'}</button>
+      ${photoDeListe(art.photo) ? `<div class="vignette" style="flex:0 0 auto"><img src="${photoDeListe(art.photo)}" alt=""></div>` : ''}
       <div class="corps"><div class="nom">${E(art.nom)}</div>
+      ${art.phrase ? `<div class="det">${E(art.phrase)}</div>` : ''}
       <div class="det">${art.priorite === 'rupture' ? '<span class="pastille p-non">rupture</span>'
-        : art.priorite === 'urgent' ? '<span class="pastille p-att">urgent</span>' : ''}
-        stock ${nf(art.stock)} · conseillé : <b>${nf(art.conseille)}</b>${art.code_barres ? ' · ' + E(art.code_barres) : ''}</div></div>
+        : art.priorite === 'urgent' ? '<span class="pastille p-att">urgent</span>'
+        : art.priorite === 'choisi' ? '<span class="pastille p-att">choisi par vous</span>' : ''}
+        ${art.stock === null || art.stock === undefined ? '' : 'stock ' + nf(art.stock) + ' · '}conseillé : <b>${art.conseille ? nf(art.conseille) : 'à vous de voir'}</b>${art.code_barres ? ' · ' + E(art.code_barres) : ''}</div></div>
       <button class="b vert m-x" onclick="acheterCourse(${i})">Acheter</button></div>`).join('')}
     <div style="height:8px"></div>
     <button class="b gris" onclick="allerA('achats')">‹ Revenir aux achats</button></div>`;
+}
+
+// v4.32 (magasin) — une photo de la liste ne s'affiche que si c'est VRAIMENT une petite image (data:image/…)
+// écrite par le magasin : jamais une adresse, jamais du code.
+function photoDeListe(p) {
+  const t = String(p || '');
+  return /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(t) && t.length < 200000 ? t : '';
 }
 
 function ecranNegocier() {
@@ -3196,7 +3210,7 @@ function ouvertParLeMagasin() {
   catch (e) { return false; }
 }
 function carteOrigineCarnet() {
-  if (window.KYLO_APPLICATION) return carteApplication();
+  if (window.KYLO_APPLICATION && location.protocol === 'https:') return carteApplication();
   if (!ouvertParLeMagasin()) {
     return `<div class="alerte a-vert"><b>Carnet hors ligne.</b> Ce fichier vit dans votre téléphone :
       il marchera en Chine, dans l'avion, sans réseau et sans que l'ordinateur du magasin soit allumé.</div>`;
@@ -3939,8 +3953,9 @@ function modifierAchat(idA) {
   const a = trouverAchat(idA); if (!a) return;
   boite(`<h3>Achat</h3>
   <div class="champ-photo">
-    <div class="vignette" id="apercuPhoto">${a.photo ? `<img src="${E(a.photo)}">` : '📦'}</div>
+    <div class="vignette" id="apercuPhoto">${a.photo ? `<img src="${E(a.photo)}">` : (photoDeListe(a.photo_liste) ? `<img src="${photoDeListe(a.photo_liste)}" alt="Photo du magasin" style="opacity:.7">` : '📦')}</div>
     <div style="flex:1">
+      ${!a.photo && photoDeListe(a.photo_liste) ? `<p class="det" style="margin:0 0 6px">Photo du magasin, pour reconnaître l'article. Elle n'est pas renvoyée : prenez la vôtre si besoin.</p>` : ''}
       <!-- Un LABEL, pas un bouton qui clique un champ cache : sur iPhone, c'est la seule facon
            fiable d'ouvrir l'appareil photo. Et PAS d'attribut capture : avec lui, iPhone saute
            directement a la camera, et la ou la camera est interdite (apercu de Fichiers,
@@ -4110,19 +4125,25 @@ function supprimerAchat(idA) {
 // ---------- 3. Frais du voyage ----------
 // La liste complete des depenses d'un voyage Chine -> Conakry, dictee par Riche.
 // Elle est la pour qu'aucune ne soit oubliee : une depense oubliee, c'est une marge fausse.
-const TYPES_FRAIS = ['Billet d\'avion', 'Hôtel', 'Repas', 'Taxi / transport local',
+// 1.1.0 — Riche, 11/10 : « mes dépenses d'avant le départ, mon passeport, mes billets d'avion ». Elles se notent ici,
+// avec leur date, avant même le premier achat ; elles seront réparties sur les produits au fil des achats.
+const TYPES_FRAIS = ['Passeport / visa', 'Billet d\'avion', 'Hôtel', 'Vaccins / santé', 'Assurance voyage', 'Repas', 'Taxi / transport local',
   'Transport maritime (bateau, conteneur)', 'Transport aérien (fret)', 'Douane',
   'Transitaire / commission', 'Port → magasin', 'Déchargement / manutention',
   'Stockage / magasinage', 'Assurance', 'Frais bancaires / transfert',
   'Loyer du magasin', 'Salaires des employés', 'Autre'];
 
+// 1.1.0 : une dépense datée avant le début du voyage (passeport, visa, billets) — elle compte quand même.
+function avantLeDepart(f) {
+  return !!(f && f.date && C.voyage && C.voyage.debut && String(f.date) < String(C.voyage.debut));
+}
 function ecranFrais() {
   const lignes = C.frais.map(f => `<div class="article" onclick="modifierFrais('${f.id}')">
     <div class="vignette">💸</div>
     <div class="corps"><div class="nom">${E(f.libelle || 'Frais')}
       ${f.etat === 'prevu' ? '<span class="pastille p-att">prévu</span>' : '<span class="pastille p-ok">payé</span>'}</div>
-      <div class="det">${f.date ? E(dateFr(f.date)) + ' · ' : ''}${f.repartition === 'quantite' ? 'réparti par quantité'
-        : f.repartition === 'produit' ? 'affecté à un seul produit' : 'réparti au prorata de la valeur'}
+      <div class="det">${f.date ? E(dateFr(f.date)) + ' · ' : ''}${avantLeDepart(f) ? '<span class="pastille p-att">avant le départ</span> · ' : ''}${f.repartition === 'quantite' ? 'réparti par quantité'
+        : f.repartition === 'produit' ? 'affecté à un seul produit' : f.repartition === 'aucune' ? 'non réparti (hors coût des produits)' : 'réparti au prorata de la valeur'}
         ${apresCommande(f) ? '<b> · arrivé après la commande</b>' : ''}</div></div>
     <div class="val">${dev(f.montant, f.devise || C.voyage.devise)}<div class="det" style="font-weight:400">${gnf(fraisGnf(f))}</div></div></div>`).join('');
   return `<div class="carte">
@@ -4130,6 +4151,9 @@ function ecranFrais() {
   `+`<div class="carte"><h2>Frais du voyage</h2>
     <p class="muet">Tout ce que le voyage vous coûte en plus de la marchandise. Ces frais sont répartis
     sur les produits : c'est ce qui donne le coût réel rendu magasin, et donc la vraie marge.</p>
+    <p class="muet"><b>Avant le départ</b> (passeport, visa, billets d'avion, assurance) : notez ces dépenses dès
+    maintenant, avec leur date. Pas besoin d'avoir déjà acheté : elles se répartiront sur les produits au fil de
+    vos achats. Une dépense que vous ne voulez pas mettre dans le coût des produits : choisissez « Ne pas répartir ».</p>
     ${lignes || '<p class="muet">Aucun frais enregistré.</p>'}
     <div class="total-ligne"><span>Total des frais</span><span>${gnf(totalFraisGnf())}</span></div>
   </div>
@@ -4204,6 +4228,7 @@ function modifierFrais(idF) {
     <option value="valeur" ${f.repartition === 'valeur' ? 'selected' : ''}>Au prorata de la valeur des produits (recommandé)</option>
     <option value="quantite" ${f.repartition === 'quantite' ? 'selected' : ''}>Au prorata des quantités</option>
     <option value="produit" ${f.repartition === 'produit' ? 'selected' : ''}>Sur un seul produit</option>
+    <option value="aucune" ${f.repartition === 'aucune' ? 'selected' : ''}>Ne pas répartir : dépense du voyage, hors coût des produits</option>
   </select>
   <div id="f_zoneProduit" style="display:${f.repartition === 'produit' ? 'block' : 'none'}">
     <label>Produit concerné</label>
@@ -4475,7 +4500,7 @@ function concentration() {
 }
 // Ce que le deplacement doit rapporter pour valoir le billet.
 function coutDuDeplacement() {
-  const mots = /avion|billet|h[oô]tel|repas|visa|taxi|transport local|s[ée]jour/i;
+  const mots = /avion|billet|h[oô]tel|repas|visa|passeport|vaccin|assurance voyage|taxi|transport local|s[ée]jour/i;
   return C.frais.filter(f => mots.test(f.libelle || '')).reduce((s, f) => s + fraisGnf(f), 0)
     + (C.depenses_type || []).filter(d => mots.test(d.libelle || ''))
         .reduce((s, d) => s + enGnf(num(d.montant), d.devise || C.voyage.devise), 0);
@@ -4750,11 +4775,23 @@ function ecranEnvoi() {
   // propose cette adresse toute seule : plus rien a taper, plus d'erreur possible.
   const adresse = (function () {
     try { const s = localStorage.getItem('kylo_adresse_magasin'); if (s) return s; } catch (e) {}
+    // 1.1.0 : un carnet TÉLÉCHARGÉ DEPUIS LE MAGASIN porte déjà son adresse et son code (window.KYLO_ENVOI).
+    if (window.KYLO_ENVOI && KYLO_ENVOI.adresse) return String(KYLO_ENVOI.adresse);
     return (location.protocol === 'http:' && location.host) ? location.host : '';
   })();
+  // v4.34 (magasin) : le magasin aussi demande un code d'envoi (Administration → Import du classeur), gardé sur le téléphone.
+  let codeMagasin = '';
+  try { codeMagasin = localStorage.getItem('kylo_code_magasin') || ''; } catch (e) {}
+  const codePreRempli = !codeMagasin && !!(window.KYLO_ENVOI && KYLO_ENVOI.code);
+  if (codePreRempli) codeMagasin = String(KYLO_ENVOI.code);
   // v3.80 : deuxieme destination, Azuska Z (fiches produits) - adresse et code gardes sur le telephone.
   let adresseAzuska = '', codeAzuska = '';
   try { adresseAzuska = localStorage.getItem('kylo_adresse_azuska') || ''; codeAzuska = localStorage.getItem('kylo_code_azuska') || ''; } catch (e) {}
+  const azuskaPreRempli = !codeAzuska && !!(window.KYLO_ENVOI && KYLO_ENVOI.codeAzuska);
+  if (window.KYLO_ENVOI) {
+    if (!adresseAzuska && KYLO_ENVOI.adresseAzuska) adresseAzuska = String(KYLO_ENVOI.adresseAzuska);
+    if (azuskaPreRempli) codeAzuska = String(KYLO_ENVOI.codeAzuska);
+  }
   return `<div class="carte"><h2>Envoyer au magasin</h2>
     <p class="muet">Deux façons de transférer ce carnet dans la plateforme du magasin. Les deux font
     exactement la même chose : le magasin vous montre ce qui va entrer, et rien n'est écrit avant votre
@@ -4790,6 +4827,9 @@ function ecranEnvoi() {
     peut y être envoyé sans passer par un fichier.</p>
     <label>Adresse du magasin</label>
     <input id="adresseMagasin" value="${E(adresse)}" placeholder="http://192.168.1.20:4000">
+    <label>Code d'envoi du magasin</label>
+    <input id="codeMagasin" value="${E(codeMagasin)}" placeholder="ABC-DEF" autocapitalize="characters" style="letter-spacing:.1em">
+    <p class="muet">${codePreRempli ? 'Déjà rempli : ce carnet a été téléchargé depuis le magasin. ' : ''}Affiché dans le magasin : <b>Administration → Import du classeur</b>. À taper une seule fois.</p>
     <div style="height:10px"></div>
     <button id="btnEnvoyer" class="b contour" onclick="envoyerAuMagasin()">Envoyer maintenant</button>
     <div id="resultatEnvoi"></div>
@@ -4801,6 +4841,7 @@ function ecranEnvoi() {
     <input id="adresseAzuska" value="${E(adresseAzuska)}" placeholder="http://192.168.1.20:3000">
     <label>Code d'envoi</label>
     <input id="codeAzuska" value="${E(codeAzuska)}" placeholder="ABC-DEF" autocapitalize="characters" style="letter-spacing:.1em">
+    ${azuskaPreRempli ? '<p class="muet">Déjà rempli : ce carnet a été téléchargé depuis Azuska Z.</p>' : ''}
     <div style="height:10px"></div>
     <button id="btnEnvoyerAzuska" class="b contour" onclick="envoyerAAzuska()">Envoyer à Azuska Z</button>
     <div id="resultatEnvoiAzuska"></div>
@@ -4958,7 +4999,10 @@ async function envoyerAuMagasin() {
     return;
   }
   if (!adresse) { z.innerHTML = '<div class="alerte a-rouge">Indiquez l\'adresse du magasin.</div>'; return; }
-  try { localStorage.setItem('kylo_adresse_magasin', adresse); } catch (e) {}
+  // v4.34 (magasin) : le code d'envoi du magasin, comme pour Azuska Z — sans lui, le magasin ne reçoit rien.
+  const codeMagasin = document.getElementById('codeMagasin').value.trim().toUpperCase();
+  if (!codeMagasin) { z.innerHTML = '<div class="alerte a-rouge">Indiquez le code d\'envoi du magasin (Administration → Import du classeur).</div>'; return; }
+  try { localStorage.setItem('kylo_adresse_magasin', adresse); localStorage.setItem('kylo_code_magasin', codeMagasin); } catch (e) {}
   if (devisesManquantes().length) {
     z.innerHTML = '<div class="alerte a-rouge">Taux manquant pour : ' + E(devisesManquantes().join(', ')) +
       '. Complétez la table des taux dans l\'onglet Voyage.</div>'; return;
@@ -4966,13 +5010,13 @@ async function envoyerAuMagasin() {
   z.innerHTML = '<div class="alerte a-info">Envoi en cours…</div>';
   try {
     const r = await fetch(adresse + '/api/carnet/recevoir', { method: 'POST',
-      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(carnetPourMagasin()) });
+      headers: { 'Content-Type': 'application/json', 'X-Code-Envoi': codeMagasin }, body: JSON.stringify(carnetPourMagasin()) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || j.ok === false) throw new Error(j.erreur || ('Réponse ' + r.status));
     z.innerHTML = `<div class="alerte a-vert">Carnet reçu par le magasin (${j.produits} produit(s)).
       Ouvrez <b>Administration → Import du classeur</b> sur l'ordinateur du magasin pour vérifier et confirmer.</div>`;
   } catch (err) {
-    z.innerHTML = `<div class="alerte a-rouge">Envoi impossible : ${E(err.message)}.<br>
+    z.innerHTML = `<div class="alerte a-rouge">Envoi impossible : ${E(String(err.message || '').replace(/\.\s*$/, ''))}.<br>
       Vérifiez que vous êtes sur le WiFi du magasin et que l'ordinateur est allumé, ou utilisez le fichier.</div>`;
   }
 }

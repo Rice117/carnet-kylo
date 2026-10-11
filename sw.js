@@ -4,7 +4,7 @@
 // Une nouvelle version change le nom VERSION : l'appareil la range a la prochaine
 // ouverture avec Internet, puis jette l'ancienne. Les achats, eux, ne sont jamais ici :
 // ils restent dans la memoire du carnet et dans votre fichier.
-const VERSION = 'carnet-kylo-1.0.3-66067c331a';
+const VERSION = 'carnet-kylo-1.1.0-a337c3d5db';
 const FICHIERS = ["./","./index.html","./manifest.webmanifest","./lecteur-codes.js","./icones/icone-180.png","./icones/icone-192.png","./icones/icone-512-masquable.png","./icones/icone-512.png"];
 // L'empreinte exacte (SHA-256) de chaque fichier de CETTE version. 1.0.3 : si Internet donne un
 // fichier different (copie en retard chez l'hebergeur, fichier d'une autre fabrication), on ne

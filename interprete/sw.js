@@ -1,7 +1,7 @@
 // Interprète KYLO (version site) : marche aussi sans Internet pour les phrases prêtes et les prix.
 // Toujours la version la plus récente quand il y a Internet (réseau d'abord), la copie gardée sinon.
 // Ne touche qu'aux fichiers de /interprete/ : jamais au carnet KYLO Achats, jamais aux traductions.
-const VERSION = 'interprete-kylo-1.1.0-' + "16/10 10:54";
+const VERSION = 'interprete-kylo-1.1.0-' + "16/10 15:02";
 const FICHIERS = ['./', './index.html', './jsQR.js', './icone-180.png'];
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FICHIERS.map((f) => new Request(f, { cache: 'reload' })))).then(() => self.skipWaiting()));

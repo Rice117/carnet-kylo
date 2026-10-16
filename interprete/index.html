@@ -316,6 +316,11 @@ details.help li{margin:.25rem 0}
 .show .bar .btn{min-height:3.6rem}
 
 /* Message bref */
+.welcome{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:16px}
+.welcome .wbox{max-width:380px;width:100%;text-align:center;display:grid;gap:1.1rem}
+.welcome .wt{font-size:1.6rem;font-weight:800}
+.welcome .btn{font-size:1.35rem;padding:1.1rem 1.4rem;justify-content:center;min-height:4rem}
+.welcome p{margin:0;font-size:1rem;color:var(--fg-soft);line-height:1.45}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(5rem + env(safe-area-inset-bottom,0px));z-index:50;background:var(--fg);color:var(--bg);padding:.7rem 1.1rem;border-radius:12px;font-weight:600;max-width:calc(100% - 32px);text-align:center;box-shadow:var(--shadow)}
 .empty{background:var(--surface);border:1.5px dashed var(--line);border-radius:var(--r);padding:1rem;color:var(--fg-soft);display:flex;flex-direction:column;gap:.5rem}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -1021,7 +1026,8 @@ var IN_APP = IOS && !/Safari\//.test(UA);
 // d'accueil (« app web ») ni dans les fenêtres internet des autres applications. Seulement dans Safari.
 var STANDALONE = navigator.standalone === true || !!(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
 var CAN_MIC = WEB && typeof SR === 'function' && !(IOS && (STANDALONE || IN_APP));
-var MIC_BLOCKED = false;
+var MIC_ORIG = CAN_MIC;
+var MIC_BLOCKED = false, MIC_HANGS = 0;
 var SAFARI_LINK = 'x-safari-' + location.href.split('#')[0];
 var HELPER = WEB ? new URL('../fiche.html', location.href).href : 'https://rice117.github.io/carnet-kylo/fiche.html'; // page d'aide « Contacts / Appeler » (la fiche voyage après le #, jamais envoyée à Internet)
 var RATE_INFO = { eurCny: '7,4832', eurGnf: '9 865', note: '¥ : Banque de France, 12/10/2026. GNF : cours du marché, 16/10/2026. Le cours de la rue à Conakry peut être différent : mets le tien.' };
@@ -1084,15 +1090,14 @@ function pickVoice(tag) {
   var same = TTS.voices.filter(function (v) { return norm(v).split('-')[0] === pre; });
   return same[0] || null;
 }
-// iPhone : la voix ne sort que si le son a été « ouvert » par un vrai toucher (touchend / click),
-// et le mode silencieux la coupe. On ouvre le son en mode « lecture » (ignore le bouton silencieux).
-var SILENCE = 'data:audio/wav;base64,UklGRmQGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YUAGAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA';
-var silentAudio = null;
-function audioSession(type) { try { if (navigator.audioSession && navigator.audioSession.type !== type) navigator.audioSession.type = type; } catch (e) {} }
-function unlockVoice() {
+// iPhone : la voix ne sort qu'après un vrai toucher. ATTENTION : jouer un son (<audio>) ou changer la
+// session audio juste avant le micro bloque la reconnaissance vocale de Safari (elle « écoute » sans
+// jamais rien rendre). Donc : aucun son caché, et on ne touche à rien quand on appuie sur un micro.
+function audioSession(type) { if (CAN_MIC) return; try { if (navigator.audioSession && navigator.audioSession.type !== type) navigator.audioSession.type = type; } catch (e) {} }
+function unlockVoice(ev) {
+  var t = ev && ev.target; if (t && t.closest && t.closest('#micMe,#micThem,#meetStart,.mic,[data-mic]')) return;
   if (WEB && !isListening()) audioSession('playback');
-  try { if (!silentAudio) { silentAudio = new Audio(SILENCE); silentAudio.setAttribute('playsinline', ''); } var pl = silentAudio.play(); if (pl && pl.catch) pl.catch(function () {}); } catch (e) {}
-  if (!TTS.ok || TTS.unlocked) return; TTS.unlocked = true;
+  if (!TTS.ok || TTS.unlocked || isListening()) return; TTS.unlocked = true;
   try { var u = new SpeechSynthesisUtterance('a'); u.volume = 0; u.rate = 2; window.speechSynthesis.speak(u); } catch (e) {}
 }
 function isListening() { return !!(rec || (typeof meet !== 'undefined' && meet.rec)); }
@@ -1286,8 +1291,13 @@ function renderConvo() {
   if (WEB && !CAN_MIC) {
     var why = STANDALONE ? 'Depuis l’icône de l’écran d’accueil, l’iPhone bloque le micro des pages (règle d’Apple).'
       : IN_APP ? 'Cette page est ouverte dans une autre application (Claude, WhatsApp…) : l’iPhone y bloque le micro.'
-      : MIC_BLOCKED ? 'L’iPhone n’a pas ouvert le micro ici.' : 'Ce navigateur n’a pas la reconnaissance vocale.';
-    box.insertBefore(h('div', { class: 'banner bad', id: 'micBanner' }, [icon('alert'), h('div', {}, [
+      : MIC_BLOCKED ? 'Le micro de l’iPhone ne répond pas (Safari le bloque parfois). Ferme Safari complètement (balaye vers le haut) et rouvre l’Interprète.' : 'Ce navigateur n’a pas la reconnaissance vocale.';
+    if (MIC_BLOCKED && !STANDALONE && !IN_APP) box.insertBefore(h('div', { class: 'banner bad', id: 'micBanner' }, [icon('alert'), h('div', {}, [
+      h('b', { text: 'Le micro de l’iPhone ne répond pas. ' }), 'Ferme Safari complètement (balaye vers le haut depuis le bas de l’écran), rouvre-le, puis rouvre l’Interprète. Si ça continue : éteins et rallume l’iPhone.',
+      h('div', { class: 'row', style: 'margin-top:.4rem' }, [h('button', { class: 'btn primary', id: 'micRetry', 'data-mic': '1', onclick: micRetry }, [icon('mic'), 'Réessayer le micro'])]),
+      h('div', { style: 'margin-top:.4rem', text: 'Ici, en attendant : touche la case en bas, puis le micro 🎤 du clavier.' })
+    ])]), box.firstChild);
+    else box.insertBefore(h('div', { class: 'banner bad', id: 'micBanner' }, [icon('alert'), h('div', {}, [
       h('b', { text: 'Micro direct indisponible ici. ' }), why,
       h('div', { style: 'margin-top:.3rem', text: 'Pour parler au micro, ouvre l’Interprète dans Safari :' }),
       h('div', { class: 'row', style: 'margin-top:.4rem' }, [
@@ -1381,10 +1391,16 @@ function micUI() {
   $('#micThemLabel').textContent = recWho === 'them' ? (LISTENING[S.theirs] || '…') : (THEM_SAYS[S.theirs] || 'Il / elle parle');
 }
 function micBlocked() {
-  MIC_BLOCKED = true; CAN_MIC = false;
+  MIC_BLOCKED = true; CAN_MIC = false; if (meet && meet.on) stopMeeting();
   document.body.classList.remove('mic-mode'); $('#mics').hidden = true; setSpeaker(speaker);
   renderConvo(); if (S.mode === 'meet') renderMeet();
-  toast('Le micro direct ne s’ouvre pas ici. Utilise le micro du clavier, ou ouvre dans Safari.', 4500);
+  toast('Le micro de l’iPhone ne répond pas. En attendant : touche la case en bas, puis le micro 🎤 du clavier.', 5000);
+}
+function micRetry() {
+  MIC_BLOCKED = false; MIC_HANGS = 0; CAN_MIC = MIC_ORIG;
+  if (CAN_MIC) { document.body.classList.add('mic-mode'); $('#mics').hidden = false; micUI(); }
+  renderConvo(); if (S.mode === 'meet') renderMeet();
+  toast('Micro remis. Touche « Je parle » et parle tout de suite.');
 }
 function showMicError(code) {
   var msg = code === 'not-allowed' ? 'Le micro est refusé. iPhone : Réglages › Safari › Micro › Autoriser, puis recharge la page.'
@@ -1396,31 +1412,49 @@ function showMicError(code) {
   pv.lastErr = 'mic'; showPreview('err', msg);
 }
 function startMic(who) {
-  if (rec) { try { rec.stop(); } catch (e) {} return; }
+  // 2e toucher = « j'ai fini ». Si l'iPhone ne répond pas à « fini », on débloque nous-mêmes.
+  if (rec) { var cur = rec; try { cur.stop(); } catch (e) {} setTimeout(function () { if (rec === cur && cur.__hang) cur.__hang(); }, 1500); return; }
   if (meet.on) stopMeeting();
-  unlockVoice(); try { window.speechSynthesis.cancel(); } catch (e) {}
+  try { if (window.speechSynthesis.speaking) window.speechSynthesis.cancel(); } catch (e) {}
   if (pv.ctl) pv.ctl.abort();
   setSpeaker(who); forcedWho = who;
   var L = KL.lang(who === 'me' ? S.mine : S.theirs);
-  audioSession('auto');
-  var r; try { r = new SR(); } catch (e) { showMicError('start'); return; }
+  var r; try { r = new SR(); } catch (e) { showMicError('start'); return; }   // une écoute neuve à chaque fois
   r.lang = L.tts; r.interimResults = true; r.continuous = false; r.maxAlternatives = 1;
   var ta = $('#say'); ta.value = ''; onType();
-  var failed = null;
-  var alive = false;
-  r.onstart = r.onaudiostart = function () { alive = true; };
-  r.onresult = function (e) { alive = true; var t = ''; for (var i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; ta.value = t; onType(); };
+  var failed = null, alive = false, gotText = false, ended = false, quietTimer = null;
+  var finish = function () { rec = null; recWho = null; micUI(); };
+  // l'iPhone « écoute » sans jamais rien rendre : on coupe, on remet les boutons et on le dit
+  var hang = function () {
+    if (rec !== r || ended) return;
+    ended = true; try { r.abort(); } catch (e) {}
+    finish();
+    if (ta.value.trim()) { MIC_HANGS = 0; commit(); return; }   // il avait entendu : on traduit
+    forcedWho = null; MIC_HANGS++;
+    if (MIC_HANGS >= 2) { micBlocked(); return; }
+    pv.lastErr = 'mic'; showPreview('err', 'Le micro de l’iPhone n’a rien rendu. Retouche « Je parle » et parle tout de suite. Si ça recommence : ferme Safari (balaye vers le haut) puis rouvre l’Interprète.');
+  };
+  r.__hang = hang;
+  var heard = function () {
+    alive = true;
+    if (!quietTimer) quietTimer = setTimeout(function () { if (rec === r && !gotText && !ended) { try { r.stop(); } catch (e) {} setTimeout(hang, 1500); } }, window.__micHangMs || 9000);
+  };
+  r.onstart = r.onaudiostart = heard;
+  r.onresult = function (e) { heard(); gotText = true; var t = ''; for (var i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; ta.value = t; onType(); };
   r.onerror = function (e) { alive = true; failed = (e && e.error) || 'error'; };
-  setTimeout(function () { if (rec === r && !alive) { try { r.abort(); } catch (e) {} rec = null; recWho = null; forcedWho = null; micBlocked(); } }, window.__micWatchdogMs || 12000);
+  // pas même « je commence » au bout de 15 s (le temps de répondre à la question « Autoriser ? ») : bloqué
+  setTimeout(function () { if (rec === r && !alive) hang(); }, window.__micWatchdogMs || 15000);
   r.onend = function () {
+    if (ended) return; ended = true;
     if (rec !== r) return;
-    rec = null; recWho = null; micUI();
+    finish();
+    if (gotText) MIC_HANGS = 0;
     if (failed && failed !== 'no-speech' && failed !== 'aborted') { forcedWho = null; showMicError(failed); return; }
     if (!ta.value.trim()) { forcedWho = null; toast('Je n’ai rien entendu. Touche le micro et parle plus près.'); return; }
     commit();
   };
   rec = r; recWho = who; micUI();
-  try { r.start(); } catch (e) { rec = null; recWho = null; micUI(); forcedWho = null; showMicError('start'); }
+  try { r.start(); } catch (e) { ended = true; finish(); forcedWho = null; showMicError('start'); }
 }
 function sayIt(text, code, quiet) {
   var r = speak(text, code);
@@ -1751,7 +1785,7 @@ function openScanner() {
   var stream = null, stopped = false;
   var video = document.createElement('video'); video.muted = true; video.setAttribute('playsinline', ''); video.setAttribute('autoplay', ''); video.setAttribute('aria-label', 'Image de la caméra');
   var info = h('p', { class: 'note', style: 'margin:0', text: 'Vise le QR code dans le cadre jaune. Il est lu tout seul.' });
-  var stop = function () { stopped = true; if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); };
+  var stop = function () { stopped = true; if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); try { video.pause(); video.srcObject = null; } catch (e) {} };
   openSheet('Scanner un QR code', function (body) { body.appendChild(h('div', { class: 'scanbox' }, [video, h('div', { class: 'scanframe' })])); body.appendChild(info); },
     [{ label: 'Prendre une photo', icon: 'camera', act: function () { closeSheet(); $('#fileQR').value = ''; $('#fileQR').click(); } }, { label: 'Annuler', act: closeSheet }]);
   sheetCleanup = stop;
@@ -1895,25 +1929,28 @@ function openSettings() {
     body.appendChild(help('Plan B si Internet coupe', ['L’onglet Phrases (en chinois) et le calcul des prix marchent sans Internet.', 'Les fiches fournisseurs restent sur le téléphone et partent dans ton espace Claude au retour d’Internet.', 'Pour une longue conversation à voix sans Internet : l’app « Traduire » d’Apple (déjà sur l’iPhone) a un mode Conversation. Télécharge le chinois avant : Traduire › Langues › Télécharger.'], false));
     var micRes = h('p', { class: 'note', style: 'margin:0' });
     if (WEB) body.appendChild(h('div', { class: 'optgroup' }, [h('b', { text: 'Tester le micro' }), h('div', { class: 'row' }, [
-      h('button', { class: 'btn primary', onclick: function () {
+      h('button', { class: 'btn primary', 'data-mic': '1', onclick: function () {
         if (!CAN_MIC) { micRes.textContent = 'Pas de reconnaissance vocale dans ce navigateur. ' + (IOS ? 'Ouvre la page dans Safari.' : ''); return; }
         micRes.textContent = 'Parle maintenant (en français)…';
         try {
-          var r = new SR(); r.lang = 'fr-FR'; r.interimResults = false; r.continuous = false; var got = '';
+          var r = new SR(); r.lang = 'fr-FR'; r.interimResults = false; r.continuous = false; var got = '', ev = {}, done = false;
+          var line = function () { return ' (démarré ' + (ev.start ? '✔' : '✗') + ' · son ' + (ev.sound ? '✔' : '✗') + ' · texte ' + (got ? '✔' : '✗') + ')'; };
+          r.onstart = function () { ev.start = 1; }; r.onaudiostart = function () { ev.start = 1; }; r.onsoundstart = r.onspeechstart = function () { ev.sound = 1; };
           r.onresult = function (e) { got = e.results[0][0].transcript; };
           r.onerror = function (e) { micRes.textContent = 'Erreur du micro : « ' + (e && e.error) + ' ». ' + (e && e.error === 'not-allowed' ? 'Réglages › Safari › Micro › Autoriser.' : e && e.error === 'service-not-allowed' ? 'Réglages › Général › Clavier › Dictée : activer.' : ''); };
-          r.onend = function () { if (got) micRes.textContent = 'Le micro marche ✔ J’ai entendu : « ' + got + ' »'; else if (micRes.textContent.indexOf('Erreur') < 0) micRes.textContent = 'Rien entendu. Réessaie en parlant près du téléphone.'; };
+          r.onend = function () { done = true; if (got) micRes.textContent = 'Le micro marche ✔ J’ai entendu : « ' + got + ' »'; else if (micRes.textContent.indexOf('Erreur') < 0) micRes.textContent = 'Rien entendu. Réessaie en parlant près du téléphone.' + line(); };
+          setTimeout(function () { if (done) return; try { r.abort(); } catch (e) {} done = true; micRes.textContent = 'Le micro de l’iPhone ne répond pas' + line() + '. Ferme Safari complètement (balaye vers le haut), rouvre, et réessaie. Envoie-moi une capture de ce message.'; }, window.__micHangMs || 10000);
           r.start();
         } catch (e) { micRes.textContent = 'Le micro n’a pas pu démarrer : ' + e.message; }
       } }, [icon('mic'), 'Tester le micro'])
     ]), micRes]));
     var st = h('div', { class: 'kv' }, [
       h('span', { class: 'k', text: 'Ouvert dans' }), h('span', { class: 'v', text: WEB ? (IN_APP ? 'une autre application (pas Safari) : micro bloqué' : (STANDALONE ? 'icône de l’écran d’accueil : micro bloqué par l’iPhone' : (IOS ? 'Safari ✔' : 'navigateur'))) : 'Claude' }),
-      h('span', { class: 'k', text: 'Son (iPhone)' }), h('span', { class: 'v', text: navigator.audioSession ? 'réglé pour passer le mode silencieux' : 'si pas de son : enlève le mode silencieux' }),
+      h('span', { class: 'k', text: 'Son (iPhone)' }), h('span', { class: 'v', text: 'si pas de son : monte le volume, enlève le mode silencieux' }),
       h('span', { class: 'k', text: 'Traduction' }), h('span', { class: 'v', text: WEB ? 'Google Traduction (secours : MyMemory)' : (caps.sample ? 'prête (Claude)' : 'indisponible ici') }),
-      h('span', { class: 'k', text: 'Micro direct' }), h('span', { class: 'v', text: CAN_MIC ? 'oui' : (WEB ? 'pas sur ce navigateur' : 'non (micro du clavier)') }),
+      h('span', { class: 'k', text: 'Micro direct' }), h('span', { class: 'v', text: CAN_MIC ? 'oui' : MIC_BLOCKED ? 'l’iPhone ne répond pas (Réessayer le micro, onglet Parler)' : (WEB ? 'pas sur ce navigateur' : 'non (micro du clavier)') }),
       h('span', { class: 'k', text: 'Fiches' }), h('span', { class: 'v', text: dbState === 'ok' ? 'dans ton espace Claude + ce téléphone' : 'sur ce téléphone' }),
-      h('span', { class: 'k', text: 'Version' }), h('span', { class: 'v', text: '1.1.0 · ' + (WEB ? 'site' : 'Claude') + ' · 16/10 10:54' }),
+      h('span', { class: 'k', text: 'Version' }), h('span', { class: 'v', text: '1.1.1 · ' + (WEB ? 'site' : 'Claude') + ' · 16/10 15:02' }),
       h('span', { class: 'k', text: 'Voix' }), h('span', { class: 'v', text: TTS.ok ? (TTS.voices.length + ' voix sur ce téléphone') : 'pas disponible ici' }),
       h('span', { class: 'k', text: 'Lecteur QR' }), h('span', { class: 'v', text: typeof window.jsQR === 'function' ? 'prêt' : 'pas chargé (Internet)' })
     ]);
@@ -2082,7 +2119,7 @@ function renderMeetCtl() {
   var B = KL.lang(S.theirs), n = unheard().length;
   var st = h('div', { class: 'meet-status' + (meet.on && !meet.paused ? ' on' : '') }, [h('i'), h('span', { text: meet.on ? (meet.paused ? 'Écoute en pause pendant la lecture' : 'J’écoute la réunion en ' + B.native + ' · ' + MEET.length + ' phrases') : (MEET.length ? 'Écoute arrêtée · ' + MEET.length + ' phrases notées' : 'Langue de la réunion : ' + B.flag + ' ' + B.native + ' (en haut à droite)') })]);
   box.appendChild(st);
-  box.appendChild(h('button', { class: 'go' + (meet.on ? ' stop' : ''), id: 'meetStart', onclick: function () { if (meet.on) stopMeeting(); else startMeeting(); } }, [icon(meet.on ? 'stop' : 'play'), meet.on ? 'Arrêter l’écoute' : (MEET.length ? 'Reprendre l’écoute' : 'Démarrer l’écoute')]));
+  box.appendChild(h('button', { class: 'go' + (meet.on ? ' stop' : ''), id: 'meetStart', 'data-mic': '1', onclick: function () { if (meet.on) stopMeeting(); else startMeeting(); } }, [icon(meet.on ? 'stop' : 'play'), meet.on ? 'Arrêter l’écoute' : (MEET.length ? 'Reprendre l’écoute' : 'Démarrer l’écoute')]));
   box.appendChild(h('div', { class: 'row2' }, [
     h('button', { class: 'btn', id: 'meetListen', disabled: !n && !meet.playing ? true : null, onclick: function () { if (meet.playing) stopPlayback(); else playUnheard(); } }, [icon(meet.playing ? 'stop' : 'sound'), meet.playing ? 'Arrêter la lecture' : 'Écouter en français' + (n ? ' (' + n + ')' : '')]),
     h('button', { class: 'btn', id: 'meetLive', 'aria-pressed': String(!!S.meetLive), onclick: function () { S.meetLive = !S.meetLive; saveSet(); renderMeetCtl(); toast(S.meetLive ? 'Direct : chaque phrase traduite est dite tout de suite. Mets tes écouteurs.' : 'Direct arrêté : touche « Écouter en français » quand tu veux.', 3600); } }, [icon('head'), 'Direct (écouteurs)'])
@@ -2137,11 +2174,12 @@ function wakeOff() { try { if (meet.wake) meet.wake.release(); } catch (e) {} me
 document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && meet.on) wakeOn(); });
 function meetListen() {
   if (!meet.on || meet.paused || meet.rec) return;
-  if (!meet.playing && !S.meetLive) audioSession('auto');
   var r; try { r = new SR(); } catch (e) { stopMeeting(); showMeetError('start'); return; }
+  meet.lastEvent = Date.now();
   r.lang = KL.lang(S.theirs).tts; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
   var done = {};
   r.onresult = function (e) {
+    meet.lastEvent = Date.now(); meet.gotAny = true; meet.idle = 0;
     var interim = '';
     for (var i = (e.resultIndex || 0); i < e.results.length; i++) {
       var res = e.results[i];
@@ -2152,8 +2190,9 @@ function meetListen() {
     var el = $('#meetInterim');
     if (el && changed) { el.textContent = '… ' + interim; el.hidden = !interim; var l = $('#meetList'); l.scrollTop = l.scrollHeight; }
   };
-  r.onerror = function (e) { meet.lastErr = (e && e.error) || 'error'; };
+  r.onerror = function (e) { meet.lastEvent = Date.now(); meet.lastErr = (e && e.error) || 'error'; };
   r.onend = function () {
+    if (meet.rec !== r) return;
     meet.rec = null;
     if (meet.interim.trim()) { addSegment(meet.interim); }
     meet.interim = '';
@@ -2168,8 +2207,19 @@ function meetListen() {
   meet.rec = r;
   try { r.start(); } catch (e) { meet.rec = null; stopMeeting(); showMeetError('restart'); }
 }
+// si l'iPhone « écoute » sans plus rien rendre pendant longtemps, on repart avec une écoute neuve
+setInterval(function () {
+  if (!meet.on || meet.paused || !meet.rec) return;
+  if (Date.now() - (meet.lastEvent || 0) > (window.__meetIdleMs || 25000)) {
+    var old = meet.rec; meet.rec = null; try { old.abort(); } catch (e) {}
+    meet.idle = (meet.idle || 0) + 1;
+    if (!meet.gotAny && meet.idle >= 2) { stopMeeting(); showMeetError('hang'); return; }
+    meet.restarts++; meetListen();
+  }
+}, 2000);
 function showMeetError(code) {
-  var msg = code === 'restart' ? 'L’iPhone a coupé l’écoute. Touche « Reprendre l’écoute ». Garde l’écran allumé et l’Interprète devant.'
+  var msg = code === 'hang' ? 'Le micro de l’iPhone ne rend rien. Ferme Safari complètement (balaye vers le haut), rouvre l’Interprète, puis « Démarrer l’écoute ».'
+    : code === 'restart' ? 'L’iPhone a coupé l’écoute. Touche « Reprendre l’écoute ». Garde l’écran allumé et l’Interprète devant.'
     : code === 'not-allowed' ? 'Le micro est refusé. iPhone : Réglages › Safari › Micro › Autoriser, puis recharge la page.'
     : code === 'service-not-allowed' ? 'La reconnaissance vocale est coupée. iPhone : Réglages › Général › Clavier › active « Dictée ».'
     : code === 'language-not-supported' ? 'L’iPhone ne reconnaît pas cette langue à la voix.'
@@ -2179,7 +2229,7 @@ function showMeetError(code) {
 function startMeeting() {
   if (!CAN_MIC) return renderMeetCtl();
   if (rec) { try { rec.stop(); } catch (e) {} }
-  unlockVoice(); meet.on = true; meet.paused = false; meet.restarts = 0; wakeOn(); renderMeet(); meetListen();
+  meet.on = true; meet.paused = false; meet.restarts = 0; meet.idle = 0; meet.gotAny = false; wakeOn(); renderMeet(); meetListen();
 }
 function stopMeeting() {
   meet.on = false; meet.paused = false; wakeOff();
@@ -2244,6 +2294,15 @@ $('#modeMeet').addEventListener('click', function () { setMode('meet'); });
 $('#micMe').addEventListener('click', function () { startMic('me'); });
 $('#micThem').addEventListener('click', function () { startMic('them'); });
 if (CAN_MIC) { document.body.classList.add('mic-mode', 'empty-say'); $('#mics').hidden = false; $('#say').placeholder = '… ou écris ici'; }
+// iPhone : un premier toucher « Commencer » ouvre la voix proprement, loin du micro
+if (WEB && IOS && CAN_MIC && TTS.ok) (function () {
+  var wl = h('div', { class: 'welcome', id: 'welcome', role: 'dialog', 'aria-label': 'Commencer' }, [h('div', { class: 'wbox' }, [
+    h('div', { class: 'wt', text: 'Interprète KYLO' }),
+    h('button', { class: 'btn primary', id: 'welcomeGo', onclick: function () { wl.remove(); } }, [icon('sound'), 'Commencer']),
+    h('p', { text: 'Ce toucher ouvre le son de l’iPhone : les traductions seront dites à voix haute. Monte le volume et enlève le mode silencieux.' })
+  ])]);
+  document.body.appendChild(wl);
+})();
 $('#tCard').addEventListener('click', function () { $('#fileCard').value = ''; $('#fileCard').click(); });
 $('#tGallery').addEventListener('click', function () { $('#fileGallery').value = ''; $('#fileGallery').click(); });
 $('#tHand').addEventListener('click', function () { editFiche(null); });

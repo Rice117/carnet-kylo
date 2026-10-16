@@ -9,3 +9,9 @@ Le carnet d'achats de KYLO EURGUINE, en application pour téléphone et ordinate
   `construire.js`. Ne pas le modifier à la main : refaire une version.
 
 Version 1.0.3 — 02/10/2026 (mémoire pleine : plus aucun achat perdu en silence ; corrections des deux vérifications indépendantes).
+
+## fiche.html — page d'aide de l'Interprète KYLO (16/10/2026)
+
+Met une fiche fournisseur dans les Contacts de l'iPhone et lance l'appel. Elle ne garde rien
+et n'envoie rien : la fiche voyage dans le lien, après le `#`, que le navigateur n'envoie jamais à
+Internet. Elle ne touche pas au carnet (aucun fichier du carnet modifié).

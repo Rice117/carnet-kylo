@@ -15,3 +15,9 @@ Version 1.0.3 — 02/10/2026 (mémoire pleine : plus aucun achat perdu en silenc
 Met une fiche fournisseur dans les Contacts de l'iPhone et lance l'appel. Elle ne garde rien
 et n'envoie rien : la fiche voyage dans le lien, après le `#`, que le navigateur n'envoie jamais à
 Internet. Elle ne touche pas au carnet (aucun fichier du carnet modifié).
+
+## interprete/ — l'Interprète KYLO, version site (16/10/2026)
+
+Traduction parlée (micro direct dans Safari), mode Réunion, phrases prêtes, fiches fournisseurs par QR code,
+calcul des prix. Fabriqué par `build.js` du projet Interprète : ne pas modifier à la main.
+Son propre service worker (portée `interprete/`) ; ne touche à aucun fichier du carnet.

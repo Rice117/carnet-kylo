@@ -1,0 +1,2215 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<meta name="apple-mobile-web-app-title" content="Interprète">
+<link rel="apple-touch-icon" href="./icone-180.png">
+<link rel="icon" href="./icone-180.png">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Interprète KYLO</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+/* Mise en page : une seule appli plein écran — en-tête, contenu qui défile, barre d'onglets en bas (comme les panneaux bleus d'un salon). */
+:root{
+  --kylo:#0B5A93; --kylo-deep:#084470; --anthracite:#4A4A4A;
+  --bg:#F2F6F9; --surface:#FFFFFF; --surface-2:#E7EEF4; --line:#CFDAE4;
+  --fg:#1E2933; --fg-soft:#4A5866; --accent:#0B5A93; --accent-ink:#FFFFFF;
+  --them:#E3EAF0; --me:#0B5A93; --me-ink:#FFFFFF;
+  --signal:#F2B200; --signal-ink:#2A2100;
+  --ok:#1C7C47; --ok-bg:#E2F3EA; --bad:#B42318; --bad-bg:#FDECEA; --warn-bg:#FFF4D6;
+  --wa:#1C8C4E;
+  --shadow:0 1px 2px rgba(11,40,70,.08),0 6px 18px rgba(11,40,70,.07);
+  --f-display:"Barlow Semi Condensed","Barlow","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow","PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-cjk:"PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei","Barlow",sans-serif;
+  --r:14px; --r-sm:10px;
+  font-size:17px;
+}
+:root[data-size="g"]{font-size:20px}
+:root[data-size="tg"]{font-size:23px}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0D151D; --surface:#15212C; --surface-2:#1C2A37; --line:#2B3D4E;
+  --fg:#E9EFF4; --fg-soft:#AEBBC7; --accent:#5AAAE6; --accent-ink:#06243A;
+  --them:#1E2C3A; --me:#0F5F9C; --me-ink:#FFFFFF;
+  --signal:#F2B200; --signal-ink:#2A2100;
+  --ok:#5BD08F; --ok-bg:#12321F; --bad:#FF8A80; --bad-bg:#3A1714; --warn-bg:#3A3110;
+  --wa:#3BC277; --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D151D; --surface:#15212C; --surface-2:#1C2A37; --line:#2B3D4E;
+  --fg:#E9EFF4; --fg-soft:#AEBBC7; --accent:#5AAAE6; --accent-ink:#06243A;
+  --them:#1E2C3A; --me:#0F5F9C; --me-ink:#FFFFFF;
+  --signal:#F2B200; --signal-ink:#2A2100;
+  --ok:#5BD08F; --ok-bg:#12321F; --bad:#FF8A80; --bad-bg:#3A1714; --warn-bg:#3A3110;
+  --wa:#3BC277; --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25); color-scheme:dark}
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:1rem;line-height:1.4;-webkit-text-size-adjust:100%;overflow:hidden}
+*{box-sizing:border-box}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--signal);outline-offset:2px}
+.ic{width:1.35em;height:1.35em;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.cjk{font-family:var(--f-cjk)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+#app{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr) auto;grid-template-columns:minmax(0,1fr);max-width:760px;margin:0 auto;background:var(--bg)}
+/* En-tête */
+.top{display:flex;align-items:center;gap:.6rem;padding-block:.55rem;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:var(--surface);border-bottom:1px solid var(--line)}
+.mono{width:2.3rem;height:2.3rem;border-radius:9px;background:var(--kylo);color:#fff;display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:1.45rem;letter-spacing:-.02em;flex:none}
+.brand{display:flex;flex-direction:column;line-height:1.05;min-width:0;flex:0 1 auto;overflow:hidden}
+.brand b,.brand span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+:root[data-size="tg"] .brand span{display:none}
+.brand b{font-family:var(--f-display);font-size:min(1.3rem,24px);font-weight:700;letter-spacing:.01em}
+.brand span{font-size:.9rem;color:var(--fg-soft);letter-spacing:.06em;text-transform:uppercase}
+.top .grow{flex:1}
+.status-dot{display:inline-flex;align-items:center;gap:.35rem;font-size:.9rem;color:var(--fg-soft);padding:.25rem .55rem;border-radius:99px;background:var(--surface-2);white-space:nowrap;min-width:0;flex:0 1 auto;overflow:hidden}
+.status-dot span{overflow:hidden;text-overflow:ellipsis}
+.status-dot i{width:.6rem;height:.6rem;border-radius:50%;background:var(--fg-soft);display:block}
+.status-dot.ok i{background:var(--ok)} .status-dot.bad i{background:var(--bad)}
+.iconbtn{min-width:2.9rem;min-height:2.9rem;border-radius:12px;border:1px solid var(--line);background:var(--surface);display:inline-grid;place-items:center;color:var(--fg)}
+
+main{overflow:hidden;position:relative;min-height:0;min-width:0}
+.tab{height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-block:1rem 1.2rem;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.tab h2{font-family:var(--f-display);font-size:1.5rem;margin:0 0 .3rem;text-wrap:balance}
+.lead{color:var(--fg-soft);margin:0 0 1rem;max-width:60ch}
+
+/* Barre d'onglets */
+.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.tabs button{border:0;background:none;padding:.5rem .2rem .45rem;display:flex;flex-direction:column;align-items:center;gap:.15rem;font-size:min(.9rem,15.5px);font-weight:600;color:var(--fg-soft);min-height:3.6rem;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;letter-spacing:-.01em}
+.tabs button .ic{width:1.6rem;height:1.6rem}
+.tabs button[aria-selected="true"]{color:var(--accent)}
+.tabs button[aria-selected="true"] .pill{background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.tabs .pill{padding:.15rem .9rem;border-radius:99px;display:grid;place-items:center}
+body.typing .tabs{display:none}
+
+/* ---- PARLER ---- */
+#tab-parler{display:flex;flex-direction:column;padding:0;overflow:hidden}
+.pairbar{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:.5rem;align-items:stretch;padding-block:.7rem;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:var(--surface);border-bottom:1px solid var(--line)}
+.langbtn{display:flex;align-items:center;gap:.5rem;padding:.5rem .7rem;border-radius:var(--r-sm);border:1.5px solid var(--line);background:var(--surface);min-height:3.2rem;text-align:left;min-width:0}
+.langbtn .flag{font-size:1.7rem;line-height:1}
+.langbtn .nm{display:flex;flex-direction:column;min-width:0;line-height:1.1}
+.langbtn .nm b{font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.langbtn .nm small{font-size:.9rem;color:var(--fg-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.langbtn.them{border-color:var(--kylo)}
+.swap{align-self:center}
+.convo{flex:1;overflow-y:auto;padding-block:1rem;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:.8rem}
+.bub{max-width:88%;min-width:0;border-radius:18px;padding:.7rem .9rem .55rem;display:flex;flex-direction:column;gap:.35rem;box-shadow:var(--shadow)}
+.bub.me{align-self:flex-end;background:var(--me);color:var(--me-ink);border-bottom-right-radius:6px}
+.bub.them{align-self:flex-start;background:var(--them);color:var(--fg);border-bottom-left-radius:6px}
+.bub .who{font-size:.9rem;display:flex;gap:.35rem;align-items:center;font-weight:600;justify-content:space-between}
+.bub .who span{opacity:.85}
+.bub .who .cp{border:0;background:none;color:inherit;opacity:.8;min-width:2.75rem;min-height:2.75rem;margin:-.6rem -.6rem -.6rem 0;display:grid;place-items:center}
+.bub .src{font-size:.95rem;opacity:.85;border-left:3px solid currentColor;padding-left:.5rem}
+.bub .out{font-size:1.35rem;font-weight:600;line-height:1.3;word-break:break-word}
+.bub .py{font-size:1rem;opacity:.9;font-style:italic}
+.bub .acts{display:flex;gap:.4rem;margin-top:.2rem;flex-wrap:wrap}
+.bub .acts button{border:0;border-radius:99px;padding:.4rem .75rem;min-height:2.75rem;display:inline-flex;align-items:center;gap:.35rem;font-size:.95rem;font-weight:600;background:color-mix(in srgb,currentColor 14%,transparent);color:inherit}
+.bub.example{opacity:.92;outline:2px dashed color-mix(in srgb,var(--fg-soft) 55%,transparent);outline-offset:3px}
+.tag-ex{display:inline-block;font-size:.9rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--signal);color:var(--signal-ink);border-radius:6px;padding:.05rem .45rem;align-self:flex-start}
+.hintcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:.9rem 1rem;display:flex;gap:.8rem;align-items:flex-start}
+.hintcard .big{font-size:1.9rem;line-height:1}
+.hintcard p{margin:.1rem 0 0}
+.composer{border-top:1px solid var(--line);background:var(--surface);padding-block:.6rem .7rem;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:.5rem}
+.who-toggle{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.4rem}
+.who-toggle button{min-width:0;overflow:hidden;border:1.5px solid var(--line);background:var(--surface);border-radius:var(--r-sm);min-height:2.9rem;display:flex;align-items:center;justify-content:center;gap:.45rem;font-weight:700;font-size:1rem;padding:.3rem .5rem}
+.who-toggle button[aria-pressed="true"]{background:var(--kylo);border-color:var(--kylo);color:#fff}
+.inwrap{position:relative}
+textarea#say{width:100%;min-height:3.4rem;max-height:9rem;resize:none;border:2px solid var(--line);border-radius:var(--r);background:var(--bg);padding:.7rem 2.9rem .7rem .85rem;font-size:1.2rem;line-height:1.35;display:block}
+textarea#say:focus{border-color:var(--accent);outline:none;background:var(--surface)}
+.clearbtn{position:absolute;right:.35rem;top:.35rem;border:0;background:none;color:var(--fg-soft);min-width:2.75rem;min-height:2.75rem;display:grid;place-items:center}
+.preview{min-height:1.5rem;font-size:1.05rem;color:var(--fg-soft);display:flex;gap:.5rem;align-items:flex-start}
+.preview b{color:var(--fg);font-weight:600}
+.dictate{font-size:.95rem;color:var(--fg-soft);display:flex;align-items:center;gap:.4rem}
+.go{border:0;border-radius:var(--r);background:var(--kylo);color:#fff;min-height:3.4rem;font-size:1.2rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:.6rem;font-family:var(--f-display);letter-spacing:.02em}
+.go[disabled]{opacity:.6}
+.spin{width:1.1em;height:1.1em;border-radius:50%;border:3px solid currentColor;border-right-color:transparent;animation:sp 0.8s linear infinite;display:inline-block;flex:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ---- Grande taille : on garde la place pour la conversation ---- */
+:root[data-size="tg"] .status-dot span{display:none}
+:root[data-size="g"] .langbtn .nm b,:root[data-size="tg"] .langbtn .nm b{font-size:min(1.05rem,19px)}
+:root[data-size="g"] .langbtn .nm small,:root[data-size="tg"] .langbtn .nm small{font-size:min(.9rem,16px)}
+:root[data-size="g"] .langbtn .flag,:root[data-size="tg"] .langbtn .flag{font-size:min(1.7rem,30px)}
+:root[data-size="tg"] .swap{display:none}
+:root[data-size="tg"] .pairbar{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+/* ---- Micro (version site) ---- */
+.mics{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.5rem}
+.mic{border:0;border-radius:var(--r);background:var(--kylo);color:#fff;min-height:min(5.2rem,96px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.2rem;font-weight:700;font-size:1.05rem;padding:.4rem;min-width:0;line-height:1.15;text-align:center}
+.mic.them{background:var(--surface);color:var(--fg);border:2px solid var(--kylo)}
+.mic .ic{width:min(2.1rem,40px);height:min(2.1rem,40px)}
+.mic.on{background:var(--bad);border-color:var(--bad);color:#fff;animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 .45rem color-mix(in srgb,var(--bad) 28%,transparent)}}
+body.mic-mode .who-toggle,body.mic-mode #dictateTip{display:none}
+body.mic-mode textarea#say{min-height:2.9rem;font-size:1.1rem}
+body.mic-mode.empty-say #btnGo{display:none}
+.scanbox{position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:3/4;max-height:58vh;width:100%}
+.scanbox video{width:100%;height:100%;object-fit:cover;display:block}
+.scanframe{position:absolute;inset:16%;border:4px solid var(--signal);border-radius:14px;box-shadow:0 0 0 999px rgba(0,0,0,.28)}
+
+/* ---- Notes, résumé, réunion ---- */
+.kp{display:inline-flex;align-items:center;gap:.25rem;font-size:.9rem;font-weight:700;border-radius:6px;padding:0 .4rem;background:color-mix(in srgb,currentColor 14%,transparent)}
+.kp .ic{width:1em;height:1em}
+.bub .acts button.on{background:var(--signal);color:var(--signal-ink)}
+.on .ic.fill,.bub .acts button.on .ic{fill:currentColor}
+.convo-foot{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;padding-top:.3rem}
+.modebar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.4rem;padding-block:.5rem;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:var(--surface);border-bottom:1px solid var(--line)}
+.modebar button{border:1.5px solid var(--line);background:var(--surface);border-radius:var(--r-sm);min-height:2.9rem;display:flex;align-items:center;justify-content:center;gap:.4rem;font-weight:700;font-size:1rem;min-width:0}
+.modebar button[aria-pressed="true"]{background:var(--surface-2);border-color:var(--accent);color:var(--accent)}
+.meet{flex:1;display:flex;flex-direction:column;min-height:0}
+.meet-list{flex:1;overflow-y:auto;padding-block:.8rem;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:.6rem}
+.mseg{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:.6rem .8rem;display:flex;flex-direction:column;gap:.25rem}
+.mseg.new{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.mseg .meta{display:flex;align-items:center;gap:.5rem;font-size:.9rem;color:var(--fg-soft);font-variant-numeric:tabular-nums}
+.mseg .meta .sp{flex:1}
+.mseg .o{font-size:.95rem;color:var(--fg-soft)}
+.mseg .f{font-size:1.2rem;font-weight:600}
+.mseg .meta button{border:0;background:none;color:inherit;min-width:2.75rem;min-height:2.75rem;margin:-.5rem -.4rem;display:grid;place-items:center}
+.mseg .meta button.on{color:var(--signal-ink);background:var(--signal);border-radius:8px}
+.mseg .meta button.on .ic{fill:currentColor}
+.interim{font-style:italic;color:var(--fg-soft);padding:.2rem .3rem}
+.meet-ctl{border-top:1px solid var(--line);background:var(--surface);padding-block:.6rem .7rem;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:.5rem}
+.meet-ctl .row2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.5rem}
+.meet-ctl .btn{min-width:0}
+.meet-ctl .btn[aria-pressed="true"]{background:var(--surface-2);border-color:var(--accent);color:var(--accent)}
+.go.stop{background:var(--bad)}
+.meet-status{display:flex;align-items:center;gap:.5rem;font-weight:600;font-size:1rem}
+.meet-status i{width:.8rem;height:.8rem;border-radius:50%;background:var(--fg-soft);display:block}
+.meet-status.on i{background:var(--bad);animation:pulse 1.2s ease-in-out infinite}
+.crsec{display:flex;flex-direction:column;gap:.35rem}
+.crsec b{font-size:1.05rem}
+.crsec ul{margin:0;padding-left:1.2rem}
+.crsec li{margin:.15rem 0}
+.crlist{display:flex;flex-direction:column;gap:.5rem;margin-top:.6rem}
+.cr{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:.65rem .85rem;text-align:left;width:100%;display:flex;flex-direction:column;gap:.15rem}
+.cr b{font-size:1.05rem}
+.cr span{color:var(--fg-soft);font-size:.95rem}
+.field select{appearance:auto}
+
+/* ---- Bandeaux ---- */
+.banner{border-radius:var(--r-sm);padding:.7rem .85rem;font-size:1rem;display:flex;gap:.6rem;align-items:flex-start}
+.banner.warn{background:var(--warn-bg)} .banner.bad{background:var(--bad-bg)} .banner.ok{background:var(--ok-bg)}
+.banner .ic{margin-top:.1rem}
+.banner button{margin-top:.4rem}
+
+/* ---- PHRASES ---- */
+.chips{display:flex;gap:.45rem;overflow-x:auto;padding-bottom:.4rem;margin:0 0 .8rem;scrollbar-width:none}
+.chip{flex:none;border:1.5px solid var(--line);background:var(--surface);border-radius:99px;padding:.45rem .85rem;min-height:2.9rem;display:inline-flex;align-items:center;gap:.4rem;font-weight:600;font-size:1rem}
+.chip[aria-pressed="true"]{background:var(--kylo);border-color:var(--kylo);color:#fff}
+.plist{display:flex;flex-direction:column;gap:.6rem}
+.pcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:.75rem .9rem;display:grid;grid-template-columns:1fr auto;gap:.2rem .7rem;align-items:center;text-align:left;width:100%}
+.pcard .fr{font-weight:600;font-size:1rem;color:var(--fg-soft)}
+.pcard .tr{font-size:1.3rem;font-weight:600;grid-column:1}
+.pcard .py{font-size:1rem;color:var(--fg-soft);font-style:italic;grid-column:1}
+.pcard .side{grid-row:1 / span 3;grid-column:2;display:flex;flex-direction:column;gap:.4rem}
+.roundbtn{width:3rem;height:3rem;border-radius:50%;border:0;background:var(--surface-2);display:grid;place-items:center;color:var(--accent)}
+.pcard.playing{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
+
+/* ---- FICHES ---- */
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem;margin-bottom:.4rem}
+.tile{min-width:0;overflow-wrap:anywhere;border:0;border-radius:var(--r);background:var(--kylo);color:#fff;padding:.85rem .5rem;min-height:6.2rem;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4rem;font-weight:700;font-size:1rem;text-align:center;line-height:1.15}
+.tile .ic{width:2.1rem;height:2.1rem}
+.tile.alt{background:var(--surface);color:var(--fg);border:1.5px solid var(--line)}
+.linkbtn{border:0;background:none;color:var(--accent);font-weight:600;padding:.5rem 0;min-height:2.75rem;font-size:1rem;text-decoration:underline;text-underline-offset:3px}
+.row{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
+.search{flex:1;min-width:12rem;display:flex;align-items:center;gap:.4rem;border:1.5px solid var(--line);border-radius:var(--r-sm);background:var(--surface);padding:0 .7rem;min-height:3rem}
+.search input{border:0;background:none;flex:1;min-width:0;font-size:1.05rem;padding:.5rem 0;outline:none}
+.seg{display:inline-grid;grid-auto-flow:column;border:1.5px solid var(--line);border-radius:var(--r-sm);overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;min-height:3rem;padding:0 .8rem;display:inline-flex;align-items:center;gap:.35rem;font-weight:600;font-size:1rem}
+.seg button[aria-pressed="true"]{background:var(--surface-2);color:var(--accent)}
+.clist{display:flex;flex-direction:column;gap:.6rem;margin-top:.8rem}
+.ccard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:.75rem .85rem;display:grid;grid-template-columns:auto 1fr;gap:.75rem;align-items:center;text-align:left;width:100%}
+.ccard .ph{width:3.4rem;height:3.4rem;border-radius:10px;background:var(--surface-2);display:grid;place-items:center;overflow:hidden;color:var(--fg-soft)}
+.ccard .ph img{width:100%;height:100%;object-fit:cover}
+.ccard .t{min-width:0}
+.ccard .t b{display:block;font-size:1.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ccard .t span{display:block;color:var(--fg-soft);font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stand{display:inline-flex;align-items:center;gap:.3rem;background:var(--signal);color:var(--signal-ink);font-family:var(--f-display);font-weight:700;border-radius:6px;padding:.05rem .5rem;font-size:.95rem;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.tablewrap{overflow-x:auto;margin-top:.8rem;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+table.grid{border-collapse:collapse;min-width:100%;font-size:.95rem}
+table.grid th,table.grid td{padding:.55rem .7rem;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:top}
+table.grid th{position:sticky;top:0;background:var(--surface-2);font-weight:700}
+table.grid td:first-child,table.grid th:first-child{position:sticky;left:0;background:var(--surface);font-weight:700;z-index:1}
+table.grid th:first-child{background:var(--surface-2)}
+table.grid td.num{font-variant-numeric:tabular-nums}
+table.grid tr{cursor:pointer}
+.foot-actions{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
+.btn{border:1.5px solid var(--line);background:var(--surface);border-radius:var(--r-sm);min-height:3rem;padding:.4rem .9rem;display:inline-flex;align-items:center;justify-content:center;gap:.45rem;font-weight:700;font-size:1rem;text-decoration:none;color:var(--fg)}
+.btn.primary{background:var(--kylo);border-color:var(--kylo);color:#fff}
+.btn.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,var(--line))}
+.btn.wa{background:var(--wa);border-color:var(--wa);color:#fff}
+.btn.block{width:100%}
+
+/* ---- PRIX ---- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1rem;display:flex;flex-direction:column;gap:.8rem}
+.field{display:flex;flex-direction:column;gap:.3rem}
+.field label{font-weight:700;font-size:1rem;display:flex;align-items:center;gap:.4rem}
+.field input,.field textarea,.field select{border:1.5px solid var(--line);border-radius:var(--r-sm);background:var(--bg);padding:.6rem .75rem;font-size:1.1rem;min-height:3rem;width:100%}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--accent);outline:none;background:var(--surface)}
+.money{font-size:1.6rem!important;font-family:var(--f-display);font-weight:700;font-variant-numeric:tabular-nums}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,9rem),1fr));gap:.7rem;align-items:end}
+.results{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.1rem .7rem;align-items:baseline;font-variant-numeric:tabular-nums}
+.results .h{font-size:.9rem;color:var(--fg-soft);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.results .l{font-weight:700;grid-column:1 / -1;margin-top:.15rem}
+.results .v{font-family:var(--f-display);font-weight:700;font-size:1.15rem;text-align:right;white-space:nowrap;overflow-wrap:normal}
+.results .v.big{font-size:1.3rem;color:var(--accent)}
+.results .h{text-align:right}
+.results hr{grid-column:1/-1;border:0;border-top:1px solid var(--line);margin:.35rem 0;width:100%}
+.note{font-size:.95rem;color:var(--fg-soft)}
+
+/* ---- Feuilles (fenêtres) ---- */
+.sheet{position:fixed;inset:0;z-index:30;background:rgba(5,20,35,.45);display:flex;align-items:flex-end;justify-content:center}
+.sheet .panel{background:var(--bg);width:100%;max-width:760px;max-height:94%;border-radius:20px 20px 0 0;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -10px 30px rgba(0,0,0,.25)}
+.sheet .head{display:flex;align-items:center;gap:.6rem;padding-block:.8rem;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:var(--surface);border-bottom:1px solid var(--line)}
+.sheet .head h3{margin:0;font-family:var(--f-display);font-size:1.35rem;flex:1;min-width:0}
+.sheet .body{overflow-y:auto;padding-block:1rem 1.4rem;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:.9rem}
+.sheet .bottom{padding-block:.7rem calc(.7rem + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:var(--surface);border-top:1px solid var(--line);display:flex;gap:.6rem}
+.sheet .bottom .btn{flex:1}
+.langgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr));gap:.5rem}
+.langgrid button{border:1.5px solid var(--line);background:var(--surface);border-radius:var(--r-sm);padding:.55rem .6rem;display:flex;align-items:center;gap:.55rem;text-align:left;min-height:3.4rem}
+.langgrid button[aria-pressed="true"]{border-color:var(--kylo);box-shadow:0 0 0 2px var(--kylo) inset}
+.langgrid .flag{font-size:1.7rem}
+.langgrid b{display:block;font-size:1rem}
+.langgrid small{display:block;font-size:.9rem;color:var(--fg-soft)}
+.optgroup{display:flex;flex-direction:column;gap:.45rem}
+.optgroup > b{font-size:1.05rem}
+.segbig{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:.4rem}
+.segbig button{border:1.5px solid var(--line);background:var(--surface);border-radius:var(--r-sm);min-height:3.2rem;font-weight:700;padding:.3rem}
+.segbig button[aria-pressed="true"]{background:var(--kylo);border-color:var(--kylo);color:#fff}
+details.help{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:.2rem .85rem}
+details.help summary{min-height:3rem;display:flex;align-items:center;font-weight:700;cursor:pointer}
+details.help ol,details.help ul{margin:.2rem 0 .8rem;padding-left:1.3rem}
+details.help li{margin:.25rem 0}
+
+/* Fiche */
+.fhead{display:flex;gap:.9rem;align-items:center}
+.fhead .ph{width:4.6rem;height:4.6rem;border-radius:12px;background:var(--surface-2);overflow:hidden;display:grid;place-items:center;flex:none;color:var(--fg-soft)}
+.fhead .ph img{width:100%;height:100%;object-fit:cover}
+.fhead b{font-size:1.45rem;font-family:var(--f-display);display:block;line-height:1.1;word-break:break-word}
+.fhead span{color:var(--fg-soft)}
+.actgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}
+.actgrid .btn{min-height:3.4rem}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:.55rem .7rem;align-items:start;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:.8rem .9rem}
+.kv .k{color:var(--fg-soft);display:flex;gap:.35rem;align-items:center;font-size:.95rem;padding-top:.1rem}
+.kv .v{font-size:1.05rem;word-break:break-word;white-space:pre-wrap}
+.bigphone{font-family:var(--f-display);font-size:1.6rem;font-weight:700;letter-spacing:.02em;font-variant-numeric:tabular-nums;user-select:all;-webkit-user-select:all}
+.confirm{background:var(--bad-bg);border-radius:var(--r-sm);padding:.8rem;display:flex;flex-direction:column;gap:.6rem}
+.thumb{max-width:100%;border-radius:12px;border:1px solid var(--line);max-height:14rem;object-fit:contain;background:var(--surface-2)}
+.fieldrow{display:grid;grid-template-columns:2.4rem 1fr;gap:.55rem;align-items:center}
+.fieldrow .fi{width:2.4rem;height:2.4rem;border-radius:10px;background:var(--surface-2);display:grid;place-items:center;color:var(--accent)}
+.fieldrow .field label{font-size:.95rem}
+
+/* Montrer en grand */
+.show{position:fixed;inset:0;z-index:40;background:var(--surface);display:flex;flex-direction:column;padding-block:calc(1rem + env(safe-area-inset-top,0px)) calc(1rem + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.show .stage{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:1rem;text-align:center;overflow:auto}
+.show.flip .stage{transform:rotate(180deg)}
+.show .flag{font-size:3rem}
+.show .txt{font-size:clamp(2rem,8vw,3.6rem);font-weight:700;line-height:1.2;word-break:break-word}
+.show .py{font-size:1.4rem;color:var(--fg-soft);font-style:italic}
+.show .fr{font-size:1.1rem;color:var(--fg-soft)}
+.show .bar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem;position:relative;z-index:2;background:var(--surface);padding-top:.6rem;flex:none}
+.show .bar .btn{min-height:3.6rem}
+
+/* Message bref */
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(5rem + env(safe-area-inset-bottom,0px));z-index:50;background:var(--fg);color:var(--bg);padding:.7rem 1.1rem;border-radius:12px;font-weight:600;max-width:calc(100% - 32px);text-align:center;box-shadow:var(--shadow)}
+.empty{background:var(--surface);border:1.5px dashed var(--line);border-radius:var(--r);padding:1rem;color:var(--fg-soft);display:flex;flex-direction:column;gap:.5rem}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:380px){.tiles{grid-template-columns:1fr 1fr 1fr;gap:.4rem}.tile{font-size:.95rem}}
+</style>
+</head>
+<body>
+
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+ <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></symbol>
+ <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5Z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/><path d="M8.5 8h7M8.5 11.5h5"/></symbol>
+ <symbol id="i-card" viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><circle cx="8.5" cy="11" r="2.2"/><path d="M5.2 16.2c.6-1.6 1.8-2.4 3.3-2.4s2.7.8 3.3 2.4M14.5 10h4.5M14.5 13.5h3.2"/></symbol>
+ <symbol id="i-yuan" viewBox="0 0 24 24"><path d="M7 4l5 7 5-7M12 11v9M8 12.5h8M8 16h8"/></symbol>
+ <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></symbol>
+ <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 7h13l-4-4M17 17H4l4 4"/></symbol>
+ <symbol id="i-sound" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></symbol>
+ <symbol id="i-expand" viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></symbol>
+ <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></symbol>
+ <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+ <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5"/></symbol>
+ <symbol id="i-qr" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v.01M14 21h3M20 17v4M17 20h.01"/></symbol>
+ <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13.5" r="3.5"/></symbol>
+ <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16Z"/><path d="M13.5 6.5l4 4"/></symbol>
+ <symbol id="i-phone" viewBox="0 0 24 24"><path d="M5 3.5h3.5l1.7 4.3-2.2 1.4a11 11 0 0 0 6.8 6.8l1.4-2.2 4.3 1.7V19a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 3 5.7 2 2 0 0 1 5 3.5Z"/></symbol>
+ <symbol id="i-msg" viewBox="0 0 24 24"><path d="M3.5 20.5l1.3-4.2A8.5 8.5 0 1 1 8 19.6Z"/><path d="M9 9.5c.3 2.2 2.3 4.4 5 5l1.2-1.3-1.8-1-1 .8a4 4 0 0 1-1.9-1.9l.8-1-1-1.8Z"/></symbol>
+ <symbol id="i-bubbles" viewBox="0 0 24 24"><path d="M9.5 4C5.4 4 2.5 6.6 2.5 9.8c0 1.8 1 3.4 2.5 4.5L4.5 17l3-1.5c.6.2 1.3.3 2 .3"/><path d="M14.5 9c3.9 0 7 2.4 7 5.4 0 1.6-.9 3-2.3 4l.5 2.4-2.7-1.4a8 8 0 0 1-2.5.4c-3.9 0-7-2.4-7-5.4S10.6 9 14.5 9Z"/><path d="M7 8.5h.01M12 8.5h.01M12.5 14h.01M16.5 14h.01"/></symbol>
+ <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.3-4 4.3-6 8-6s6.7 2 8 6"/></symbol>
+ <symbol id="i-building" viewBox="0 0 24 24"><path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16M15 9h4a1 1 0 0 1 1 1v11M2.5 21h19M8 8h3M8 12h3M8 16h3"/></symbol>
+ <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 6.5 8.5 6 8.5-6"/></symbol>
+ <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+ <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.7 5.6 3.7 9s-1.2 6.4-3.7 9c-2.5-2.6-3.7-5.6-3.7-9S9.5 5.6 12 3Z"/></symbol>
+ <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9Z"/><circle cx="7.5" cy="7.5" r="1.5"/></symbol>
+ <symbol id="i-box" viewBox="0 0 24 24"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5Z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></symbol>
+ <symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 7.5l3 4 3-4M12 11.5v5.5M9.5 12.5h5M9.5 15h5"/></symbol>
+ <symbol id="i-note" viewBox="0 0 24 24"><path d="M5 3h10l4 4v14H5Z"/><path d="M15 3v4h4M8.5 11h7M8.5 14.5h7M8.5 18h4"/></symbol>
+ <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"/></symbol>
+ <symbol id="i-check" viewBox="0 0 24 24"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></symbol>
+ <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
+ <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5"/></symbol>
+ <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9.5h18M3 15h18M9 4v16"/></symbol>
+ <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
+ <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></symbol>
+ <symbol id="i-addc" viewBox="0 0 24 24"><circle cx="10" cy="8" r="4"/><path d="M3 21c1.2-3.8 3.9-5.8 7-5.8 1.4 0 2.6.3 3.7 1M18.5 14v7M15 17.5h7"/></symbol>
+ <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.8"/><path d="m21 16-5-5-9 9"/></symbol>
+ <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></symbol>
+ <symbol id="i-hand" viewBox="0 0 24 24"><path d="M12 4a2 2 0 0 0-2 2v6"/><path d="M14 6V4a2 2 0 0 0-4 0M14 11V6a2 2 0 0 1 4 0v8a7 7 0 0 1-7 7h-.6a7 7 0 0 1-5.6-2.8L3 15.7a2 2 0 0 1 3.2-2.4L8 15V8a2 2 0 0 1 4 0"/></symbol>
+ <symbol id="i-car" viewBox="0 0 24 24"><path d="M5 17h14M3.5 17V12l2-5h13l2 5v5M6.5 17v2.5M17.5 17v2.5M3.5 12h17"/><circle cx="7.5" cy="14.5" r=".8"/><circle cx="16.5" cy="14.5" r=".8"/></symbol>
+ <symbol id="i-ship" viewBox="0 0 24 24"><path d="M3 15l2 5h14l2-5Z"/><path d="M6 15V9h12v6M12 4v5M2 21c1.5 0 1.5-1 3-1s1.5 1 3 1"/></symbol>
+ <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2 20h20Z"/><path d="M12 10v4.5M12 17.5h.01"/></symbol>
+ <symbol id="i-sample" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2h12.4a1.5 1.5 0 0 0 1.3-2L14 9V3"/><path d="M7 15h10"/></symbol>
+ <symbol id="i-pay" viewBox="0 0 24 24"><rect x="2.5" y="5.5" width="19" height="13" rx="2"/><path d="M2.5 10h19M6 15h4"/></symbol>
+ <symbol id="i-stack" viewBox="0 0 24 24"><path d="M3 8l9-4.5L21 8l-9 4.5Z"/><path d="M3 12.5 12 17l9-4.5M3 17l9 4.5 9-4.5"/></symbol>
+ <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17l-5.2 2.7 1-5.9-4.3-4.1 5.9-.8Z"/></symbol>
+ <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.9-3.6 3.4-5.5 6.5-5.5s5.6 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.8"/><path d="M16.5 14.6c2.6.2 4.3 1.9 5 4.6"/></symbol>
+ <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5Z"/></symbol>
+ <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></symbol>
+ <symbol id="i-head" viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4.5" height="6.5" rx="1.5"/><rect x="16.5" y="14" width="4.5" height="6.5" rx="1.5"/></symbol>
+ <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+</svg>
+
+<div id="app">
+ <header class="top">
+  <div class="mono" aria-hidden="true">K</div>
+  <div class="brand"><b>Interprète</b><span>KYLO Eurguine</span></div>
+  <div class="grow"></div>
+  <span class="status-dot" id="claudeState" title="État de la traduction"><i></i><span>Démarrage…</span></span>
+  <button class="iconbtn" id="openSettings" aria-label="Réglages"><svg class="ic"><use href="#i-gear"/></svg></button>
+ </header>
+
+ <main>
+  <!-- PARLER -->
+  <section id="tab-parler" class="tab" aria-label="Parler">
+   <div class="pairbar">
+    <button class="langbtn" id="btnMine" aria-label="Ma langue"><span class="flag" id="mineFlag">🇫🇷</span><span class="nm"><b id="mineName">Français</b><small>Moi</small></span></button>
+    <button class="iconbtn swap" id="btnSwap" aria-label="Inverser les langues"><svg class="ic"><use href="#i-swap"/></svg></button>
+    <button class="langbtn them" id="btnTheirs" aria-label="Langue de l'autre personne"><span class="flag" id="theirsFlag">🇨🇳</span><span class="nm"><b id="theirsName">中文</b><small id="theirsSub">L'autre personne</small></span></button>
+   </div>
+   <div class="modebar" role="group" aria-label="Mode">
+    <button id="modeConv" aria-pressed="true"><svg class="ic"><use href="#i-chat"/></svg>Conversation</button>
+    <button id="modeMeet" aria-pressed="false"><svg class="ic"><use href="#i-users"/></svg>Réunion</button>
+   </div>
+   <div class="meet" id="meetView" hidden>
+    <div class="meet-list" id="meetList" aria-live="polite"></div>
+    <div class="meet-ctl" id="meetCtl"></div>
+   </div>
+   <div class="convo" id="convo" aria-live="polite"></div>
+   <div class="composer" id="composer">
+    <div class="who-toggle" role="group" aria-label="Qui parle">
+     <button id="whoMe" aria-pressed="true"><span id="whoMeFlag">🇫🇷</span> Je parle</button>
+     <button id="whoThem" aria-pressed="false"><span id="whoThemFlag">🇨🇳</span> <span id="whoThemLabel">对方说</span></button>
+    </div>
+    <div class="mics" id="mics" hidden>
+     <button class="mic" id="micMe" aria-label="Je parle"><svg class="ic"><use href="#i-mic"/></svg><span><b id="micMeFlag">🇫🇷</b> <span id="micMeLabel">Je parle</span></span></button>
+     <button class="mic them" id="micThem" aria-label="L'autre personne parle"><svg class="ic"><use href="#i-mic"/></svg><span><b id="micThemFlag">🇨🇳</b> <span id="micThemLabel">对方说</span></span></button>
+    </div>
+    <div class="inwrap">
+     <label for="say" class="sr">Texte à traduire</label>
+     <textarea id="say" rows="2" enterkeyhint="send" autocomplete="off" autocapitalize="sentences" spellcheck="false" placeholder="Touche ici puis le micro du clavier"></textarea>
+     <button class="clearbtn" id="clearSay" aria-label="Effacer le texte" hidden><svg class="ic"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="preview" id="preview" hidden></div>
+    <div class="dictate" id="dictateTip"><svg class="ic"><use href="#i-mic"/></svg><span id="dictateText">Pour parler : touche la case, puis le micro 🎤 du clavier.</span></div>
+    <button class="go" id="btnGo"><svg class="ic"><use href="#i-sound"/></svg><span>Traduire et dire</span></button>
+   </div>
+  </section>
+
+  <!-- PHRASES -->
+  <section id="tab-phrases" class="tab" hidden aria-label="Phrases prêtes">
+   <h2>Phrases prêtes</h2>
+   <p class="lead" id="phLead">Touche une phrase : le téléphone la dit à voix haute. En chinois, elles marchent même sans Internet.</p>
+   <div class="chips" id="phCats" role="group" aria-label="Catégories"></div>
+   <div id="phState"></div>
+   <div class="plist" id="phList"></div>
+  </section>
+
+  <!-- FOURNISSEURS -->
+  <section id="tab-fiches" class="tab" hidden aria-label="Fournisseurs">
+   <h2>Mes fournisseurs</h2>
+   <p class="lead">Scanne le QR code ou photographie la carte : les cases se remplissent toutes seules. Tu vérifies, puis tu enregistres.</p>
+   <div class="tiles">
+    <button class="tile" id="tQR"><svg class="ic"><use href="#i-qr"/></svg>Scanner un QR code</button>
+    <button class="tile" id="tCard"><svg class="ic"><use href="#i-card"/></svg>Photo de la carte</button>
+    <button class="tile alt" id="tHand"><svg class="ic"><use href="#i-pen"/></svg>Écrire à la main</button>
+   </div>
+   <button class="linkbtn" id="tGallery"><svg class="ic" style="vertical-align:-.25em"><use href="#i-image"/></svg> Prendre une photo déjà faite (capture WeChat, image reçue…)</button>
+   <input type="file" id="fileQR" accept="image/*" capture="environment" hidden>
+   <input type="file" id="fileCard" accept="image/*" capture="environment" hidden>
+   <input type="file" id="fileGallery" accept="image/*" hidden>
+   <div id="fStore"></div>
+   <div class="row" style="margin-top:.6rem">
+    <label class="search"><svg class="ic"><use href="#i-search"/></svg><input id="fSearch" type="search" placeholder="Chercher un nom, un produit, un stand…" aria-label="Chercher"></label>
+    <div class="seg" role="group" aria-label="Affichage">
+     <button id="vCards" aria-pressed="true"><svg class="ic"><use href="#i-list"/></svg>Fiches</button>
+     <button id="vTable" aria-pressed="false"><svg class="ic"><use href="#i-table"/></svg>Tableau</button>
+    </div>
+   </div>
+   <div id="fList"></div>
+   <div id="crBox"></div>
+   <div class="foot-actions" id="fFoot">
+    <button class="btn" id="fExport"><svg class="ic"><use href="#i-down"/></svg>Télécharger le tableau (Excel)</button>
+    <button class="btn" id="fCopyAll"><svg class="ic"><use href="#i-copy"/></svg>Copier le tableau</button>
+   </div>
+  </section>
+
+  <!-- PRIX -->
+  <section id="tab-prix" class="tab" hidden aria-label="Prix">
+   <h2>Calcul du prix</h2>
+   <p class="lead">Le fournisseur donne un prix en yuans (¥) : tu vois tout de suite combien ça fait en euros et en francs guinéens.</p>
+   <div class="card">
+    <div class="two">
+     <div class="field"><label for="pUnit"><svg class="ic"><use href="#i-coin"/></svg>Prix à la pièce (¥)</label><input id="pUnit" class="money" inputmode="decimal" placeholder="0" value="12,5"></div>
+     <div class="field"><label for="pQty"><svg class="ic"><use href="#i-stack"/></svg>Quantité</label><input id="pQty" class="money" inputmode="numeric" placeholder="0" value="500"></div>
+    </div>
+    <span class="tag-ex" id="pEx">Exemple — mets tes chiffres</span>
+    <div class="results" id="pRes"></div>
+    <div class="row">
+     <button class="btn primary" id="pSay"><svg class="ic"><use href="#i-sound"/></svg>Dire le prix en chinois</button>
+    </div>
+   </div>
+   <div class="card" style="margin-top:.9rem">
+    <b style="font-size:1.15rem">Faire une offre</b>
+    <div class="field"><label for="pOffer">Mon prix par pièce (¥)</label><input id="pOffer" class="money" inputmode="decimal" placeholder="Ex. 10"></div>
+    <button class="btn primary" id="pOfferGo"><svg class="ic"><use href="#i-expand"/></svg>Montrer et dire mon offre</button>
+    <p class="note" style="margin:0">Le téléphone dit : « 我出价每件 … 元，可以吗？ » — « Je propose … yuans la pièce, c'est d'accord ? »</p>
+   </div>
+   <div class="card" style="margin-top:.9rem">
+    <b style="font-size:1.15rem">Taux de change</b>
+    <div class="two">
+     <div class="field"><label for="rCny">1 € = combien de ¥</label><input id="rCny" inputmode="decimal"></div>
+     <div class="field"><label for="rGnf">1 € = combien de GNF</label><input id="rGnf" inputmode="decimal"></div>
+    </div>
+    <p class="note" style="margin:0" id="rNote"></p>
+   </div>
+  </section>
+ </main>
+
+ <nav class="tabs" role="tablist" aria-label="Onglets">
+  <button role="tab" data-tab="parler" aria-selected="true"><span class="pill"><svg class="ic"><use href="#i-chat"/></svg></span>Parler</button>
+  <button role="tab" data-tab="phrases" aria-selected="false"><span class="pill"><svg class="ic"><use href="#i-book"/></svg></span>Phrases</button>
+  <button role="tab" data-tab="fiches" aria-selected="false"><span class="pill"><svg class="ic"><use href="#i-card"/></svg></span>Fournisseurs</button>
+  <button role="tab" data-tab="prix" aria-selected="false"><span class="pill"><svg class="ic"><use href="#i-yuan"/></svg></span>Prix</button>
+ </nav>
+</div>
+
+<div id="sheets"></div>
+<div id="toast" hidden role="status"></div>
+
+<script src="./jsQR.js"></script>
+<script>/* Interprète KYLO — fonctions pures (testées par tests/logic.test.js) */
+(function (root) {
+  'use strict';
+
+  // ---------- Langues ----------
+  var LANGS = [
+    { code: 'fr', gt: 'fr', flag: '🇫🇷', name: 'Français', native: 'Français', tts: 'fr-FR', prompt: 'French' },
+    { code: 'zh', gt: 'zh-CN', flag: '🇨🇳', name: 'Chinois', native: '中文', tts: 'zh-CN', prompt: 'Mandarin Chinese (Simplified characters)', pinyin: true },
+    { code: 'yue', gt: 'yue', flag: '🇭🇰', name: 'Cantonais', native: '粵語', tts: 'zh-HK', prompt: 'Cantonese (colloquial written Cantonese, Traditional characters)' },
+    { code: 'en', gt: 'en', flag: '🇬🇧', name: 'Anglais', native: 'English', tts: 'en-GB', prompt: 'English' },
+    { code: 'ar', gt: 'ar', flag: '🇸🇦', name: 'Arabe', native: 'العربية', tts: 'ar-SA', prompt: 'Arabic (Modern Standard)', rtl: true },
+    { code: 'es', gt: 'es', flag: '🇪🇸', name: 'Espagnol', native: 'Español', tts: 'es-ES', prompt: 'Spanish' },
+    { code: 'pt', gt: 'pt', flag: '🇧🇷', name: 'Portugais', native: 'Português', tts: 'pt-BR', prompt: 'Portuguese' },
+    { code: 'ru', gt: 'ru', flag: '🇷🇺', name: 'Russe', native: 'Русский', tts: 'ru-RU', prompt: 'Russian' },
+    { code: 'tr', gt: 'tr', flag: '🇹🇷', name: 'Turc', native: 'Türkçe', tts: 'tr-TR', prompt: 'Turkish' },
+    { code: 'hi', gt: 'hi', flag: '🇮🇳', name: 'Hindi', native: 'हिन्दी', tts: 'hi-IN', prompt: 'Hindi' },
+    { code: 'ja', gt: 'ja', flag: '🇯🇵', name: 'Japonais', native: '日本語', tts: 'ja-JP', prompt: 'Japanese' },
+    { code: 'ko', gt: 'ko', flag: '🇰🇷', name: 'Coréen', native: '한국어', tts: 'ko-KR', prompt: 'Korean' },
+    { code: 'vi', gt: 'vi', flag: '🇻🇳', name: 'Vietnamien', native: 'Tiếng Việt', tts: 'vi-VN', prompt: 'Vietnamese' },
+    { code: 'th', gt: 'th', flag: '🇹🇭', name: 'Thaï', native: 'ไทย', tts: 'th-TH', prompt: 'Thai' },
+    { code: 'id', gt: 'id', flag: '🇮🇩', name: 'Indonésien', native: 'Bahasa Indonesia', tts: 'id-ID', prompt: 'Indonesian' },
+    { code: 'de', gt: 'de', flag: '🇩🇪', name: 'Allemand', native: 'Deutsch', tts: 'de-DE', prompt: 'German' },
+    { code: 'it', gt: 'it', flag: '🇮🇹', name: 'Italien', native: 'Italiano', tts: 'it-IT', prompt: 'Italian' }
+  ];
+  function lang(code) {
+    for (var i = 0; i < LANGS.length; i++) if (LANGS[i].code === code) return LANGS[i];
+    return LANGS[0];
+  }
+
+  // ---------- Téléphones ----------
+  function cleanPhone(s) {
+    if (!s) return '';
+    var t = String(s).trim();
+    t = t.replace(/^tel:/i, '');
+    var plus = /^\s*(\+|00)/.test(t);
+    var d = t.replace(/[^\d]/g, '');
+    if (!d) return '';
+    if (/^\s*00/.test(t)) d = d.slice(2);
+    if (plus) return '+' + d;
+    // Portable chinois sans indicatif : 11 chiffres commençant par 1
+    if (/^1[3-9]\d{9}$/.test(d)) return '+86' + d;
+    if (/^86 ?1[3-9]\d{9}$/.test(d)) return '+' + d;
+    // Portable guinéen sans indicatif : 9 chiffres commençant par 6
+    if (/^6\d{8}$/.test(d)) return '+224' + d;
+    return d;
+  }
+  function formatPhone(p) {
+    if (!p) return '';
+    var m;
+    if ((m = /^\+86(1\d{2})(\d{4})(\d{4})$/.exec(p))) return '+86 ' + m[1] + ' ' + m[2] + ' ' + m[3];
+    if ((m = /^\+224(\d{3})(\d{2})(\d{2})(\d{2})$/.exec(p))) return '+224 ' + m[1] + ' ' + m[2] + ' ' + m[3] + ' ' + m[4];
+    if ((m = /^\+33(\d)(\d{2})(\d{2})(\d{2})(\d{2})$/.exec(p))) return '+33 ' + m[1] + ' ' + m[2] + ' ' + m[3] + ' ' + m[4] + ' ' + m[5];
+    return p;
+  }
+  function waLink(p) {
+    var d = String(p || '').replace(/[^\d]/g, '');
+    return d.length >= 8 ? 'https://wa.me/' + d : '';
+  }
+
+  // ---------- Lecture des QR codes ----------
+  var EMPTY = function () {
+    return { nom: '', societe: '', fonction: '', tel: '', telAutres: '', whatsapp: '', wechat: '', email: '', adresse: '', site: '', stand: '', produits: '', prix: '', note: '' };
+  };
+
+  function utf8FromBytes(bytes) {
+    try {
+      if (typeof TextDecoder !== 'undefined') return new TextDecoder('utf-8').decode(new Uint8Array(bytes));
+    } catch (e) {}
+    var s = '';
+    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    try { return decodeURIComponent(escape(s)); } catch (e2) { return s; }
+  }
+  function decodeQP(v) {
+    var bytes = [];
+    for (var i = 0; i < v.length; i++) {
+      var c = v[i];
+      if (c === '=' && /^[0-9A-Fa-f]{2}$/.test(v.substr(i + 1, 2))) { bytes.push(parseInt(v.substr(i + 1, 2), 16)); i += 2; }
+      else bytes.push(c.charCodeAt(0) & 0xff);
+    }
+    return utf8FromBytes(bytes);
+  }
+  function decodeB64(v) {
+    try {
+      var bin = (typeof atob !== 'undefined') ? atob(v.replace(/\s/g, '')) : Buffer.from(v, 'base64').toString('binary');
+      var bytes = [];
+      for (var i = 0; i < bin.length; i++) bytes.push(bin.charCodeAt(i));
+      return utf8FromBytes(bytes);
+    } catch (e) { return v; }
+  }
+  function unescapeV(v) {
+    return String(v).replace(/\\n/gi, '\n').replace(/\\([,;:\\])/g, '$1');
+  }
+  function splitUnescaped(v, sep) {
+    var out = [], cur = '';
+    for (var i = 0; i < v.length; i++) {
+      if (v[i] === '\\' && i + 1 < v.length) { cur += v[i] + v[i + 1]; i++; continue; }
+      if (v[i] === sep) { out.push(cur); cur = ''; continue; }
+      cur += v[i];
+    }
+    out.push(cur);
+    return out;
+  }
+  var CJK = /[\u3400-\u9fff\uf900-\ufaff]/;
+  function joinName(family, given) {
+    family = (family || '').trim(); given = (given || '').trim();
+    if (!family) return given;
+    if (!given) return family;
+    if (CJK.test(family) || CJK.test(given)) return family + given;
+    return given + ' ' + family;
+  }
+  function addTo(f, key, val) {
+    val = (val || '').trim();
+    if (!val) return;
+    if (!f[key]) f[key] = val;
+    else if (f[key].indexOf(val) === -1) f[key] += ' · ' + val;
+  }
+  function setPhone(f, raw, isMobile) {
+    var p = cleanPhone(raw);
+    if (!p) return;
+    if (!f.tel) { f.tel = p; return; }
+    if (isMobile && !/^\+?86?1/.test(f.tel) && f.tel !== p) { addTo(f, 'telAutres', f.tel); f.tel = p; return; }
+    if (f.tel !== p) addTo(f, 'telAutres', p);
+  }
+
+  function parseVCard(text) {
+    var f = EMPTY();
+    // Lignes repliées (vCard 3/4) et lignes « soft break » quoted-printable (vCard 2.1)
+    var t = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    t = t.replace(/=\n/g, '');
+    t = t.replace(/\n[ \t]/g, '');
+    var lines = t.split('\n');
+    var fam = '', giv = '';
+    lines.forEach(function (line) {
+      var idx = -1, inQ = false;
+      for (var i = 0; i < line.length; i++) {
+        if (line[i] === '"') inQ = !inQ;
+        if (line[i] === ':' && !inQ) { idx = i; break; }
+      }
+      if (idx < 0) return;
+      var left = line.slice(0, idx), value = line.slice(idx + 1);
+      var parts = left.split(';');
+      var name = parts[0].toUpperCase().replace(/^ITEM\d+\./, '');
+      var params = parts.slice(1).join(';').toUpperCase();
+      if (/ENCODING=QUOTED-PRINTABLE|(^|;)QUOTED-PRINTABLE/.test(params)) value = decodeQP(value);
+      else if (/ENCODING=(B|BASE64)/.test(params) && !/^PHOTO|^LOGO/.test(name)) value = decodeB64(value);
+      switch (name) {
+        case 'FN': f.nom = unescapeV(value).trim(); break;
+        case 'N': {
+          var n = splitUnescaped(value, ';').map(unescapeV);
+          fam = n[0] || ''; giv = [n[1], n[2]].filter(Boolean).join(' ');
+          break;
+        }
+        case 'ORG': addTo(f, 'societe', splitUnescaped(value, ';').map(unescapeV).filter(Boolean).join(' ')); break;
+        case 'TITLE': case 'ROLE': addTo(f, 'fonction', unescapeV(value)); break;
+        case 'TEL': {
+          var v = unescapeV(value);
+          if (/WHATSAPP/.test(params)) { f.whatsapp = cleanPhone(v); setPhone(f, v, false); }
+          else setPhone(f, v, /CELL|MOBILE|IPHONE/.test(params));
+          break;
+        }
+        case 'EMAIL': if (!f.email) f.email = unescapeV(value).trim(); break;
+        case 'ADR': addTo(f, 'adresse', splitUnescaped(value, ';').map(unescapeV).map(function (s) { return s.trim(); }).filter(Boolean).join(', ')); break;
+        case 'LABEL': if (!f.adresse) f.adresse = unescapeV(value).replace(/\n/g, ', '); break;
+        case 'URL': addTo(f, 'site', unescapeV(value)); break;
+        case 'NOTE': addTo(f, 'note', unescapeV(value)); break;
+        case 'X-WECHAT': case 'X-WEIXIN': f.wechat = unescapeV(value).trim(); break;
+        case 'X-WHATSAPP': f.whatsapp = cleanPhone(value); break;
+        case 'IMPP': case 'X-SOCIALPROFILE': {
+          var vv = unescapeV(value).trim();
+          if (/WECHAT|WEIXIN/.test(params) || /^(weixin|wechat|x-apple:wechat)/i.test(vv)) f.wechat = vv.replace(/^(weixin|wechat):/i, '');
+          else if (/WHATSAPP/.test(params) || /^whatsapp:/i.test(vv)) f.whatsapp = cleanPhone(vv.replace(/^whatsapp:/i, ''));
+          break;
+        }
+      }
+    });
+    if (!f.nom) f.nom = joinName(fam, giv);
+    return f;
+  }
+
+  function parseKV(body) {
+    // MECARD / BIZCARD : CLE:valeur;CLE:valeur;;
+    var out = [];
+    splitUnescaped(body, ';').forEach(function (seg) {
+      var i = seg.indexOf(':');
+      if (i > 0) out.push([seg.slice(0, i).toUpperCase(), unescapeV(seg.slice(i + 1))]);
+    });
+    return out;
+  }
+  function parseMeCard(text) {
+    var f = EMPTY();
+    parseKV(text.replace(/^MECARD:/i, '')).forEach(function (kv) {
+      var k = kv[0], v = kv[1];
+      if (k === 'N') { var p = v.split(','); f.nom = joinName(p[0], p[1]); }
+      else if (k === 'SOUND') {}
+      else if (k === 'TEL' || k === 'TEL-AV') setPhone(f, v, false);
+      else if (k === 'EMAIL') { if (!f.email) f.email = v.trim(); }
+      else if (k === 'ADR') addTo(f, 'adresse', v.replace(/\s*,+\s*/g, ', ').replace(/^[, ]+|[, ]+$/g, ''));
+      else if (k === 'URL') addTo(f, 'site', v);
+      else if (k === 'NOTE' || k === 'MEMO') addTo(f, 'note', v);
+      else if (k === 'ORG') addTo(f, 'societe', v);
+      else if (k === 'NICKNAME' && !f.nom) f.nom = v;
+    });
+    return f;
+  }
+  function parseBizCard(text) {
+    var f = EMPTY(), first = '', last = '';
+    parseKV(text.replace(/^BIZCARD:/i, '')).forEach(function (kv) {
+      var k = kv[0], v = kv[1];
+      if (k === 'N') first = v; else if (k === 'X') last = v;
+      else if (k === 'T') addTo(f, 'fonction', v);
+      else if (k === 'C') addTo(f, 'societe', v);
+      else if (k === 'A') addTo(f, 'adresse', v);
+      else if (k === 'B' || k === 'M' || k === 'F') setPhone(f, v, k === 'M');
+      else if (k === 'E') { if (!f.email) f.email = v.trim(); }
+    });
+    f.nom = joinName(last, first);
+    return f;
+  }
+
+  function extractFromText(text) {
+    var f = EMPTY();
+    var t = String(text);
+    var em = t.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+    if (em) f.email = em[0];
+    var wx = t.match(/(?:wechat|weixin|微信|wx)\s*(?:id|号)?\s*[:：]\s*([A-Za-z0-9_-]{5,30})/i);
+    if (wx) f.wechat = wx[1];
+    var wa = t.match(/(?:whatsapp|wa)\s*[:：]\s*([+\d][\d\s().-]{6,})/i);
+    if (wa) f.whatsapp = cleanPhone(wa[1]);
+    var phones = t.match(/(?:\+|00)?\d[\d\s().-]{7,}\d/g) || [];
+    phones.forEach(function (p) { if (p.replace(/\D/g, '').length >= 8) setPhone(f, p, false); });
+    var url = t.match(/https?:\/\/[^\s]+/i);
+    if (url) f.site = url[0];
+    return f;
+  }
+
+  function parseQR(raw) {
+    var text = String(raw || '').trim();
+    var res = { kind: 'texte', fields: EMPTY(), raw: text, hint: '' };
+    if (!text) return res;
+    var low = text.toLowerCase();
+    if (/^begin:vcard/i.test(text)) { res.kind = 'vcard'; res.fields = parseVCard(text); }
+    else if (/^mecard:/i.test(text)) { res.kind = 'mecard'; res.fields = parseMeCard(text); }
+    else if (/^bizcard:/i.test(text)) { res.kind = 'bizcard'; res.fields = parseBizCard(text); }
+    else if (/^(https?:\/\/)?(u\.wechat\.com|weixin\.qq\.com|wechat\.com|w\.url\.cn)\//i.test(text)) {
+      res.kind = 'wechat'; res.fields.wechat = text;
+      res.hint = 'Ce QR code est un lien WeChat : il ne contient ni nom ni numéro. Il est rangé dans la case WeChat. Pour ajouter la personne, ouvre WeChat, touche + puis « Scanner ».';
+    }
+    else if (/^(https?:\/\/)?(wa\.me\/|api\.whatsapp\.com\/send|chat\.whatsapp\.com\/)/i.test(text)) {
+      res.kind = 'whatsapp';
+      var m = text.match(/wa\.me\/(\+?\d+)/i) || text.match(/[?&]phone=(\+?\d+)/i);
+      if (m) { var p = cleanPhone((m[1][0] === '+' ? '' : '+') + m[1]); res.fields.whatsapp = p; res.fields.tel = p; }
+      else res.fields.site = text;
+    }
+    else if (/^tel:/i.test(text)) { res.kind = 'tel'; res.fields.tel = cleanPhone(text); }
+    else if (/^(smsto|sms):/i.test(text)) { res.kind = 'tel'; res.fields.tel = cleanPhone(text.replace(/^(smsto|sms):/i, '').split(/[:?]/)[0]); }
+    else if (/^mailto:/i.test(text)) { res.kind = 'email'; res.fields.email = decodeURIComponent(text.replace(/^mailto:/i, '').split('?')[0]); }
+    else if (/^matmsg:/i.test(text)) { res.kind = 'email'; var mm = text.match(/TO:([^;]+)/i); if (mm) res.fields.email = mm[1]; }
+    else if (/^https?:\/\//i.test(text)) { res.kind = 'lien'; res.fields.site = text; res.hint = 'Ce QR code est un lien vers un site. Il est rangé dans la case Site.'; }
+    else { res.kind = 'texte'; res.fields = extractFromText(text); res.fields.note = text.length <= 500 ? text : text.slice(0, 500); }
+    if (!res.fields.wechat && res.kind !== 'texte' && /wechat|weixin|微信/i.test(low)) {
+      var w = extractFromText([res.fields.note, res.fields.site, unescapeV(text)].join('\n')).wechat;
+      if (w) res.fields.wechat = w;
+    }
+    if (res.fields.whatsapp && !res.fields.tel) res.fields.tel = res.fields.whatsapp;
+    return res;
+  }
+
+  // ---------- Fiche -> vCard (pour les Contacts de l'iPhone) ----------
+  function escV(s) { return String(s || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;'); }
+  function toVCard(c) {
+    var L = ['BEGIN:VCARD', 'VERSION:3.0'];
+    var nom = (c.nom || c.societe || 'Fournisseur').trim();
+    L.push('FN:' + escV(nom));
+    L.push('N:;' + escV(nom) + ';;;');
+    if (c.societe) L.push('ORG:' + escV(c.societe));
+    if (c.fonction) L.push('TITLE:' + escV(c.fonction));
+    if (c.tel) L.push('TEL;TYPE=CELL:' + c.tel);
+    String(c.telAutres || '').split('·').map(function (s) { return cleanPhone(s); }).filter(Boolean).forEach(function (p) { if (p !== c.tel) L.push('TEL;TYPE=WORK:' + p); });
+    if (c.whatsapp && c.whatsapp !== c.tel) L.push('TEL;TYPE=CELL:' + c.whatsapp);
+    if (c.email) L.push('EMAIL;TYPE=WORK:' + escV(c.email));
+    if (c.adresse) L.push('ADR;TYPE=WORK:;;' + escV(c.adresse) + ';;;;');
+    if (c.site && /^https?:/i.test(c.site)) L.push('URL:' + c.site);
+    if (c.wechat && !/^https?:/i.test(c.wechat)) L.push('IMPP;X-SERVICE-TYPE=WeChat:x-apple:' + escV(c.wechat));
+    var note = [];
+    if (c.stand) note.push('Stand : ' + c.stand);
+    if (c.produits) note.push('Produits : ' + c.produits);
+    if (c.prix) note.push('Prix : ' + c.prix);
+    if (c.wechat) note.push('WeChat : ' + c.wechat);
+    if (c.note) note.push(c.note);
+    note.push('Fiche KYLO — Foire de Canton');
+    L.push('NOTE:' + escV(note.join('\n')));
+    L.push('END:VCARD');
+    return L.join('\r\n') + '\r\n';
+  }
+
+  // ---------- Tableau (.csv pour Excel) ----------
+  var COLS = [
+    ['nom', 'Nom'], ['societe', 'Société'], ['fonction', 'Fonction'], ['tel', 'Téléphone'], ['telAutres', 'Autres numéros'],
+    ['whatsapp', 'WhatsApp'], ['wechat', 'WeChat'], ['email', 'E-mail'], ['adresse', 'Adresse'], ['site', 'Site'],
+    ['stand', 'Stand'], ['produits', 'Produits'], ['prix', 'Prix / conditions'], ['note', 'Note'], ['source', 'Source'], ['creeLe', 'Ajouté le']
+  ];
+  function csvCell(v) {
+    var s = String(v == null ? '' : v);
+    if (/^[=+\-@]/.test(s) && !/^\+\d/.test(s)) s = "'" + s; // pas de formule Excel
+    if (/[";\n\r]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+  function toCSV(list) {
+    var rows = [COLS.map(function (c) { return c[1]; }).join(';')];
+    list.forEach(function (c) {
+      rows.push(COLS.map(function (col) {
+        var v = c[col[0]];
+        if (col[0] === 'tel' || col[0] === 'whatsapp') v = formatPhone(v);
+        if (col[0] === 'creeLe' && v) v = String(v).slice(0, 16).replace('T', ' ');
+        return csvCell(v);
+      }).join(';'));
+    });
+    return '\ufeff' + rows.join('\r\n') + '\r\n';
+  }
+
+  // ---------- Prix ----------
+  function toNum(s) {
+    if (typeof s === 'number') return s;
+    var t = String(s || '').replace(/\s/g, '').replace(/[¥€]/g, '').replace(',', '.');
+    var n = parseFloat(t);
+    return isFinite(n) ? n : 0;
+  }
+  function prices(unitCny, qty, eurCny, eurGnf) {
+    var u = toNum(unitCny), q = toNum(qty) || 0, r1 = toNum(eurCny), r2 = toNum(eurGnf);
+    var totalCny = u * q;
+    var unitEur = r1 > 0 ? u / r1 : 0;
+    return {
+      unitCny: u, qty: q, totalCny: totalCny,
+      unitEur: unitEur, totalEur: r1 > 0 ? totalCny / r1 : 0,
+      unitGnf: unitEur * r2, totalGnf: (r1 > 0 ? totalCny / r1 : 0) * r2
+    };
+  }
+  function cnySpoken(n) {
+    // Lecture d'un prix pour la voix chinoise : 12.5 -> "12.5元"
+    var v = Math.round(toNum(n) * 100) / 100;
+    return String(v) + '元';
+  }
+
+  // ---------- Consignes envoyées à Claude ----------
+  function translatePrompt(o) {
+    var A = lang(o.mine), B = lang(o.theirs);
+    var hist = (o.history || []).slice(-4).map(function (h) { return '- ' + h; }).join('\n');
+    return [
+      'You are a live interpreter on a phone, between two people at a trade fair (Canton Fair, Guangzhou).',
+      'Person 1 speaks ' + A.prompt + '. Person 2 speaks ' + B.prompt + '.',
+      'Person 1 is a merchant from Guinea (West Africa) buying goods: prices, quantities, minimum order, samples, quality, payment, shipping.',
+      hist ? 'Recent exchange, for context only (do not translate it):\n' + hist : '',
+      'TEXT TO TRANSLATE (it may come from voice dictation, so it can lack punctuation or contain small recognition errors):',
+      '<<<', o.text, '>>>',
+      'Rules:',
+      '- If the text is in ' + A.prompt + ', translate it into ' + B.prompt + '. Otherwise translate it into ' + A.prompt + '.',
+      '- Spoken, natural and polite style, like a good human interpreter. Fix obvious dictation errors silently.',
+      '- Keep every number, price, currency, quantity, unit, size, model reference and proper name exactly as given.',
+      '- Translate only. Never answer the question, never add comments or explanations.',
+      'Reply with only this JSON object:',
+      '{"from":"<ISO 639-1 code of the source language>","text":"<the translation>","pinyin":"<Hanyu Pinyin with tone marks of the translation if it is Mandarin Chinese, otherwise empty string>"}'
+    ].filter(Boolean).join('\n');
+  }
+  function phrasesPrompt(list, code) {
+    var L = lang(code);
+    return [
+      'Translate each French sentence below into ' + L.prompt + '. Context: a merchant from Guinea buying goods at the Canton Fair; spoken, polite, natural.',
+      'Keep numbers and names exactly. Return only a JSON array of strings, same order, same length (' + list.length + ' items).',
+      JSON.stringify(list)
+    ].join('\n');
+  }
+  function cardPrompt() {
+    return [
+      'The image is a photo of a business card (or a badge, a stand sign, or a supplier\'s phone screen) taken at the Canton Fair.',
+      'Read it and extract the contact details. Keep names, numbers and addresses exactly as printed; if the name is in Chinese characters, write the characters followed by the pinyin or English name if printed.',
+      'Phone numbers: keep the country code if printed (China is +86).',
+      'Reply with only this JSON object (empty string when absent):',
+      '{"nom":"","societe":"","fonction":"","tel":"","telAutres":"","whatsapp":"","wechat":"","email":"","adresse":"","site":"","stand":"","produits":"","note":""}',
+      '"produits" = the products or activity printed on the card, translated into French. "stand" = booth / hall number if printed. "note" = anything useful not covered, in French.'
+    ].join('\n');
+  }
+  // Moteur de traduction de la version « site » (Google Traduction, accès libre).
+  function gtxUrl(text, sl, tl) {
+    return 'https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&dt=rm&sl=' + encodeURIComponent(sl) + '&tl=' + encodeURIComponent(tl) + '&q=' + encodeURIComponent(text);
+  }
+  function parseGtx(j) {
+    var segs = (j && j[0]) || [], text = '', rm = '';
+    for (var i = 0; i < segs.length; i++) {
+      var s = segs[i]; if (!s) continue;
+      if (typeof s[0] === 'string') text += s[0];
+      else if (s[0] == null && typeof s[2] === 'string') rm = s[2];
+    }
+    return { text: text.trim(), pinyin: rm.trim(), from: (j && typeof j[2] === 'string') ? j[2] : '' };
+  }
+  function sameLang(code, L) {
+    if (!code || !L) return false;
+    var a = String(code).toLowerCase().split('-')[0], b = String(L.gt || L.code).toLowerCase().split('-')[0];
+    return a === b;
+  }
+  function checkTranslation(o) {
+    if (!o || typeof o !== 'object') return null;
+    var text = typeof o.text === 'string' ? o.text.trim() : '';
+    if (!text) return null;
+    return { from: typeof o.from === 'string' ? o.from.toLowerCase().slice(0, 3) : '', text: text, pinyin: typeof o.pinyin === 'string' ? o.pinyin.trim() : '' };
+  }
+  function mergeFields(base, extra) {
+    var out = {};
+    var keys = Object.keys(EMPTY());
+    keys.forEach(function (k) {
+      var a = (base && base[k]) || '', b = (extra && extra[k]) || '';
+      if (typeof b !== 'string') b = String(b);
+      out[k] = a ? a : b.trim();
+    });
+    if (out.tel) out.tel = cleanPhone(out.tel);
+    if (out.whatsapp) out.whatsapp = cleanPhone(out.whatsapp);
+    return out;
+  }
+
+  // ---------- Notes, résumé, comptes rendus ----------
+  var CJK_NUM = /[一二三四五六七八九十百千万两半][^。，,.!?！？]{0,3}[元块件个天周月箱%％]/;
+  function isKeyPoint(text) {
+    var t = String(text || '');
+    return /\d/.test(t) || CJK_NUM.test(t);
+  }
+  var THEMES = [
+    ['prix', 'Prix', /prix|yuan|¥|€|euro|dollar|\$|co[uû]t|cher|tarif|remise|r[ée]duction|offre|propos/i],
+    ['quantite', 'Quantités', /pi[eè]ce|carton|minimum|quantit|moq|commande|lot|stock|unit[ée]/i],
+    ['delai', 'Délais', /jour|semaine|mois|d[ée]lai|date|quand|demain|aujourd|fabrication|production/i],
+    ['paiement', 'Paiement', /pai|acompte|virement|avance|alibaba|facture|proforma|banque|esp[eè]ces|tiers/i],
+    ['qualite', 'Échantillons et qualité', /[ée]chantillon|qualit|garantie|certificat|logo|couleur|mod[eè]le|contr[oô]le/i],
+    ['livraison', 'Livraison', /livr|exp[ée]di|bateau|avion|maritime|a[ée]rien|transport|conakry|fob|exw|transitaire|douane|emballage/i]
+  ];
+  function myText(m) { return m.who === 'me' ? m.src : m.out; }
+  function otherText(m) { return m.who === 'me' ? m.out : m.src; }
+  function buildNotes(conv) {
+    var real = (conv || []).filter(function (m) { return m && !m.example; });
+    var out = { themes: {}, autres: [], importants: [], total: real.length };
+    THEMES.forEach(function (th) { out.themes[th[0]] = []; });
+    real.forEach(function (m) {
+      var fr = myText(m), item = { who: m.who, fr: fr, autre: otherText(m), t: m.t || '' };
+      if (m.star) out.importants.push(item);
+      if (!isKeyPoint(fr) && !isKeyPoint(otherText(m)) && !m.star) return;
+      var hit = false;
+      THEMES.forEach(function (th) { if (th[2].test(fr)) { out.themes[th[0]].push(item); hit = true; } });
+      if (!hit && (isKeyPoint(fr) || isKeyPoint(otherText(m)))) out.autres.push(item);
+    });
+    return out;
+  }
+  function themeLabel(id) { if (id === 'autres') return 'Autres chiffres'; if (id === 'importants') return 'Marqué important'; for (var i = 0; i < THEMES.length; i++) if (THEMES[i][0] === id) return THEMES[i][1]; return id; }
+  function transcriptLines(conv, theirsName) {
+    return (conv || []).filter(function (m) { return m && !m.example; }).map(function (m, i) {
+      return (i + 1) + '. ' + (m.who === 'me' ? 'Riche' : (theirsName || 'Fournisseur')) + ' : ' + myText(m) + (m.who === 'me' ? '' : '  (dit : ' + m.src + ')');
+    });
+  }
+  function summaryPrompt(conv, theirs) {
+    var B = lang(theirs);
+    var lines = transcriptLines(conv, 'Fournisseur').slice(-150);
+    return [
+      'You take the minutes of a business conversation at the Canton Fair (Guangzhou) between Riche, a merchant from Guinea who speaks French, and a supplier who speaks ' + B.prompt + '.',
+      'Below is the whole conversation in order. Each line is given in French; for the supplier the original words follow in brackets.',
+      '<<<', lines.join('\n'), '>>>',
+      'Write the minutes in FRENCH, with simple everyday words. Use ONLY what was actually said; never invent or assume anything. Keep every number, price, unit, currency and date exactly.',
+      'A "decision" is only something both people clearly agreed on. If nothing was agreed, return an empty list.',
+      'Reply with only this JSON object:',
+      '{"titre":"short title: supplier or product","resume":"3 to 6 sentences: everything important that was said","decisions":["each decision or agreement"],"chiffres":["each price, quantity, minimum order, lead time, payment term, with its unit"],"a_verifier":["open questions, things to confirm, next steps"],"fournisseur":{"nom":"","societe":"","stand":"","produits":""}}'
+    ].join('\n');
+  }
+  function checkSummary(o) {
+    if (!o || typeof o !== 'object') return null;
+    var arr = function (v) { return Array.isArray(v) ? v.filter(function (x) { return typeof x === 'string' && x.trim(); }).map(function (x) { return x.trim(); }) : []; };
+    var resume = typeof o.resume === 'string' ? o.resume.trim() : '';
+    if (!resume) return null;
+    var f = o.fournisseur && typeof o.fournisseur === 'object' ? o.fournisseur : {};
+    var s = function (v) { return typeof v === 'string' ? v.trim() : ''; };
+    return { titre: s(o.titre) || 'Conversation', resume: resume, decisions: arr(o.decisions), chiffres: arr(o.chiffres), aVerifier: arr(o.a_verifier),
+      fournisseur: { nom: s(f.nom), societe: s(f.societe), stand: s(f.stand), produits: s(f.produits) } };
+  }
+  function crText(cr) {
+    var L = [];
+    L.push('COMPTE RENDU — ' + (cr.titre || 'Conversation') + ' — ' + String(cr.date || '').slice(0, 16).replace('T', ' '));
+    if (cr.fournisseurNom) L.push('Fournisseur : ' + cr.fournisseurNom);
+    if (cr.resume) { L.push(''); L.push(cr.resume); }
+    var sec = function (title, items) { if (items && items.length) { L.push(''); L.push(title.toUpperCase()); items.forEach(function (x) { L.push('- ' + x); }); } };
+    sec('Décisions', cr.decisions); sec('Chiffres', cr.chiffres); sec('À vérifier', cr.aVerifier);
+    if (cr.notes) { Object.keys(cr.notes).forEach(function (k) { sec(themeLabel(k), cr.notes[k]); }); }
+    if (cr.transcript && cr.transcript.length) { L.push(''); L.push('CONVERSATION'); cr.transcript.forEach(function (x) { L.push(x); }); }
+    return L.join('\n');
+  }
+
+  var api = {
+    LANGS: LANGS, lang: lang, cleanPhone: cleanPhone, formatPhone: formatPhone, waLink: waLink,
+    parseQR: parseQR, parseVCard: parseVCard, toVCard: toVCard, toCSV: toCSV, COLS: COLS, EMPTY: EMPTY,
+    prices: prices, toNum: toNum, cnySpoken: cnySpoken,
+    translatePrompt: translatePrompt, phrasesPrompt: phrasesPrompt, cardPrompt: cardPrompt,
+    checkTranslation: checkTranslation, mergeFields: mergeFields, gtxUrl: gtxUrl, parseGtx: parseGtx, sameLang: sameLang,
+    isKeyPoint: isKeyPoint, buildNotes: buildNotes, themeLabel: themeLabel, THEMES: THEMES, transcriptLines: transcriptLines, summaryPrompt: summaryPrompt, checkSummary: checkSummary, crText: crText
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.KL = api;
+})(this);
+</script>
+<script>
+(function () {
+'use strict';
+var PHRASES = [{"id":"salut","fr":"Bonjour & politesse","phrases":[["Bonjour.","你好。","Nǐ hǎo."],["Merci beaucoup.","非常感谢。","Fēicháng gǎnxiè."],["Je suis commerçant, je viens de Guinée, en Afrique de l'Ouest.","我是西非几内亚的商人。","Wǒ shì Xīfēi Jǐnèiyà de shāngrén."],["Je ne parle pas chinois, j'utilise un traducteur.","我不会说中文，我在用翻译软件。","Wǒ bú huì shuō Zhōngwén, wǒ zài yòng fānyì ruǎnjiàn."],["Pouvez-vous parler plus lentement ?","请说慢一点，好吗？","Qǐng shuō màn yìdiǎn, hǎo ma?"],["Pouvez-vous l'écrire ?","可以写下来吗？","Kěyǐ xiě xiàlai ma?"],["Je reviens plus tard.","我等一下再来。","Wǒ děng yíxià zài lái."],["Au revoir.","再见。","Zàijiàn."]]},{"id":"prix","fr":"Prix & négociation","phrases":[["Combien ça coûte ?","这个多少钱？","Zhège duōshao qián?"],["Quel est le prix à la pièce ?","单价是多少？","Dānjià shì duōshao?"],["Ce prix est pour combien de pièces ?","这个价格是按多少件算的？","Zhège jiàgé shì àn duōshao jiàn suàn de?"],["C'est trop cher.","太贵了。","Tài guì le."],["Pouvez-vous faire un meilleur prix ?","能便宜一点吗？","Néng piányi yìdiǎn ma?"],["Quel est votre dernier prix ?","最低多少钱？","Zuìdī duōshao qián?"],["Si j'en prends plus, le prix baisse ?","如果我多买一些，可以便宜点吗？","Rúguǒ wǒ duō mǎi yìxiē, kěyǐ piányi diǎn ma?"],["Le prix est en yuans ou en dollars ?","价格是人民币还是美元？","Jiàgé shì rénmínbì háishi měiyuán?"],["L'emballage est compris dans le prix ?","价格包括包装吗？","Jiàgé bāokuò bāozhuāng ma?"],["Pouvez-vous me faire un devis écrit ?","可以给我一份书面报价吗？","Kěyǐ gěi wǒ yí fèn shūmiàn bàojià ma?"],["D'accord pour ce prix.","这个价格可以，成交。","Zhège jiàgé kěyǐ, chéngjiāo."]]},{"id":"quantite","fr":"Quantité & commande","phrases":[["Quelle est la quantité minimum de commande ?","最小起订量是多少？","Zuìxiǎo qǐdìngliàng shì duōshao?"],["Combien de pièces par carton ?","一箱有多少件？","Yì xiāng yǒu duōshao jiàn?"],["Quelles sont la taille et le poids d'un carton ?","一箱的尺寸和重量是多少？","Yì xiāng de chǐcùn hé zhòngliàng shì duōshao?"],["Avez-vous ce produit en stock ?","这个有现货吗？","Zhège yǒu xiànhuò ma?"],["Combien de temps pour fabriquer la commande ?","生产需要多长时间？","Shēngchǎn xūyào duō cháng shíjiān?"],["Je peux mélanger plusieurs modèles dans une commande ?","一个订单可以混装不同款式吗？","Yí ge dìngdān kěyǐ hùnzhuāng bùtóng kuǎnshì ma?"],["Quelles couleurs avez-vous ?","有哪些颜色？","Yǒu nǎxiē yánsè?"]]},{"id":"qualite","fr":"Échantillons & qualité","phrases":[["Je peux avoir un échantillon ?","可以给我一个样品吗？","Kěyǐ gěi wǒ yí ge yàngpǐn ma?"],["L'échantillon est gratuit ?","样品是免费的吗？","Yàngpǐn shì miǎnfèi de ma?"],["Je peux prendre le produit en photo ?","我可以拍一下这个产品吗？","Wǒ kěyǐ pāi yíxià zhège chǎnpǐn ma?"],["La marchandise doit être identique à l'échantillon.","大货必须和样品一模一样。","Dàhuò bìxū hé yàngpǐn yìmú-yíyàng."],["Quelle est la garantie ?","保修期是多久？","Bǎoxiūqī shì duōjiǔ?"],["Je veux mon logo sur le produit. C'est possible ?","我想在产品上印我的标志，可以吗？","Wǒ xiǎng zài chǎnpǐn shang yìn wǒ de biāozhì, kěyǐ ma?"],["Avez-vous des certificats, par exemple CE ?","你们有CE之类的认证吗？","Nǐmen yǒu CE zhī lèi de rènzhèng ma?"]]},{"id":"paiement","fr":"Paiement","phrases":[["Je ne paie pas tout à l'avance.","我不会提前付全款。","Wǒ bú huì tíqián fù quánkuǎn."],["Je paie après le contrôle de la marchandise.","货物检验合格后我再付款。","Huòwù jiǎnyàn hégé hòu wǒ zài fùkuǎn."],["Je paie par un intermédiaire de confiance.","我通过第三方担保付款。","Wǒ tōngguò dì-sān fāng dānbǎo fùkuǎn."],["Acceptez-vous la garantie de commande d'Alibaba (Trade Assurance) ?","可以用阿里巴巴信用保障付款吗？","Kěyǐ yòng Ālǐbābā xìnyòng bǎozhàng fùkuǎn ma?"],["Quels moyens de paiement acceptez-vous ?","你们接受哪些付款方式？","Nǐmen jiēshòu nǎxiē fùkuǎn fāngshì?"],["Pouvez-vous me faire une facture proforma ?","可以给我开一张形式发票吗？","Kěyǐ gěi wǒ kāi yì zhāng xíngshì fāpiào ma?"]]},{"id":"livraison","fr":"Livraison & expédition","phrases":[["Pouvez-vous expédier à Conakry, en Guinée ?","可以发货到几内亚的科纳克里吗？","Kěyǐ fāhuò dào Jǐnèiyà de Kēnàkèlǐ ma?"],["Combien coûte l'envoi par bateau ?","海运费是多少？","Hǎiyùn fèi shì duōshao?"],["Et par avion ?","空运呢？","Kōngyùn ne?"],["Combien de temps dure le transport ?","运输需要多长时间？","Yùnshū xūyào duō cháng shíjiān?"],["Pouvez-vous livrer chez mon transitaire à Guangzhou ?","可以把货送到我在广州的货代那里吗？","Kěyǐ bǎ huò sòng dào wǒ zài Guǎngzhōu de huòdài nàli ma?"],["C'est un prix FOB ou départ usine ?","这是FOB价还是出厂价？","Zhè shì FOB jià háishi chūchǎng jià?"],["Emballez solidement, le voyage est long.","请包装结实一点，路途很远。","Qǐng bāozhuāng jiēshi yìdiǎn, lùtú hěn yuǎn."]]},{"id":"contact","fr":"Contact","phrases":[["Pouvez-vous me donner votre carte de visite ?","可以给我一张您的名片吗？","Kěyǐ gěi wǒ yì zhāng nín de míngpiàn ma?"],["On s'ajoute sur WeChat ?","我们加个微信吧？","Wǒmen jiā ge Wēixìn ba?"],["Avez-vous WhatsApp ?","你有WhatsApp吗？","Nǐ yǒu WhatsApp ma?"],["Envoyez-moi le catalogue et les prix.","请把产品目录和价格发给我。","Qǐng bǎ chǎnpǐn mùlù hé jiàgé fā gěi wǒ."],["Quel est le numéro de votre stand ?","你们的展位号是多少？","Nǐmen de zhǎnwèi hào shì duōshao?"],["Où se trouve votre usine ?","你们的工厂在哪里？","Nǐmen de gōngchǎng zài nǎli?"],["Vous êtes fabricant ou revendeur ?","你们是工厂还是贸易公司？","Nǐmen shì gōngchǎng háishi màoyì gōngsī?"]]},{"id":"voyage","fr":"Taxi, hôtel, repas","phrases":[["Emmenez-moi à cette adresse, s'il vous plaît.","请带我去这个地址。","Qǐng dài wǒ qù zhège dìzhǐ."],["Emmenez-moi à la Foire de Canton, à Pazhou.","请带我去琶洲的广交会展馆。","Qǐng dài wǒ qù Pázhōu de Guǎngjiāohuì zhǎnguǎn."],["Où est la station de métro ?","地铁站在哪里？","Dìtiězhàn zài nǎli?"],["Je voudrais retourner à mon hôtel.","我想回酒店。","Wǒ xiǎng huí jiǔdiàn."],["Où sont les toilettes ?","洗手间在哪里？","Xǐshǒujiān zài nǎli?"],["Je ne mange pas de porc.","我不吃猪肉。","Wǒ bù chī zhūròu."],["Pas trop épicé, s'il vous plaît.","请不要太辣。","Qǐng bú yào tài là."],["L'addition, s'il vous plaît.","服务员，买单。","Fúwùyuán, mǎidān."]]},{"id":"urgence","fr":"Urgence","phrases":[["Aidez-moi, s'il vous plaît.","请帮帮我。","Qǐng bāngbang wǒ."],["J'ai perdu mon passeport.","我的护照丢了。","Wǒ de hùzhào diū le."],["Appelez la police, s'il vous plaît.","请帮我报警。","Qǐng bāng wǒ bàojǐng."],["J'ai besoin d'un médecin.","我需要看医生。","Wǒ xūyào kàn yīshēng."],["Où est l'hôpital le plus proche ?","最近的医院在哪里？","Zuìjìn de yīyuàn zài nǎli?"]]}];
+// Deux maisons pour la même appli : dans Claude (traduction par Claude, fiches dans l'espace Claude)
+// ou sur le site rice117.github.io (micro direct, caméra en direct, traduction Google, fiches sur le téléphone).
+var WEB = !(window.claude && typeof window.claude.use === 'function');
+var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+var CAN_MIC = WEB && typeof SR === 'function';
+var HELPER = WEB ? new URL('../fiche.html', location.href).href : 'https://rice117.github.io/carnet-kylo/fiche.html'; // page d'aide « Contacts / Appeler » (la fiche voyage après le #, jamais envoyée à Internet)
+var RATE_INFO = { eurCny: '7,4832', eurGnf: '9 865', note: '¥ : Banque de France, 12/10/2026. GNF : cours du marché, 16/10/2026. Le cours de la rue à Conakry peut être différent : mets le tien.' };
+
+// ---------- petits outils ----------
+var $ = function (s, r) { return (r || document).querySelector(s); };
+function h(tag, attrs, kids) {
+  var el = document.createElement(tag);
+  if (attrs) for (var k in attrs) {
+    var v = attrs[k];
+    if (v == null || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k === 'text') el.textContent = v;
+    else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  (kids || []).forEach(function (c) { if (c == null || c === false) return; el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+  return el;
+}
+function icon(id) { var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('class', 'ic'); s.setAttribute('aria-hidden', 'true'); var u = document.createElementNS('http://www.w3.org/2000/svg', 'use'); u.setAttribute('href', '#i-' + id); s.appendChild(u); return s; }
+function load(k, d) { try { var v = localStorage.getItem(k); return v ? Object.assign(Array.isArray(d) ? [] : {}, d, JSON.parse(v)) : d; } catch (e) { return d; } }
+function loadArr(k) { try { var v = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+var toastT;
+function toast(msg, ms) { var t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, ms || 2600); }
+function copyText(txt, okMsg) {
+  try {
+    navigator.clipboard.writeText(txt).then(function () { toast(okMsg || 'Copié'); }, function () { fallbackCopy(txt, okMsg); });
+  } catch (e) { fallbackCopy(txt, okMsg); }
+}
+function fallbackCopy(txt, okMsg) {
+  var ta = h('textarea', { style: 'position:fixed;top:0;left:0;opacity:0' }); ta.value = txt; document.body.appendChild(ta); ta.select();
+  var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+  ta.remove(); toast(ok ? (okMsg || 'Copié') : 'Copie impossible ici : appuie longtemps sur le texte pour le copier.');
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function fmt(n, d) { return (Number(n) || 0).toLocaleString('fr-FR', { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 }); }
+
+// ---------- réglages ----------
+var S = load('kylo.interp.set', { size: 'n', mine: 'fr', theirs: 'zh', speed: 0.95, quality: 'quick', pinyin: true, autoSpeak: true, eurCny: RATE_INFO.eurCny, eurGnf: RATE_INFO.eurGnf });
+var CONV = loadArr('kylo.interp.conv');
+var caps = { sample: null, db: null, downloads: null, user: null, perms: null, started: false };
+var speaker = 'me';
+function saveSet() { save('kylo.interp.set', S); }
+function applySize() { document.documentElement.setAttribute('data-size', S.size); }
+applySize();
+
+// ---------- voix ----------
+var TTS = { ok: 'speechSynthesis' in window, voices: [], unlocked: false };
+function loadVoices() { try { TTS.voices = window.speechSynthesis.getVoices() || []; } catch (e) { TTS.voices = []; } }
+if (TTS.ok) { loadVoices(); try { window.speechSynthesis.onvoiceschanged = loadVoices; } catch (e) {} }
+function pickVoice(tag) {
+  if (!TTS.voices.length) loadVoices();
+  var t = tag.toLowerCase(), pre = t.split('-')[0];
+  var norm = function (v) { return String(v.lang || '').toLowerCase().replace('_', '-'); };
+  var exact = TTS.voices.filter(function (v) { return norm(v) === t; });
+  if (exact.length) return exact.filter(function (v) { return v.localService; })[0] || exact[0];
+  if (t === 'zh-hk') { var y = TTS.voices.filter(function (v) { return /^(yue|zh-hk)/.test(norm(v)); }); if (y.length) return y[0]; return null; }
+  if (t === 'zh-cn') { var z = TTS.voices.filter(function (v) { return /^(zh-cn|cmn|zh-hans|zh$)/.test(norm(v)); }); if (z.length) return z[0]; }
+  var same = TTS.voices.filter(function (v) { return norm(v).split('-')[0] === pre; });
+  return same[0] || null;
+}
+function unlockVoice() {
+  if (!TTS.ok || TTS.unlocked) return; TTS.unlocked = true;
+  try { var u = new SpeechSynthesisUtterance(' '); u.volume = 0; window.speechSynthesis.speak(u); } catch (e) {}
+}
+document.addEventListener('pointerdown', unlockVoice, { once: true, capture: true });
+function speak(text, code, onDone) {
+  if (!TTS.ok || !text) return { spoken: false, reason: 'none' };
+  var L = KL.lang(code);
+  try {
+    window.speechSynthesis.cancel();
+    var u = new SpeechSynthesisUtterance(text);
+    u.lang = L.tts; var v = pickVoice(L.tts); if (v) { try { u.voice = v; } catch (e1) { v = null; } }
+    u.rate = S.speed || 1;
+    if (onDone) { var called = false; var fin = function () { if (!called) { called = true; onDone(); } }; u.onend = fin; u.onerror = fin; }
+    window.speechSynthesis.speak(u);
+    return { spoken: true, voice: !!v };
+  } catch (e) { return { spoken: false, reason: 'error' }; }
+}
+
+// ---------- Claude ----------
+function setState(kind, txt) { var el = $('#claudeState'); el.className = 'status-dot ' + (kind || ''); el.lastChild.textContent = txt; }
+function initCaps() {
+  if (WEB) { caps.started = true; setState(navigator.onLine === false ? 'bad' : 'ok', navigator.onLine === false ? 'Hors ligne' : 'Prête'); renderStore(); renderConvo(); return; }
+  window.claude.use('sample').then(function (s) { caps.sample = s; caps.started = true; setState(s ? 'ok' : 'bad', s ? 'Prête' : 'Sans Claude'); renderConvo(); }, function () { caps.started = true; setState('bad', 'Sans Claude'); renderConvo(); });
+  window.claude.use('downloads').then(function (d) { caps.downloads = d; }, function () {});
+  window.claude.use('user').then(function (u) { caps.user = u; if (u && u.isOwner) u.isOwner().then(function (v) { caps.owner = v; renderStore(); }, function () {}); }, function () {});
+  window.claude.use('permissions').then(function (p) { caps.perms = p; }, function () {});
+  window.claude.use('db').then(function (db) { caps.db = db; if (db) startDb(); else renderStore(); }, function () { renderStore(); });
+}
+function errText(e) {
+  var c = e && e.code;
+  if (WEB && c === 'rate_limited') return "Trop de traductions d'un coup. Attends une minute puis réessaie. En attendant : onglet Phrases.";
+  if (WEB && c !== 'image_rejected') return navigator.onLine === false ? "Pas d'Internet. Les phrases prêtes (onglet Phrases) et les prix marchent sans Internet." : "La traduction ne répond pas (Internet faible ?). Réessaie dans un instant. Les phrases prêtes marchent sans Internet.";
+  if (c === 'no_sample') return "La traduction marche seulement dans l'application Claude (ou sur claude.ai). Les phrases prêtes et le calcul des prix marchent quand même.";
+  if (c === 'not_granted') return "La page n'a pas encore le droit d'utiliser Claude. Touche « Autoriser » ci-dessous, puis réessaie.";
+  if (c === 'rate_limited') return "Trop de demandes d'un coup, ou ta limite d'utilisation Claude est atteinte. Attends une minute puis réessaie. En attendant : onglet Phrases.";
+  if (c === 'session_expired') return 'Ta connexion à Claude a expiré : reconnecte-toi dans l’application, puis réessaie.';
+  if (c === 'refused') return "Claude n'a pas traduit cette phrase. Dis-la autrement.";
+  if (c === 'sampling_disabled' || c === 'not_declared' || c === 'capability_disabled' || c === 'capability_removed') return "La traduction n'est pas disponible ici. Les phrases prêtes marchent quand même.";
+  if (c === 'images_unavailable') return "La lecture de photo par Claude n'est pas disponible ici. Remplis la fiche à la main.";
+  if (c === 'image_rejected') return 'Cette photo est refusée (trop grande ou format inconnu). Reprends-la.';
+  if (!navigator.onLine) return "Pas d'Internet. Les phrases prêtes (onglet Phrases) marchent sans Internet.";
+  return "La traduction n'a pas abouti (réseau ou service). Touche « Traduire et dire » pour réessayer.";
+}
+function isLang(from, L) {
+  from = String(from || '').toLowerCase();
+  if (!from) return false;
+  if (from === L.code) return true;
+  if (L.code === 'zh' && (from === 'cmn' || from === 'zh-cn')) return true;
+  if (L.code === 'yue' && (from === 'zh' || from === 'zh-hk')) return true;
+  return false;
+}
+function historyLines() {
+  return CONV.filter(function (m) { return !m.example; }).slice(-4).map(function (m) { return (m.who === 'me' ? 'Person 1: ' : 'Person 2: ') + m.src; });
+}
+function decodeEntities(t) { var d = document.createElement('textarea'); d.innerHTML = t; return d.value; }
+function gtxCall(text, sl, tl, signal) {
+  return fetch(KL.gtxUrl(text, sl, tl), { signal: signal, credentials: 'omit', referrerPolicy: 'no-referrer' }).then(function (res) {
+    if (!res.ok) throw { code: res.status === 429 ? 'rate_limited' : 'upstream_error' };
+    return res.json();
+  }).then(function (j) { var r = KL.parseGtx(j); if (!r.text) throw { code: 'invalid_json' }; r.engine = 'google'; return r; })
+  .catch(function (e) {
+    if (signal && signal.aborted) throw { code: 'cancelled' };
+    // Secours : MyMemory (service libre, moins bon), pour que la conversation ne s'arrête pas
+    var msl = sl === 'auto' ? KL.lang(speaker === 'me' ? S.mine : S.theirs).gt : sl;
+    return fetch('https://api.mymemory.translated.net/get?langpair=' + encodeURIComponent(msl + '|' + tl) + '&q=' + encodeURIComponent(text.slice(0, 480)), { signal: signal, credentials: 'omit', referrerPolicy: 'no-referrer' })
+      .then(function (res) { return res.json(); })
+      .then(function (j) {
+        var t = j && j.responseData && j.responseData.translatedText;
+        if (!t || Number(j.responseStatus) >= 400) throw { code: 'upstream_error' };
+        return { text: decodeEntities(t).trim(), pinyin: '', from: msl, engine: 'secours' };
+      }, function () { if (signal && signal.aborted) throw { code: 'cancelled' }; throw { code: 'upstream_error' }; });
+  });
+}
+function webTranslate(text, signal, fromWho) {
+  var A = KL.lang(S.mine), B = KL.lang(S.theirs);
+  var who = fromWho || speaker;
+  var src = who === 'me' ? A : B, dst = who === 'me' ? B : A;
+  var done = function (r, sL, dL) {
+    r.outLang = dL.code; r.who = dL.code === B.code ? 'me' : 'them'; r.srcLang = sL.code;
+    if (!dL.pinyin) r.pinyin = '';
+    return r;
+  };
+  if (fromWho) return gtxCall(text, src.gt, dst.gt, signal).then(function (r) { return done(r, src, dst); });
+  return gtxCall(text, 'auto', dst.gt, signal).then(function (r) {
+    // écrit dans la langue d'arrivée : on traduit dans l'autre sens
+    if (KL.sameLang(r.from, dst) && !KL.sameLang(r.from, src)) return gtxCall(text, dst.gt, src.gt, signal).then(function (r2) { return done(r2, dst, src); });
+    return done(r, src, dst);
+  });
+}
+function translate(text, signal, fromWho) {
+  if (WEB) return webTranslate(text, signal, fromWho);
+  if (!caps.sample) return Promise.reject({ code: 'no_sample' });
+  var prompt = KL.translatePrompt({ mine: S.mine, theirs: S.theirs, text: text, history: historyLines() });
+  return caps.sample.json(prompt, { modelTier: S.quality === 'precise' ? 'default' : 'quick', signal: signal }).then(function (o) {
+    var r = KL.checkTranslation(o);
+    if (!r) throw { code: 'invalid_json' };
+    var A = KL.lang(S.mine), B = KL.lang(S.theirs);
+    var toB = isLang(r.from, A);
+    if (!r.from) toB = speaker === 'me';
+    r.outLang = toB ? B.code : A.code;
+    r.who = toB ? 'me' : 'them';
+    r.srcLang = toB ? A.code : (isLang(r.from, B) ? B.code : r.from);
+    return r;
+  });
+}
+
+// ---------- PARLER ----------
+var EXAMPLES = [
+  { example: true, who: 'me', src: 'Quel est le prix à la pièce pour 500 pièces ?', srcLang: 'fr', out: '500件的话，单价是多少？', outLang: 'zh', pinyin: '500 jiàn dehuà, dānjià shì duōshao?' },
+  { example: true, who: 'them', src: '500件的话，每件12块5。', srcLang: 'zh', out: 'Pour 500 pièces, c’est 12,5 yuans la pièce.', outLang: 'fr', pinyin: '' }
+];
+function renderPair() {
+  var A = KL.lang(S.mine), B = KL.lang(S.theirs);
+  $('#mineFlag').textContent = A.flag; $('#mineName').textContent = A.native;
+  $('#theirsFlag').textContent = B.flag; $('#theirsName').textContent = B.native; $('#theirsSub').textContent = B.code === A.code ? 'Choisis une langue' : B.name;
+  $('#whoMeFlag').textContent = A.flag; $('#whoThemFlag').textContent = B.flag;
+  $('#whoThemLabel').textContent = THEM_SAYS[B.code] || 'Il / elle parle';
+  $('#micMeFlag').textContent = A.flag; $('#micThemFlag').textContent = B.flag;
+  micUI();
+  setSpeaker(speaker);
+  document.getElementById('say').dir = 'auto';
+}
+var THEM_SAYS = { zh: '对方说', yue: '對方講', en: 'They speak', ar: 'هو يتكلم', es: 'Él / ella habla', pt: 'Ele / ela fala', ru: 'Говорит он', tr: 'O konuşuyor', hi: 'वे बोलें', ja: '相手が話す', ko: '상대방', vi: 'Họ nói', th: 'อีกฝ่ายพูด', id: 'Dia bicara', de: 'Er / sie spricht', it: 'Lui / lei parla', fr: 'Il / elle parle' };
+var PLACE = {
+  fr: 'Touche ici puis le micro 🎤 du clavier, et parle',
+  zh: '请点这里，再按键盘上的🎤说话，或者直接打字', yue: '請點呢度，再撳鍵盤上嘅🎤講嘢', en: 'Tap here, then the 🎤 on the keyboard, and speak',
+  ar: 'المس هنا ثم الميكروفون 🎤 في لوحة المفاتيح وتكلم', es: 'Toca aquí y luego el 🎤 del teclado, y habla', pt: 'Toque aqui e depois no 🎤 do teclado, e fale',
+  ru: 'Нажмите здесь, затем 🎤 на клавиатуре и говорите', tr: 'Buraya, sonra klavyedeki 🎤 simgesine dokunup konuşun', hi: 'यहाँ टैप करें, फिर कीबोर्ड का 🎤 दबाकर बोलें',
+  ja: 'ここをタップして、キーボードの🎤で話してください', ko: '여기를 누르고 키보드의 🎤를 눌러 말하세요', vi: 'Chạm vào đây, rồi bấm 🎤 trên bàn phím và nói', th: 'แตะที่นี่ แล้วกด 🎤 บนแป้นพิมพ์แล้วพูด',
+  id: 'Ketuk di sini, lalu 🎤 di keyboard, dan bicara', de: 'Hier tippen, dann 🎤 auf der Tastatur, und sprechen', it: 'Tocca qui, poi il 🎤 della tastiera, e parla'
+};
+function setSpeaker(w) {
+  speaker = w;
+  $('#whoMe').setAttribute('aria-pressed', w === 'me'); $('#whoThem').setAttribute('aria-pressed', w === 'them');
+  var code = w === 'me' ? S.mine : S.theirs;
+  var ta = $('#say'); ta.placeholder = CAN_MIC ? (code === 'zh' ? '……或者在这里打字' : code === 'fr' ? '… ou écris ici' : '…') : (PLACE[code] || PLACE.en);
+  ta.lang = KL.lang(code).tts;
+  $('#dictateText').textContent = w === 'me'
+    ? 'Pour parler : touche la case, puis le micro 🎤 du clavier.'
+    : "Pour l'autre personne : elle écrit ou dicte dans sa langue (clavier chinois : voir Réglages › Aide).";
+}
+function bubble(m, idx) {
+  var sc = m.srcLang || (m.who === 'me' ? S.mine : S.theirs);
+  var A = KL.LANGS.some(function (L) { return L.code === sc; }) ? KL.lang(sc) : { flag: '🌐' }, B = KL.lang(m.outLang);
+  var b = h('div', { class: 'bub ' + (m.who === 'me' ? 'me' : 'them') + (m.example ? ' example' : '') });
+  if (m.example) b.appendChild(h('span', { class: 'tag-ex', text: 'Exemple' }));
+  var kp = KL.isKeyPoint(m.src) || KL.isKeyPoint(m.out);
+  b.appendChild(h('div', { class: 'who' }, [h('span', { text: A.flag + ' → ' + B.flag + '  ' + (m.who === 'me' ? 'Moi' : "L'autre personne") }),
+    kp ? h('span', { class: 'kp', title: 'Chiffre noté' }, [icon('tag'), 'Chiffre']) : null,
+    h('button', { class: 'cp', 'aria-label': 'Copier la traduction', onclick: function () { copyText(m.out, 'Traduction copiée'); } }, [icon('copy')])]));
+  b.appendChild(h('div', { class: 'src', dir: 'auto', text: m.src }));
+  b.appendChild(h('div', { class: 'out' + (/^(zh|yue|ja)$/.test(B.code) ? ' cjk' : ''), dir: 'auto', lang: B.tts, text: m.out }));
+  if (m.pinyin && S.pinyin) b.appendChild(h('div', { class: 'py', text: m.pinyin }));
+  b.appendChild(h('div', { class: 'acts' }, [
+    h('button', { 'aria-label': 'Réécouter', onclick: function () { sayIt(m.out, m.outLang); } }, [icon('sound'), 'Écouter']),
+    h('button', { 'aria-label': 'Montrer en grand', onclick: function () { showBig(m.out, m.outLang, m.pinyin, m.src); } }, [icon('expand'), 'Montrer']),
+    h('button', { class: m.star ? 'on' : '', 'aria-pressed': String(!!m.star), 'aria-label': 'Marquer important', onclick: function () { if (m.example) return toast('C’est un exemple'); m.star = !m.star; save('kylo.interp.conv', CONV); renderConvo(); } }, [icon('star'), 'Important'])
+  ]));
+  return b;
+}
+function renderConvo() {
+  var box = $('#convo'); box.innerHTML = '';
+  var real = CONV.filter(function (m) { return !m.example; });
+  if (!real.length) {
+    box.appendChild(h('div', { class: 'hintcard' }, [h('span', { class: 'big', text: '🗣️' }), h('div', {}, [
+      h('b', { text: 'Parle, le téléphone traduit et le dit à voix haute.' }),
+      h('p', { class: 'note', text: CAN_MIC ? "1. Touche « 🎤 Je parle » et parle.  2. Arrête-toi : le téléphone traduit et le dit.  3. L'autre personne touche son bouton 🎤 et répond dans sa langue." : "1. Choisis qui parle.  2. Touche la case puis le micro du clavier.  3. Touche « Traduire et dire ». La traduction s'affiche aussi pendant que tu parles." })
+    ])]));
+    EXAMPLES.forEach(function (m) { box.appendChild(bubble(m)); });
+  } else {
+    real.forEach(function (m, i) { box.appendChild(bubble(m, i)); });
+    box.appendChild(h('div', { class: 'convo-foot' }, [
+      h('button', { class: 'btn primary', onclick: function () { openSummary(CONV, 'conversation'); } }, [icon('note'), 'Résumé']),
+      h('button', { class: 'btn', onclick: function () { var t = real.map(function (m) { return (m.who === 'me' ? 'Moi : ' : 'Lui/elle : ') + m.src + '\n→ ' + m.out; }).join('\n\n'); copyText(t, 'Conversation copiée'); } }, [icon('copy'), 'Copier']),
+      h('button', { class: 'btn', onclick: askClearConvo }, [icon('trash'), 'Effacer'])
+    ]));
+  }
+  if (caps.started && !caps.sample && !WEB) box.insertBefore(h('div', { class: 'banner warn' }, [icon('info'), h('span', { text: errText({ code: 'no_sample' }) })]), box.firstChild);
+  box.scrollTop = real.length ? box.scrollHeight : 0;
+}
+function askClearConvo() {
+  openSheet('Effacer la conversation ?', function (body) {
+    body.appendChild(h('p', { text: 'Les phrases de cet écran seront effacées de ce téléphone. Tes fiches fournisseurs ne bougent pas.' }));
+  }, [
+    { label: 'Garder', cls: '', act: closeSheet },
+    { label: 'Résumé d’abord', cls: 'primary', act: function () { closeSheet(); openSummary(CONV, 'conversation'); } },
+    { label: 'Effacer', cls: 'danger', act: function () { CONV = []; save('kylo.interp.conv', CONV); closeSheet(); renderConvo(); } }
+  ]);
+}
+var pv = { ctl: null, text: '', res: null, t: null, busy: false };
+function showPreview(state, txt) {
+  var p = $('#preview');
+  if (!state) { p.hidden = true; p.innerHTML = ''; return; }
+  p.hidden = false; p.innerHTML = '';
+  if (state === 'wait') p.appendChild(h('span', { class: 'spin', 'aria-hidden': 'true' }));
+  if (state === 'wait') p.appendChild(h('span', { text: 'Traduction…' }));
+  if (state === 'ok') { p.appendChild(icon('chat')); p.appendChild(h('b', { dir: 'auto', text: txt })); }
+  if (state === 'err') { p.appendChild(icon('alert')); p.appendChild(h('span', { text: txt })); if (pv.lastErr === 'not_granted') p.appendChild(permBtn()); }
+}
+function permBtn() {
+  return h('button', { class: 'btn', style: 'margin-left:auto', onclick: function () {
+    if (!caps.perms) return toast("Ouvre le menu de la page (en haut) › Autorisations.");
+    caps.perms.request(['sample']).then(function (st) { if (st && st.sample === 'granted') { toast('Autorisé'); runPreview(true); } else caps.perms.manage().catch(function () { toast('Menu de la page › Autorisations'); }); });
+  } }, ['Autoriser']);
+}
+function runPreview(force) {
+  var text = $('#say').value.trim();
+  if (!text) { showPreview(null); return; }
+  if (!force && pv.text === text && pv.res && pv.who === forcedWho) return;
+  if (pv.ctl) pv.ctl.abort();
+  var ctl = new AbortController(); pv.ctl = ctl; pv.text = text; pv.res = null; pv.who = forcedWho;
+  showPreview('wait');
+  return translate(text, ctl.signal, forcedWho).then(function (r) {
+    if (ctl.signal.aborted || $('#say').value.trim() !== text) return null;
+    pv.res = r; showPreview('ok', r.out || r.text); return r;
+  }, function (e) {
+    if (e && e.code === 'cancelled') return null;
+    if (ctl.signal.aborted) return null;
+    pv.lastErr = e && e.code; showPreview('err', errText(e)); return null;
+  });
+}
+function onType() {
+  var v = $('#say').value;
+  document.body.classList.toggle('empty-say', !v.trim());
+  $('#clearSay').hidden = !v;
+  autoGrow();
+  clearTimeout(pv.t); pv.res = null;
+  if (!v.trim()) { if (pv.ctl) pv.ctl.abort(); showPreview(null); return; }
+  if (!WEB && !caps.sample) { if (caps.started) showPreview('err', errText({ code: 'no_sample' })); return; }
+  pv.t = setTimeout(function () { runPreview(false); }, WEB ? 450 : 850);
+}
+function autoGrow() { var ta = $('#say'); ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight + 4, 9 * 17 * (S.size === 'tg' ? 1.35 : S.size === 'g' ? 1.18 : 1)) + 'px'; }
+function commit() {
+  var ta = $('#say'); var text = ta.value.trim();
+  if (!text) { ta.focus(); toast('Écris ou dicte une phrase d’abord'); return; }
+  var go = $('#btnGo'); if (pv.busy) return;
+  var finish = function (r) {
+    if (!r) return;
+    var m = { id: uid(), who: r.who, src: text, srcLang: r.srcLang, out: r.text, outLang: r.outLang, pinyin: KL.lang(r.outLang).pinyin ? r.pinyin : '', t: new Date().toISOString() };
+    CONV.push(m); if (CONV.length > 200) CONV = CONV.slice(-200); save('kylo.interp.conv', CONV);
+    ta.value = ''; $('#clearSay').hidden = true; document.body.classList.add('empty-say'); autoGrow(); showPreview(null); pv.res = null; pv.text = ''; forcedWho = null;
+    renderConvo();
+    if (S.autoSpeak) { var s = sayIt(m.out, m.outLang, true); }
+  };
+  if (pv.res && pv.text === text && pv.who === forcedWho) { finish(pv.res); return; }
+  clearTimeout(pv.t); if (pv.ctl) pv.ctl.abort();
+  pv.busy = true; go.disabled = true; go.lastChild.textContent = 'Traduction…'; go.firstChild.replaceWith(h('span', { class: 'spin', 'aria-hidden': 'true' }));
+  var ctl = new AbortController(); pv.ctl = ctl;
+  translate(text, ctl.signal, forcedWho).then(function (r) { r.out = r.text; finish(r); }, function (e) { if (e && e.code === 'cancelled') return; pv.lastErr = e && e.code; showPreview('err', errText(e)); }).then(function () {
+    pv.busy = false; go.disabled = false; go.lastChild.textContent = 'Traduire et dire'; go.firstChild.replaceWith(icon('sound'));
+  });
+}
+var rec = null, recWho = null, forcedWho = null;
+var LISTENING = { fr: 'J’écoute… touche pour finir', zh: '正在听…说完点一下', yue: '聽緊…講完撳一下', en: 'Listening… tap to finish', ar: 'أستمع… المس للإنهاء', es: 'Escuchando… toca para terminar', pt: 'Ouvindo… toque para terminar', ru: 'Слушаю… нажмите, чтобы закончить', tr: 'Dinliyorum… bitirmek için dokunun', de: 'Ich höre zu… zum Beenden tippen', it: 'Ascolto… tocca per finire', ja: '聞いています…終わったらタップ', ko: '듣는 중… 끝나면 누르세요', vi: 'Đang nghe… chạm để kết thúc', th: 'กำลังฟัง… แตะเพื่อจบ', id: 'Mendengarkan… ketuk untuk selesai', hi: 'सुन रहा हूँ… खत्म करने के लिए टैप करें' };
+function micUI() {
+  var me = $('#micMe'), th = $('#micThem'); if (!me) return;
+  me.classList.toggle('on', recWho === 'me'); th.classList.toggle('on', recWho === 'them');
+  $('#micMeLabel').textContent = recWho === 'me' ? (LISTENING[S.mine] || LISTENING.fr) : 'Je parle';
+  $('#micThemLabel').textContent = recWho === 'them' ? (LISTENING[S.theirs] || '…') : (THEM_SAYS[S.theirs] || 'Il / elle parle');
+}
+function showMicError(code) {
+  var msg = code === 'not-allowed' ? 'Le micro est refusé. iPhone : Réglages › Safari › Micro › Autoriser, puis recharge la page.'
+    : code === 'service-not-allowed' ? 'La reconnaissance vocale est coupée. iPhone : Réglages › Général › Clavier › active « Dictée ».'
+    : code === 'network' ? 'Pas d’Internet pour la reconnaissance vocale. Les phrases prêtes marchent sans Internet.'
+    : code === 'language-not-supported' ? 'L’iPhone ne reconnaît pas cette langue à la voix : écris-la dans la case.'
+    : code === 'audio-capture' ? 'Le micro est occupé (un appel en cours ?). Réessaie.'
+    : 'Le micro n’a pas marché. Réessaie, ou écris dans la case.';
+  pv.lastErr = 'mic'; showPreview('err', msg);
+}
+function startMic(who) {
+  if (rec) { try { rec.stop(); } catch (e) {} return; }
+  if (meet.on) stopMeeting();
+  unlockVoice(); try { window.speechSynthesis.cancel(); } catch (e) {}
+  if (pv.ctl) pv.ctl.abort();
+  setSpeaker(who); forcedWho = who;
+  var L = KL.lang(who === 'me' ? S.mine : S.theirs);
+  var r; try { r = new SR(); } catch (e) { showMicError('start'); return; }
+  r.lang = L.tts; r.interimResults = true; r.continuous = false; r.maxAlternatives = 1;
+  var ta = $('#say'); ta.value = ''; onType();
+  var failed = null;
+  r.onresult = function (e) { var t = ''; for (var i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; ta.value = t; onType(); };
+  r.onerror = function (e) { failed = (e && e.error) || 'error'; };
+  r.onend = function () {
+    rec = null; recWho = null; micUI();
+    if (failed && failed !== 'no-speech' && failed !== 'aborted') { forcedWho = null; showMicError(failed); return; }
+    if (!ta.value.trim()) { forcedWho = null; toast('Je n’ai rien entendu. Touche le micro et parle plus près.'); return; }
+    commit();
+  };
+  rec = r; recWho = who; micUI();
+  try { r.start(); } catch (e) { rec = null; recWho = null; micUI(); forcedWho = null; showMicError('start'); }
+}
+function sayIt(text, code, quiet) {
+  var r = speak(text, code);
+  if (!r.spoken) { if (!quiet) toast('La voix ne marche pas ici : montre l’écran en grand.'); return r; }
+  if (!r.voice) toast("Pas de voix « " + KL.lang(code).name + " » sur ce téléphone : montre l'écran en grand.", 3600);
+  return r;
+}
+
+// ---------- Montrer en grand ----------
+function showBig(text, code, pinyin, src) {
+  var L = KL.lang(code);
+  var box = h('div', { class: 'show', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Traduction en grand' });
+  var stage = h('div', { class: 'stage' }, [
+    h('div', { class: 'flag', text: L.flag }),
+    h('div', { class: 'txt' + (/^(zh|yue|ja)$/.test(L.code) ? ' cjk' : ''), dir: 'auto', lang: L.tts, text: text }),
+    pinyin && S.pinyin ? h('div', { class: 'py', text: pinyin }) : null,
+    src ? h('div', { class: 'fr', dir: 'auto', text: src }) : null
+  ]);
+  box.appendChild(stage);
+  box.appendChild(h('div', { class: 'bar' }, [
+    h('button', { class: 'btn', onclick: function () { box.classList.toggle('flip'); } }, [icon('rotate'), 'Retourner']),
+    h('button', { class: 'btn primary', onclick: function () { sayIt(text, code); } }, [icon('sound'), 'Écouter']),
+    h('button', { class: 'btn', onclick: function () { box.remove(); } }, [icon('x'), 'Fermer'])
+  ]));
+  document.body.appendChild(box);
+  sayIt(text, code, true);
+}
+
+// ---------- Feuilles ----------
+function openSheet(title, fill, buttons) {
+  closeSheet();
+  var body = h('div', { class: 'body' });
+  var panel = h('div', { class: 'panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': title }, [
+    h('div', { class: 'head' }, [h('h3', { text: title }), h('button', { class: 'iconbtn', 'aria-label': 'Fermer', onclick: closeSheet }, [icon('x')])]),
+    body
+  ]);
+  if (buttons && buttons.length) panel.appendChild(h('div', { class: 'bottom' }, buttons.map(function (b) { return h('button', { class: 'btn ' + (b.cls || ''), onclick: b.act, id: b.id }, [b.icon ? icon(b.icon) : null, b.label]); })));
+  var wrap = h('div', { class: 'sheet', onclick: function (e) { if (e.target === wrap) closeSheet(); } }, [panel]);
+  $('#sheets').appendChild(wrap);
+  fill(body, panel);
+  return body;
+}
+var sheetCleanup = null;
+function closeSheet() { if (sheetCleanup) { var f = sheetCleanup; sheetCleanup = null; try { f(); } catch (e) {} } $('#sheets').innerHTML = ''; }
+
+function langPicker(which) {
+  openSheet(which === 'mine' ? 'Ma langue' : "Langue de l'autre personne", function (body) {
+    var cur = which === 'mine' ? S.mine : S.theirs;
+    var g = h('div', { class: 'langgrid' });
+    KL.LANGS.forEach(function (L) {
+      g.appendChild(h('button', { 'aria-pressed': String(L.code === cur), onclick: function () {
+        if (which === 'mine') { if (L.code === S.theirs) S.theirs = S.mine; S.mine = L.code; } else { if (L.code === S.mine) S.mine = S.theirs; S.theirs = L.code; }
+        saveSet(); renderPair(); renderPhrases(); closeSheet(); pv.res = null; onType();
+        if (meet.on && meet.rec) { try { meet.rec.stop(); } catch (e) {} } if (S.mode === 'meet') renderMeet();
+      } }, [h('span', { class: 'flag', text: L.flag }), h('span', {}, [h('b', { text: L.native }), h('small', { text: L.name })])]));
+    });
+    body.appendChild(g);
+    body.appendChild(h('p', { class: 'note', text: 'Les langues de Guinée (pular, malinké, soussou) ne sont pas dans la liste : la traduction et les voix du téléphone ne sont pas assez fiables pour elles.' }));
+  });
+}
+
+// ---------- PHRASES ----------
+var phCat = PHRASES.length ? PHRASES[0].id : '';
+var PH_ICON = { salut: 'hand', prix: 'coin', quantite: 'stack', qualite: 'sample', paiement: 'pay', livraison: 'ship', contact: 'card', voyage: 'car', urgence: 'alert' };
+var phLoading = {};
+function phCache(code, cat) { try { var v = JSON.parse(localStorage.getItem('kylo.interp.ph.' + code + '.' + cat) || 'null'); return Array.isArray(v) ? v : null; } catch (e) { return null; } }
+function renderPhrases() {
+  var cats = $('#phCats'); cats.innerHTML = '';
+  PHRASES.forEach(function (c) {
+    cats.appendChild(h('button', { class: 'chip', 'aria-pressed': String(c.id === phCat), onclick: function () { phCat = c.id; renderPhrases(); } }, [icon(PH_ICON[c.id] || 'chat'), c.fr]));
+  });
+  var cat = PHRASES.filter(function (c) { return c.id === phCat; })[0]; if (!cat) return;
+  var B = KL.lang(S.theirs), st = $('#phState'); st.innerHTML = '';
+  var list = $('#phList'); list.innerHTML = '';
+  var tr = null, py = null;
+  if (B.code === 'zh') { tr = cat.phrases.map(function (p) { return p[1]; }); py = cat.phrases.map(function (p) { return p[2]; }); }
+  else if (B.code === 'fr') { tr = cat.phrases.map(function (p) { return p[0]; }); }
+  else {
+    tr = phCache(B.code, cat.id);
+    if (!tr) {
+      if (caps.sample || WEB) {
+        st.appendChild(h('div', { class: 'banner warn' }, [h('span', { class: 'spin' }), h('span', { text: (WEB ? 'Traduction de ces phrases en ' : 'Claude traduit ces phrases en ') + B.name.toLowerCase() + '… (une seule fois, ensuite elles restent sur le téléphone)' })]));
+        loadPhrases(B.code, cat);
+      } else st.appendChild(h('div', { class: 'banner warn' }, [icon('info'), h('span', { text: 'Sans Claude, les phrases prêtes existent seulement en chinois. Choisis 中文 en haut de l’onglet Parler.' })]));
+    }
+  }
+  cat.phrases.forEach(function (p, i) {
+    var t = tr ? tr[i] : '';
+    var card = h('div', { class: 'pcard' }, [
+      h('div', { class: 'fr', text: p[0] }),
+      t ? h('div', { class: 'tr' + (/^(zh|yue|ja)$/.test(B.code) ? ' cjk' : ''), dir: 'auto', lang: B.tts, text: t }) : null,
+      py && S.pinyin ? h('div', { class: 'py', text: py[i] }) : null,
+      h('div', { class: 'side' }, [
+        h('button', { class: 'roundbtn', 'aria-label': 'Dire la phrase', disabled: !t, onclick: function () { sayIt(t, B.code); card.classList.add('playing'); setTimeout(function () { card.classList.remove('playing'); }, 1800); } }, [icon('sound')]),
+        h('button', { class: 'roundbtn', 'aria-label': 'Montrer en grand', disabled: !t, onclick: function () { showBig(t, B.code, py ? py[i] : '', p[0]); } }, [icon('expand')])
+      ])
+    ]);
+    list.appendChild(card);
+  });
+  $('#phLead').textContent = B.code === 'zh' ? 'Touche une phrase : le téléphone la dit à voix haute. En chinois, elles marchent même sans Internet.' : 'Touche une phrase : le téléphone la dit à voix haute en ' + B.name.toLowerCase() + '.';
+}
+function loadPhrases(code, cat) {
+  var key = code + '.' + cat.id; if (phLoading[key]) return; phLoading[key] = true;
+  var fr = cat.phrases.map(function (p) { return p[0]; });
+  var job = WEB ? fr.reduce(function (pr, t) { return pr.then(function (acc) { return gtxCall(t, 'fr', KL.lang(code).gt).then(function (r) { acc.push(r.text); return acc; }); }); }, Promise.resolve([]))
+    : caps.sample.json(KL.phrasesPrompt(fr, code), { modelTier: 'default', cache: { gcTime: 86400000 } });
+  job.then(function (arr) {
+    if (Array.isArray(arr) && arr.length === fr.length && arr.every(function (s) { return typeof s === 'string' && s.trim(); })) {
+      save('kylo.interp.ph.' + code + '.' + cat.id, arr);
+    } else throw { code: 'invalid_json' };
+  }).catch(function (e) {
+    var st = $('#phState'); st.innerHTML = ''; st.appendChild(h('div', { class: 'banner bad' }, [icon('alert'), h('span', { text: errText(e) })]));
+    phLoading[key] = 'err'; return 'err';
+  }).then(function (x) { if (x !== 'err') { delete phLoading[key]; if (phCat === cat.id && S.theirs === code) renderPhrases(); } });
+}
+
+// ---------- FOURNISSEURS ----------
+var FICHES = loadArr('kylo.interp.fiches');
+var PENDING = loadArr('kylo.interp.pending');
+var dbState = 'local';
+var fView = 'cards';
+function sortFiches() { FICHES.sort(function (a, b) { return String(b.creeLe || '').localeCompare(String(a.creeLe || '')); }); }
+function mirror() { save('kylo.interp.fiches', FICHES); save('kylo.interp.pending', PENDING); }
+function startDb() {
+  dbState = 'connexion'; renderStore();
+  caps.db.collection('comptes-rendus').onSnapshot(function (snap) {
+    var server = snap.docs.map(function (d) { var o = Object.assign({}, d.data()); o.id = d.id; return o; });
+    var ids = {}; server.forEach(function (o) { ids[o.id] = 1; });
+    var localOnly = CRS.filter(function (c) { return CR_PENDING.indexOf(c.id) >= 0 && !ids[c.id]; });
+    CRS = server.concat(localOnly); sortCRS(); crMirror(); renderCRList(); flushCR();
+  }, function () {});
+  var col = caps.db.collection('fournisseurs');
+  col.onSnapshot(function (snap) {
+    var server = snap.docs.map(function (d) { var o = Object.assign({}, d.data()); o.id = d.id; return o; });
+    var ids = {}; server.forEach(function (o) { ids[o.id] = 1; });
+    var localOnly = FICHES.filter(function (f) { return PENDING.indexOf(f.id) >= 0 && !ids[f.id]; });
+    FICHES = server.concat(localOnly); sortFiches(); dbState = 'ok'; mirror(); renderFiches(); renderStore();
+    flushPending();
+  }, function (e) { dbState = 'erreur'; renderStore(); });
+}
+var flushing = false;
+function flushPending() {
+  if (flushing || !caps.db || dbState !== 'ok' || !PENDING.length) return;
+  flushing = true;
+  var id = PENDING[0]; var f = FICHES.filter(function (x) { return x.id === id; })[0];
+  var p = f ? caps.db.collection('fournisseurs').doc(id).set(clean(f)) : Promise.resolve();
+  p.then(function () { PENDING = PENDING.filter(function (x) { return x !== id; }); mirror(); flushing = false; flushPending(); renderStore(); },
+    function () { flushing = false; });
+}
+function clean(f) { var o = {}; Object.keys(f).forEach(function (k) { if (k !== 'id' && f[k] !== undefined) o[k] = f[k]; }); return o; }
+function renderStore() {
+  var el = $('#fStore'); if (!el) return; el.innerHTML = '';
+  var owner = caps.owner == null ? null : caps.owner;
+  if (dbState === 'ok') el.appendChild(h('div', { class: 'banner ok', style: 'margin-top:.4rem' }, [icon('check'), h('span', { text: 'Tes fiches sont rangées dans ton espace Claude (visible seulement par toi), avec une copie sur ce téléphone.' + (PENDING.length ? ' ' + PENDING.length + ' fiche(s) en attente d’envoi.' : '') })]));
+  else if (dbState === 'connexion') el.appendChild(h('div', { class: 'banner warn', style: 'margin-top:.4rem' }, [h('span', { class: 'spin' }), h('span', { text: 'Connexion à ton espace Claude…' })]));
+  else if (WEB) el.appendChild(h('div', { class: 'banner warn', style: 'margin-top:.4rem' }, [icon('info'), h('span', { text: 'Tes fiches sont gardées sur ce téléphone (dans Safari). Touche « Télécharger le tableau » de temps en temps pour en garder une copie.' })]));
+  else if (caps.started || dbState === 'erreur') el.appendChild(h('div', { class: 'banner warn', style: 'margin-top:.4rem' }, [icon('info'), h('span', { text: owner === false ? 'Cette page appartient à quelqu’un d’autre : les fiches restent sur ce téléphone.' : 'Les fiches sont gardées sur ce téléphone. Elles partiront dans ton espace Claude dès qu’il répondra.' })]));
+}
+function saveFiche(f) {
+  f.modifieLe = new Date().toISOString(); if (!f.creeLe) f.creeLe = f.modifieLe;
+  var i = FICHES.findIndex(function (x) { return x.id === f.id; });
+  if (i >= 0) FICHES[i] = f; else FICHES.unshift(f);
+  if (PENDING.indexOf(f.id) < 0) PENDING.push(f.id);
+  sortFiches(); mirror(); renderFiches(); renderStore();
+  if (caps.db && dbState === 'ok') { flushPending(); }
+}
+function deleteFiche(id) {
+  FICHES = FICHES.filter(function (x) { return x.id !== id; }); PENDING = PENDING.filter(function (x) { return x !== id; }); mirror(); renderFiches();
+  if (caps.db) caps.db.collection('fournisseurs').doc(id).delete().catch(function () { toast('Effacée ici. Elle sera effacée de Claude à la prochaine connexion.'); });
+}
+var EX_FICHE = { id: 'exemple', example: true, nom: 'Lily Wang 王丽', societe: 'Guangzhou Star Electronics', tel: '+8613800000000', whatsapp: '', wechat: 'exemple_wechat', stand: '11.2 C23', produits: 'Écouteurs, chargeurs', prix: '12,5 ¥ / pièce · minimum 500', source: 'Exemple' };
+function matches(f, q) { if (!q) return true; q = q.toLowerCase(); return ['nom', 'societe', 'produits', 'stand', 'tel', 'wechat', 'note', 'prix', 'adresse'].some(function (k) { return String(f[k] || '').toLowerCase().indexOf(q) >= 0; }); }
+function renderFiches() {
+  var box = $('#fList'); box.innerHTML = '';
+  var q = $('#fSearch').value.trim();
+  var list = FICHES.filter(function (f) { return matches(f, q); });
+  $('#fFoot').hidden = !FICHES.length;
+  if (!FICHES.length) {
+    box.appendChild(h('div', { class: 'empty', style: 'margin-top:.8rem' }, [h('b', { text: 'Aucun fournisseur pour l’instant.' }), h('span', { text: 'Ta première fiche apparaîtra ici. Voici à quoi elle ressemblera :' })]));
+    var c = ficheCard(EX_FICHE); c.style.marginTop = '.6rem'; box.appendChild(c); return;
+  }
+  if (!list.length) { box.appendChild(h('div', { class: 'empty', style: 'margin-top:.8rem', text: 'Aucune fiche ne contient « ' + q + ' ».' })); return; }
+  if (fView === 'table') {
+    var tw = h('div', { class: 'tablewrap' }); var t = h('table', { class: 'grid' });
+    var cols = [['nom', 'Nom'], ['societe', 'Société'], ['tel', 'Téléphone'], ['whatsapp', 'WhatsApp'], ['wechat', 'WeChat'], ['email', 'E-mail'], ['adresse', 'Adresse'], ['stand', 'Stand'], ['produits', 'Produits'], ['prix', 'Prix / conditions'], ['note', 'Note'], ['creeLe', 'Ajouté le']];
+    t.appendChild(h('thead', {}, [h('tr', {}, cols.map(function (c) { return h('th', { text: c[1] }); }))]));
+    var tb = h('tbody');
+    list.forEach(function (f) {
+      tb.appendChild(h('tr', { onclick: function () { openFiche(f.id); } }, cols.map(function (c) {
+        var v = f[c[0]] || ''; if (c[0] === 'tel' || c[0] === 'whatsapp') v = KL.formatPhone(v); if (c[0] === 'creeLe' && v) v = new Date(v).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        return h('td', { class: /tel|whatsapp|creeLe/.test(c[0]) ? 'num' : '', text: String(v).length > 40 ? String(v).slice(0, 40) + '…' : v });
+      })));
+    });
+    t.appendChild(tb); tw.appendChild(t); box.appendChild(tw);
+  } else {
+    var cl = h('div', { class: 'clist' }); list.forEach(function (f) { cl.appendChild(ficheCard(f)); }); box.appendChild(cl);
+  }
+}
+function ficheCard(f) {
+  var sub = [f.societe, f.produits].filter(Boolean).join(' · ') || KL.formatPhone(f.tel) || f.wechat || '';
+  return h('button', { class: 'ccard', onclick: function () { if (f.example) toast('C’est un exemple : scanne ou photographie une vraie carte.'); else openFiche(f.id); } }, [
+    h('span', { class: 'ph' }, [f.photo ? h('img', { src: f.photo, alt: '' }) : icon('user')]),
+    h('span', { class: 't' }, [
+      f.example ? h('span', { class: 'tag-ex', text: 'Exemple' }) : null,
+      h('b', { text: f.nom || f.societe || 'Sans nom' }),
+      h('span', { text: sub }),
+      f.stand ? h('span', {}, [h('span', { class: 'stand' }, [icon('tag'), f.stand])]) : null
+    ])
+  ]);
+}
+var FIELDS = [
+  ['nom', 'Nom', 'user', 'text'], ['societe', 'Société', 'building', 'text'], ['tel', 'Téléphone', 'phone', 'tel'], ['whatsapp', 'WhatsApp', 'msg', 'tel'],
+  ['wechat', 'WeChat (identifiant)', 'bubbles', 'text'], ['email', 'E-mail', 'mail', 'email'], ['adresse', 'Adresse', 'pin', 'text'], ['stand', 'Stand (hall + numéro)', 'tag', 'text'],
+  ['produits', 'Produits', 'box', 'text'], ['prix', 'Prix / conditions (minimum, délai…)', 'coin', 'text'], ['note', 'Note', 'note', 'area']
+];
+var MORE = [['fonction', 'Fonction', 'user', 'text'], ['telAutres', 'Autres numéros', 'phone', 'text'], ['site', 'Site internet', 'globe', 'url']];
+function editFiche(f, opts) {
+  opts = opts || {};
+  var data = Object.assign(KL.EMPTY(), f || {});
+  if (!data.id) data.id = uid();
+  openSheet(f && f.creeLe ? 'Modifier la fiche' : 'Nouvelle fiche', function (body) {
+    if (opts.hint) body.appendChild(h('div', { class: 'banner warn' }, [icon('info'), h('span', { text: opts.hint })]));
+    if (opts.source) body.appendChild(h('div', { class: 'banner ok' }, [icon('check'), h('span', { text: opts.source })]));
+    if (data.photo) body.appendChild(h('img', { class: 'thumb', src: data.photo, alt: 'Photo prise' }));
+    var mk = function (d) {
+      var id = 'ff-' + d[0];
+      var input = d[3] === 'area' ? h('textarea', { id: id, rows: '3' }) : h('input', { id: id, type: d[3], inputmode: d[3] === 'tel' ? 'tel' : null, autocomplete: 'off' });
+      input.value = d[0] === 'tel' || d[0] === 'whatsapp' ? KL.formatPhone(data[d[0]] || '') : (data[d[0]] || '');
+      return h('div', { class: 'fieldrow' }, [h('span', { class: 'fi' }, [icon(d[2])]), h('div', { class: 'field' }, [h('label', { for: id, text: d[1] }), input])]);
+    };
+    FIELDS.forEach(function (d) { body.appendChild(mk(d)); if (d[0] === 'whatsapp') body.appendChild(h('button', { class: 'linkbtn', style: 'margin:-.5rem 0 0 3rem;padding:.2rem 0', onclick: function () { $('#ff-whatsapp').value = $('#ff-tel').value; } }, ['WhatsApp = même numéro que le téléphone'])); });
+    var det = h('details', { class: 'help' }, [h('summary', { text: 'Plus de détails (fonction, autres numéros, site)' })]);
+    MORE.forEach(function (d) { det.appendChild(mk(d)); });
+    body.appendChild(det);
+    if (opts.raw) body.appendChild(h('details', { class: 'help' }, [h('summary', { text: 'Ce que contenait le QR code' }), h('pre', { style: 'white-space:pre-wrap;word-break:break-all;font-size:.95rem', text: opts.raw })]));
+  }, [
+    { label: 'Annuler', act: closeSheet },
+    { label: 'Enregistrer', cls: 'primary', icon: 'check', act: function () {
+      FIELDS.concat(MORE).forEach(function (d) { var el = $('#ff-' + d[0]); if (el) data[d[0]] = el.value.trim(); });
+      data.tel = KL.cleanPhone(data.tel); data.whatsapp = KL.cleanPhone(data.whatsapp);
+      if (!data.nom && !data.societe && !data.tel && !data.wechat && !data.email) { toast('Mets au moins un nom, une société ou un numéro.'); return; }
+      if (!data.source) data.source = 'Écrit à la main';
+      saveFiche(data); closeSheet(); toast('Fiche enregistrée ✔'); openFiche(data.id, true);
+    } }
+  ]);
+}
+function ficheText(f) {
+  return [f.nom, f.societe, f.fonction, f.tel && ('Tél : ' + KL.formatPhone(f.tel)), f.whatsapp && ('WhatsApp : ' + KL.formatPhone(f.whatsapp)), f.wechat && ('WeChat : ' + f.wechat), f.email && ('E-mail : ' + f.email), f.adresse && ('Adresse : ' + f.adresse), f.stand && ('Stand : ' + f.stand), f.produits && ('Produits : ' + f.produits), f.prix && ('Prix : ' + f.prix), f.note].filter(Boolean).join('\n');
+}
+function b64url(s) { var bytes = new TextEncoder().encode(s); var bin = ''; bytes.forEach(function (b) { bin += String.fromCharCode(b); }); return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function openFiche(id, justSaved) {
+  var f = FICHES.filter(function (x) { return x.id === id; })[0]; if (!f) return;
+  openSheet('Fiche fournisseur', function (body) {
+    body.appendChild(h('div', { class: 'fhead' }, [h('span', { class: 'ph' }, [f.photo ? h('img', { src: f.photo, alt: '' }) : icon('user')]), h('div', {}, [h('b', { text: f.nom || f.societe || 'Sans nom' }), f.nom && f.societe ? h('span', { text: f.societe }) : null, f.stand ? h('div', {}, [h('span', { class: 'stand' }, [icon('tag'), f.stand])]) : null])]));
+    if (justSaved) body.appendChild(h('div', { class: 'banner ok' }, [icon('check'), h('span', { text: dbState === 'ok' ? 'Enregistrée dans l’application.' : 'Enregistrée sur ce téléphone.' })]));
+    var g = h('div', { class: 'actgrid' });
+    var num = f.tel || f.whatsapp;
+    if (num) {
+      g.appendChild(h('a', { class: 'btn primary', href: 'tel:' + num, target: '_blank', rel: 'noopener', onclick: function () { copyText(num, 'Numéro copié — si l’appel ne part pas, colle-le dans Téléphone'); } }, [icon('phone'), 'Appeler']));
+    }
+    var wa = KL.waLink(f.whatsapp || f.tel);
+    if (wa) g.appendChild(h('a', { class: 'btn wa', href: wa, target: '_blank', rel: 'noopener' }, [icon('msg'), 'WhatsApp']));
+    if (f.wechat) g.appendChild(h('button', { class: 'btn', onclick: function () { copyText(f.wechat, /^https?:/.test(f.wechat) ? 'Lien WeChat copié : ouvre WeChat › + › Scanner' : 'Identifiant WeChat copié : ouvre WeChat › + › Ajouter des contacts › colle'); } }, [icon('bubbles'), 'WeChat']));
+    if (HELPER) g.appendChild(h('a', { class: 'btn', href: HELPER + '#v=' + b64url(KL.toVCard(f)), target: '_blank', rel: 'noopener' }, [icon('addc'), 'Dans mes contacts']));
+    else g.appendChild(h('button', { class: 'btn', onclick: function () { copyText(ficheText(f), 'Fiche copiée : colle-la dans une note ou un message'); } }, [icon('copy'), 'Copier la fiche']));
+    body.appendChild(g);
+    if (num) body.appendChild(h('div', { class: 'card', style: 'padding:.7rem .9rem;gap:.2rem' }, [h('span', { class: 'note', text: 'Numéro (appuie longtemps pour copier)' }), h('span', { class: 'bigphone', text: KL.formatPhone(num) })]));
+    var kv = h('div', { class: 'kv' });
+    FIELDS.concat(MORE).forEach(function (d) {
+      var v = f[d[0]]; if (!v || d[0] === 'nom') return;
+      if (d[0] === 'tel' || d[0] === 'whatsapp') v = KL.formatPhone(v);
+      kv.appendChild(h('span', { class: 'k' }, [icon(d[2]), d[1].replace(/ \(.*\)/, '')])); kv.appendChild(h('span', { class: 'v', dir: 'auto', text: v }));
+    });
+    kv.appendChild(h('span', { class: 'k' }, [icon('info'), 'Source'])); kv.appendChild(h('span', { class: 'v', text: (f.source || '') + (f.creeLe ? ' · ' + new Date(f.creeLe).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '') }));
+    body.appendChild(kv);
+    var mine = CRS.filter(function (c) { return c.fournisseurId === f.id; });
+    if (mine.length) {
+      body.appendChild(h('b', { style: 'font-size:1.1rem', text: 'Comptes rendus (' + mine.length + ')' }));
+      var cl = h('div', { class: 'crlist', style: 'margin-top:0' }); mine.forEach(function (c) { cl.appendChild(crCard(c)); }); body.appendChild(cl);
+    }
+    if (!HELPER) body.appendChild(h('p', { class: 'note', text: 'Ajout direct dans les Contacts de l’iPhone : pas encore possible depuis une page Claude. En attendant, « WhatsApp » ouvre la discussion, et depuis WhatsApp tu peux l’ajouter à tes contacts.' }));
+    var conf = h('div', { class: 'confirm', hidden: true }, [h('b', { text: 'Supprimer cette fiche pour de bon ?' }), h('div', { class: 'row' }, [h('button', { class: 'btn', onclick: function () { conf.hidden = true; } }, ['Non, garder']), h('button', { class: 'btn danger', onclick: function () { deleteFiche(f.id); closeSheet(); toast('Fiche supprimée'); } }, [icon('trash'), 'Oui, supprimer'])])]);
+    body.appendChild(h('div', { class: 'row' }, [h('button', { class: 'btn', onclick: function () { editFiche(f); } }, [icon('pen'), 'Modifier']), h('button', { class: 'btn danger', onclick: function () { conf.hidden = false; } }, [icon('trash'), 'Supprimer'])]));
+    body.appendChild(conf);
+  });
+}
+
+// ---- photos : QR code et carte de visite ----
+function readImage(file) {
+  return new Promise(function (res, rej) {
+    var url = URL.createObjectURL(file); var img = new Image();
+    img.onload = function () { res({ img: img, url: url }); };
+    img.onerror = function () { URL.revokeObjectURL(url); rej(new Error('image')); };
+    img.src = url;
+  });
+}
+function drawScaled(img, max, crop) {
+  var sw = img.naturalWidth, sh = img.naturalHeight, sx = 0, sy = 0;
+  if (crop) { sx = sw * (1 - crop) / 2; sy = sh * (1 - crop) / 2; sw = sw * crop; sh = sh * crop; }
+  var k = Math.min(1, max / Math.max(sw, sh));
+  var c = document.createElement('canvas'); c.width = Math.round(sw * k); c.height = Math.round(sh * k);
+  var x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  return c;
+}
+function findQR(img) {
+  if (typeof window.jsQR !== 'function') return null;
+  var tries = [[1000], [1600], [700], [1000, .6], [2200], [500]];
+  for (var i = 0; i < tries.length; i++) {
+    var c = drawScaled(img, tries[i][0], tries[i][1]);
+    var d = c.getContext('2d').getImageData(0, 0, c.width, c.height);
+    var r = window.jsQR(d.data, c.width, c.height, { inversionAttempts: 'attemptBoth' });
+    if (r && r.data) return r.data;
+  }
+  return null;
+}
+function thumbOf(img) { var c = drawScaled(img, 420); try { return c.toDataURL('image/jpeg', 0.72); } catch (e) { return ''; } }
+function blobOf(img, max) { return new Promise(function (res, rej) { var c = drawScaled(img, max); c.toBlob(function (b) { if (b) res(b); else rej({ code: 'image_rejected' }); }, 'image/jpeg', 0.86); }); }
+function busySheet(title, msg, onStop) {
+  openSheet(title, function (body) { body.appendChild(h('div', { class: 'banner warn' }, [h('span', { class: 'spin' }), h('span', { text: msg })])); }, onStop ? [{ label: 'Arrêter', act: onStop }] : []);
+}
+function qrFound(data) {
+  var r = KL.parseQR(data);
+  var f = Object.assign(r.fields, { source: 'Lu dans un QR code', qrBrut: data.slice(0, 1500), photo: '' });
+  editFiche(f, { source: 'QR code lu ✔ Vérifie les cases, puis Enregistrer.', hint: r.hint, raw: data });
+}
+function openScanner() {
+  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) { $('#fileQR').value = ''; $('#fileQR').click(); return; }
+  var stream = null, stopped = false;
+  var video = document.createElement('video'); video.muted = true; video.setAttribute('playsinline', ''); video.setAttribute('autoplay', ''); video.setAttribute('aria-label', 'Image de la caméra');
+  var info = h('p', { class: 'note', style: 'margin:0', text: 'Vise le QR code dans le cadre jaune. Il est lu tout seul.' });
+  var stop = function () { stopped = true; if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); };
+  openSheet('Scanner un QR code', function (body) { body.appendChild(h('div', { class: 'scanbox' }, [video, h('div', { class: 'scanframe' })])); body.appendChild(info); },
+    [{ label: 'Prendre une photo', icon: 'camera', act: function () { closeSheet(); $('#fileQR').value = ''; $('#fileQR').click(); } }, { label: 'Annuler', act: closeSheet }]);
+  sheetCleanup = stop;
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 960 } }, audio: false }).then(function (st) {
+    if (stopped) { st.getTracks().forEach(function (t) { t.stop(); }); return; }
+    stream = st; video.srcObject = st; var pl = video.play(); if (pl && pl.catch) pl.catch(function () {});
+    var c = document.createElement('canvas'), x = c.getContext('2d', { willReadFrequently: true });
+    var tick = function () {
+      if (stopped) return;
+      if (video.readyState >= 2 && video.videoWidth && typeof window.jsQR === 'function') {
+        var k = Math.min(1, 800 / Math.max(video.videoWidth, video.videoHeight));
+        c.width = Math.round(video.videoWidth * k); c.height = Math.round(video.videoHeight * k);
+        x.drawImage(video, 0, 0, c.width, c.height);
+        var d = x.getImageData(0, 0, c.width, c.height);
+        var r = window.jsQR(d.data, c.width, c.height, { inversionAttempts: 'attemptBoth' });
+        if (r && r.data) { try { navigator.vibrate && navigator.vibrate(60); } catch (e) {} closeSheet(); qrFound(r.data); return; }
+      }
+      setTimeout(tick, 150);
+    };
+    tick();
+  }, function () {
+    info.textContent = 'La caméra est refusée ou absente. Touche « Prendre une photo ». (iPhone : Réglages › Safari › Appareil photo › Autoriser)';
+  });
+}
+function handleQRFile(file) {
+  if (!file) return;
+  busySheet('Lecture du QR code', 'Je cherche le QR code sur la photo…');
+  readImage(file).then(function (o) {
+    setTimeout(function () {
+      var data = findQR(o.img); var thumb = thumbOf(o.img);
+      if (data) {
+        qrFound(data);
+      } else {
+        openSheet('Pas de QR code trouvé', function (body) {
+          body.appendChild(h('img', { class: 'thumb', src: thumb, alt: 'Photo prise' }));
+          body.appendChild(h('p', { text: typeof window.jsQR !== 'function' ? "Le lecteur de QR code n'a pas pu se charger (Internet). Fais lire la photo par Claude, ou écris la fiche." : 'Je ne vois pas de QR code sur cette photo. Rapproche-toi, tiens le téléphone bien droit, avec de la lumière, puis reprends la photo.' }));
+        }, [
+          { label: 'Reprendre', act: function () { closeSheet(); $('#fileQR').click(); } },
+          { label: 'Lire avec Claude', cls: 'primary', act: function () { readCardImage(o.img, null); } }
+        ]);
+      }
+    }, 30);
+  }, function () { closeSheet(); toast('Photo illisible. Reprends-la.'); });
+}
+function handleCardFile(file) {
+  if (!file) return;
+  busySheet('Lecture de la carte', 'Je prépare la photo…');
+  readImage(file).then(function (o) { setTimeout(function () { var qr = findQR(o.img); readCardImage(o.img, qr); }, 30); }, function () { closeSheet(); toast('Photo illisible. Reprends-la.'); });
+}
+function readCardImage(img, qrData) {
+  var thumb = thumbOf(img);
+  var base = qrData ? KL.parseQR(qrData).fields : KL.EMPTY();
+  var src = qrData ? 'QR code + carte lus' : 'Carte lue par Claude';
+  var finish = function (extra, note) {
+    var f = KL.mergeFields(base, extra || {});
+    f.photo = thumb; f.source = extra ? src : (qrData ? 'Lu dans un QR code' : 'Photo, écrit à la main');
+    if (qrData) f.qrBrut = qrData.slice(0, 1500);
+    editFiche(f, { source: extra ? src + ' ✔ Vérifie chaque case, surtout les numéros.' : null, hint: note, raw: qrData });
+  };
+  if (!caps.sample) { finish(null, qrData ? null : (WEB ? 'Lire le texte d’une carte sans QR code : seulement dans l’Interprète version Claude. Ici, remplis les cases ; la photo reste jointe.' : errText({ code: 'no_sample' }))); return; }
+  var ctl = new AbortController();
+  busySheet('Lecture de la carte', 'Claude lit la carte… (10 à 30 secondes)', function () { ctl.abort(); closeSheet(); });
+  blobOf(img, 1600).then(function (blob) {
+    return caps.sample.json(KL.cardPrompt(), { images: [blob], modelTier: 'default', signal: ctl.signal });
+  }).then(function (o) {
+    if (ctl.signal.aborted) return;
+    if (!o || typeof o !== 'object') throw { code: 'invalid_json' };
+    var clean = {}; Object.keys(KL.EMPTY()).forEach(function (k) { var v = o[k]; clean[k] = typeof v === 'string' ? v : (v == null ? '' : String(v)); });
+    finish(clean, null);
+  }, function (e) {
+    if (e && e.code === 'cancelled') return;
+    finish(null, (qrData ? 'Le QR code est lu, mais Claude n’a pas pu lire le reste de la carte : ' : '') + errText(e));
+  });
+}
+
+function exportCSV() {
+  var csv = KL.toCSV(FICHES);
+  var name = 'Fournisseurs-Foire-de-Canton-' + new Date().toISOString().slice(0, 10) + '.csv';
+  if (WEB) {
+    try {
+      var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove(); toast('Tableau téléchargé ✔ (Fichiers › Téléchargements)', 3200);
+    } catch (e) { copyTSV(); }
+    return;
+  }
+  if (!caps.downloads) { copyTSV(); return; }
+  caps.downloads.save({ filename: name, data: csv }).then(function () { toast('Tableau prêt ✔'); }, function (e) {
+    if (e && e.code === 'declined') return;
+    if (e && e.code === 'rate_limited') return toast('Une fenêtre est déjà ouverte. Réessaie dans un instant.');
+    copyTSV();
+  });
+}
+function copyTSV() {
+  var rows = [KL.COLS.map(function (c) { return c[1]; }).join('\t')].concat(FICHES.map(function (f) { return KL.COLS.map(function (c) { var v = f[c[0]] || ''; if (c[0] === 'tel' || c[0] === 'whatsapp') v = KL.formatPhone(v); return String(v).replace(/[\t\n\r]+/g, ' '); }).join('\t'); }));
+  copyText(rows.join('\n'), 'Tableau copié : colle-le dans Excel ou Numbers');
+}
+
+// ---------- PRIX ----------
+function renderPrix() {
+  var p = KL.prices($('#pUnit').value, $('#pQty').value, S.eurCny, S.eurGnf);
+  var r = $('#pRes'); r.innerHTML = '';
+  ['Pièce', 'Total'].forEach(function (x) { r.appendChild(h('span', { class: 'h', text: x })); });
+  [['Yuans ¥', p.unitCny, p.totalCny, 2], ['Euros €', p.unitEur, p.totalEur, 2], ['GNF', p.unitGnf, p.totalGnf, 0]].forEach(function (row, i) {
+    if (i) r.appendChild(h('hr'));
+    r.appendChild(h('span', { class: 'l', text: row[0] }));
+    r.appendChild(h('span', { class: 'v', text: fmt(row[1], row[3]) }));
+    r.appendChild(h('span', { class: 'v big', text: fmt(row[2], row[3]) }));
+  });
+  $('#pEx').hidden = !($('#pUnit').value === '12,5' && $('#pQty').value === '500');
+}
+
+// ---------- RÉGLAGES ----------
+function openSettings() {
+  openSheet('Réglages', function (body) {
+    var seg = function (title, opts, cur, set) {
+      var g = h('div', { class: 'optgroup' }, [h('b', { text: title })]);
+      var row = h('div', { class: 'segbig' });
+      opts.forEach(function (o) { row.appendChild(h('button', { 'aria-pressed': String(o[0] === cur), style: o[2] || null, onclick: function () { set(o[0]); saveSet(); openSettings(); } }, [o[1]])); });
+      g.appendChild(row); return g;
+    };
+    body.appendChild(seg('Taille du texte', [['n', 'Normal', 'font-size:1rem'], ['g', 'Grand', 'font-size:1.15rem'], ['tg', 'Très grand', 'font-size:1.3rem']], S.size, function (v) { S.size = v; applySize(); renderPrix(); }));
+    if (!WEB) body.appendChild(seg('Traduction', [['quick', 'Rapide (conseillé)'], ['precise', 'Précise (plus lente)']], S.quality, function (v) { S.quality = v; }));
+    body.appendChild(seg('Lire la traduction à voix haute', [[true, 'Oui'], [false, 'Non']], S.autoSpeak, function (v) { S.autoSpeak = v; }));
+    body.appendChild(seg('Vitesse de la voix', [[0.75, 'Lente'], [0.95, 'Normale']], S.speed, function (v) { S.speed = v; }));
+    body.appendChild(seg('Montrer le pinyin (prononciation du chinois)', [[true, 'Oui'], [false, 'Non']], S.pinyin, function (v) { S.pinyin = v; renderConvo(); renderPhrases(); }));
+    var B = KL.lang(S.theirs);
+    var vres = h('p', { class: 'note', style: 'margin:0' });
+    body.appendChild(h('div', { class: 'optgroup' }, [h('b', { text: 'Tester la voix' }), h('div', { class: 'row' }, [
+      h('button', { class: 'btn primary', onclick: function () {
+        var txt = B.code === 'zh' ? '你好，欢迎！' : B.code === 'fr' ? 'Bonjour !' : 'OK';
+        var r = speak(txt, B.code); var r2 = pickVoice(B.tts);
+        vres.textContent = !TTS.ok ? 'La voix n’existe pas dans cette application : utilise « Montrer » pour faire lire l’écran.' : (r2 ? 'Voix trouvée : ' + r2.name + ' (' + r2.lang + '). Si tu n’entends rien, monte le son et enlève le mode silencieux.' : 'Aucune voix « ' + B.name + ' » sur ce téléphone. Sur iPhone : Réglages › Accessibilité › Contenu énoncé › Voix › ' + B.name + ' › télécharger une voix.');
+      } }, [icon('sound'), B.flag + ' Tester la voix ' + B.native])
+    ]), vres]));
+    var help = function (title, items, ordered) { var d = h('details', { class: 'help' }, [h('summary', { text: title })]); var l = h(ordered ? 'ol' : 'ul'); items.forEach(function (t) { l.appendChild(h('li', { text: t })); }); d.appendChild(l); return d; };
+    if (CAN_MIC) body.appendChild(help('Comment parler', ['Touche le gros bouton « 🎤 Je parle » et parle normalement.', 'Arrête-toi : la traduction s’affiche et le téléphone la dit à voix haute.', 'L’autre personne touche son bouton 🎤 (dans sa langue) et répond. Tu lis et tu entends le français.', 'La première fois, l’iPhone demande l’accès au micro : touche « Autoriser ».'], true));
+    else body.appendChild(help('Comment parler au lieu d’écrire', ['Touche la case de texte de l’onglet Parler.', 'Sur le clavier, touche le micro 🎤 (en bas). Parle normalement.', 'Touche « Traduire et dire ». La traduction est dite à voix haute.', 'Le micro du clavier remplace un bouton micro dans la page : les pages Claude n’ont pas le droit d’ouvrir le micro elles-mêmes.'], true));
+    body.appendChild(help('Notes, résumé et réunion', ['Chaque phrase avec un chiffre (prix, quantité, délai) est notée toute seule. Touche ⭐ « Important » pour en noter d’autres.', 'Touche « Résumé » : ' + (WEB ? 'les notes de toute la conversation, rangées par thème ; « Résumé complet avec Claude » pour les décisions.' : 'Claude relit toute la conversation et donne le résumé, les décisions, les chiffres et ce qui reste à vérifier.'), 'Range le compte rendu dans la fiche du fournisseur : il reste dans l’onglet Fournisseurs.', 'Mode Réunion (site, dans Safari) : l’Interprète écoute tout, écrit tout en français ; « Écouter en français » quand tu es prêt, ou « Direct » avec des écouteurs.'], true));
+    body.appendChild(help('Ajouter le clavier chinois (pour que le fournisseur parle ou écrive)', ['iPhone : Réglages › Général › Clavier › Claviers › Ajouter un clavier.', 'Choisis « Chinois simplifié », coche « Pinyin – QWERTY » et « Écriture manuscrite ».', 'Dans l’appli, touche « 对方说 », passe sur le clavier chinois avec le globe 🌐, puis le fournisseur dicte avec le micro ou écrit au doigt.'], true));
+    body.appendChild(help('Plan B si Internet coupe', ['L’onglet Phrases (en chinois) et le calcul des prix marchent sans Internet.', 'Les fiches fournisseurs restent sur le téléphone et partent dans ton espace Claude au retour d’Internet.', 'Pour une longue conversation à voix sans Internet : l’app « Traduire » d’Apple (déjà sur l’iPhone) a un mode Conversation. Télécharge le chinois avant : Traduire › Langues › Télécharger.'], false));
+    var st = h('div', { class: 'kv' }, [
+      h('span', { class: 'k', text: 'Traduction' }), h('span', { class: 'v', text: WEB ? 'Google Traduction (secours : MyMemory)' : (caps.sample ? 'prête (Claude)' : 'indisponible ici') }),
+      h('span', { class: 'k', text: 'Micro direct' }), h('span', { class: 'v', text: CAN_MIC ? 'oui' : (WEB ? 'pas sur ce navigateur' : 'non (micro du clavier)') }),
+      h('span', { class: 'k', text: 'Fiches' }), h('span', { class: 'v', text: dbState === 'ok' ? 'dans ton espace Claude + ce téléphone' : 'sur ce téléphone' }),
+      h('span', { class: 'k', text: 'Version' }), h('span', { class: 'v', text: '1.1.0 · ' + (WEB ? 'site' : 'Claude') }),
+      h('span', { class: 'k', text: 'Voix' }), h('span', { class: 'v', text: TTS.ok ? (TTS.voices.length + ' voix sur ce téléphone') : 'pas disponible ici' }),
+      h('span', { class: 'k', text: 'Lecteur QR' }), h('span', { class: 'v', text: typeof window.jsQR === 'function' ? 'prêt' : 'pas chargé (Internet)' })
+    ]);
+    body.appendChild(h('div', { class: 'optgroup' }, [h('b', { text: 'État' }), st]));
+  });
+}
+
+// ---------- COMPTES RENDUS (mémoire du projet) ----------
+var CRS = loadArr('kylo.interp.cr');
+var CR_PENDING = loadArr('kylo.interp.crpending');
+function sortCRS() { CRS.sort(function (a, b) { return String(b.date || '').localeCompare(String(a.date || '')); }); }
+function crMirror() {
+  var ok1 = true;
+  try { localStorage.setItem('kylo.interp.cr', JSON.stringify(CRS.slice(0, 120))); localStorage.setItem('kylo.interp.crpending', JSON.stringify(CR_PENDING)); } catch (e) { ok1 = false; }
+  if (!ok1) toast('Mémoire du téléphone pleine : télécharge ou copie tes comptes rendus.', 4200);
+  return ok1;
+}
+var crFlushing = false;
+function flushCR() {
+  if (crFlushing || !caps.db || dbState !== 'ok' || !CR_PENDING.length) return;
+  crFlushing = true;
+  var id = CR_PENDING[0], c = CRS.filter(function (x) { return x.id === id; })[0];
+  (c ? caps.db.collection('comptes-rendus').doc(id).set(clean(c)) : Promise.resolve()).then(function () {
+    CR_PENDING = CR_PENDING.filter(function (x) { return x !== id; }); crMirror(); crFlushing = false; flushCR();
+  }, function () { crFlushing = false; });
+}
+function saveCR(c) {
+  CRS = CRS.filter(function (x) { return x.id !== c.id; }); CRS.unshift(c); sortCRS();
+  if (CR_PENDING.indexOf(c.id) < 0) CR_PENDING.push(c.id);
+  crMirror(); renderCRList(); flushCR();
+}
+function deleteCR(id) {
+  CRS = CRS.filter(function (x) { return x.id !== id; }); CR_PENDING = CR_PENDING.filter(function (x) { return x !== id; }); crMirror(); renderCRList();
+  if (caps.db) caps.db.collection('comptes-rendus').doc(id).delete().catch(function () {});
+}
+function crDate(c) { try { return new Date(c.date).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } }
+function crCard(c) {
+  var first = (c.decisions && c.decisions[0]) || (c.resume || '').slice(0, 90) || ((c.transcript || []).length + ' phrases notées');
+  return h('button', { class: 'cr', onclick: function () { viewCR(c.id); } }, [
+    h('b', { text: (c.titre || 'Compte rendu') + (c.fournisseurNom ? ' · ' + c.fournisseurNom : '') }),
+    h('span', { text: crDate(c) + ' · ' + (c.type === 'reunion' ? 'Réunion' : 'Conversation') }),
+    h('span', { text: first })
+  ]);
+}
+function renderCRList() {
+  var box = $('#crBox'); if (!box) return; box.innerHTML = '';
+  if (!CRS.length) return;
+  box.appendChild(h('h2', { style: 'margin-top:1.2rem', text: 'Comptes rendus' }));
+  box.appendChild(h('p', { class: 'lead', style: 'margin-bottom:.2rem', text: WEB ? 'Gardés sur ce téléphone.' : (dbState === 'ok' ? 'Rangés dans ton espace Claude : demande à Claude « relis mes comptes rendus de la Foire » pour les retrouver.' : 'Gardés sur ce téléphone, envoyés dans ton espace Claude dès qu’il répond.') }));
+  var l = h('div', { class: 'crlist' }); CRS.forEach(function (c) { l.appendChild(crCard(c)); }); box.appendChild(l);
+}
+function crBody(body, c) {
+  body.appendChild(h('div', {}, [h('b', { style: 'font-size:1.3rem;font-family:var(--f-display);display:block', text: c.titre || 'Compte rendu' }), h('span', { class: 'note', text: crDate(c) + ' · ' + (c.transcript || []).length + ' phrases' + (c.fournisseurNom ? ' · ' + c.fournisseurNom : '') })]));
+  if (c.resume) body.appendChild(h('div', { class: 'card', style: 'padding:.8rem .9rem' }, [h('b', { text: 'Résumé' }), h('p', { style: 'margin:0', text: c.resume })]));
+  var sec = function (title, items, ic, emptyTxt) {
+    if ((!items || !items.length) && !emptyTxt) return;
+    var ul = h('ul'); (items || []).forEach(function (x) { ul.appendChild(h('li', { dir: 'auto', text: x })); });
+    body.appendChild(h('div', { class: 'crsec' }, [h('b', {}, [icon(ic), ' ' + title]), items && items.length ? ul : h('span', { class: 'note', text: emptyTxt })]));
+  };
+  if (c.source === 'claude') { sec('Décisions prises', c.decisions, 'check', 'Aucune décision claire dans la conversation.'); sec('Chiffres', c.chiffres, 'coin'); sec('À vérifier', c.aVerifier, 'alert'); }
+  var nk = Object.keys(c.notes || {});
+  if (nk.length) {
+    var det = h('details', { class: 'help' }); if (c.source !== 'claude') det.open = true;
+    det.appendChild(h('summary', { text: 'Notes automatiques (phrases avec des chiffres ou marquées)' }));
+    nk.forEach(function (k) { var ul = h('ul'); c.notes[k].forEach(function (x) { ul.appendChild(h('li', { dir: 'auto', text: x })); }); det.appendChild(h('div', { class: 'crsec', style: 'margin-bottom:.6rem' }, [h('b', { text: KL.themeLabel(k) }), ul])); });
+    body.appendChild(det);
+  } else if (c.source !== 'claude') body.appendChild(h('p', { class: 'note', text: 'Aucun chiffre ni phrase marquée « Important » pour l’instant.' }));
+  if (c.transcript && c.transcript.length) {
+    var tr = h('details', { class: 'help' }, [h('summary', { text: 'Tout ce qui a été dit (' + c.transcript.length + ' phrases)' })]);
+    var ol = h('div', { style: 'display:flex;flex-direction:column;gap:.3rem;padding-bottom:.6rem' }); c.transcript.forEach(function (x) { ol.appendChild(h('div', { dir: 'auto', text: x })); });
+    tr.appendChild(ol); body.appendChild(tr);
+  }
+}
+function viewCR(id) {
+  var c = CRS.filter(function (x) { return x.id === id; })[0]; if (!c) return;
+  openSheet('Compte rendu', function (body) {
+    crBody(body, c);
+    var conf = h('div', { class: 'confirm', hidden: true }, [h('b', { text: 'Supprimer ce compte rendu pour de bon ?' }), h('div', { class: 'row' }, [h('button', { class: 'btn', onclick: function () { conf.hidden = true; } }, ['Non, garder']), h('button', { class: 'btn danger', onclick: function () { deleteCR(c.id); closeSheet(); toast('Compte rendu supprimé'); } }, [icon('trash'), 'Oui, supprimer'])])]);
+    body.appendChild(h('div', { class: 'row' }, [h('button', { class: 'btn', onclick: function () { copyText(KL.crText(c), 'Compte rendu copié'); } }, [icon('copy'), 'Copier']), h('button', { class: 'btn danger', onclick: function () { conf.hidden = false; } }, [icon('trash'), 'Supprimer'])]));
+    body.appendChild(conf);
+  });
+}
+function claudeChat(c) {
+  var txt = 'Fais-moi le compte rendu de cette ' + (c.type === 'reunion' ? 'réunion' : 'conversation') + ' de la Foire de Canton, en français simple : le résumé, les décisions prises, tous les chiffres (prix, quantités, délais, paiement) et ce qui reste à vérifier. Garde chaque chiffre exact, n’invente rien.\n\n' + (c.transcript || []).join('\n');
+  copyText(txt, 'Conversation copiée');
+  try { window.open('https://claude.ai/new', '_blank', 'noopener'); } catch (e) {}
+  setTimeout(function () { toast('Dans Claude : appui long dans la case › Coller › Envoyer.', 5000); }, 2700);
+}
+// Résumé : relit toute la conversation (ou la réunion) depuis le début
+function openSummary(list, type) {
+  var real = (list || []).filter(function (m) { return m && !m.example && (m.out || m.src); });
+  if (!real.length) return toast(type === 'reunion' ? 'Rien n’a encore été noté dans la réunion' : 'Pas encore de conversation');
+  var notes = KL.buildNotes(real);
+  var fmt1 = function (it) { return (it.who === 'me' ? 'Moi : ' : (type === 'reunion' ? '' : 'Lui : ')) + it.fr; };
+  var c = { id: uid(), type: type, date: new Date().toISOString(), titre: type === 'reunion' ? 'Réunion' : 'Conversation', resume: '', decisions: [], chiffres: [], aVerifier: [], notes: {},
+    transcript: KL.transcriptLines(real, KL.lang(S.theirs).name).slice(-150), source: 'auto', fournisseurId: '', fournisseurNom: '', fournisseur: null };
+  KL.THEMES.forEach(function (th) { if (notes.themes[th[0]].length) c.notes[th[0]] = notes.themes[th[0]].map(fmt1); });
+  if (notes.autres.length) c.notes.autres = notes.autres.map(fmt1);
+  if (notes.importants.length) c.notes.importants = notes.importants.map(fmt1);
+  var ctl = null;
+  var draw = function (body, state, err) {
+    body.innerHTML = '';
+    if (state === 'wait') body.appendChild(h('div', { class: 'banner warn' }, [h('span', { class: 'spin' }), h('span', { text: 'Claude relit toute la ' + (type === 'reunion' ? 'réunion' : 'conversation') + ' depuis le début… (10 à 40 secondes)' })]));
+    if (err) body.appendChild(h('div', { class: 'banner bad' }, [icon('alert'), h('span', { text: 'Le résumé par Claude n’a pas abouti : ' + err + ' Voici les notes automatiques.' })]));
+    if (WEB) body.appendChild(h('div', { class: 'banner warn' }, [icon('info'), h('span', { text: 'Ici, ce sont les notes automatiques (les phrases avec des chiffres et celles marquées « Important »). Pour un vrai résumé avec les décisions, touche « Résumé complet avec Claude ».' })]));
+    crBody(body, c);
+    if (WEB) body.appendChild(h('button', { class: 'btn primary block', onclick: function () { claudeChat(c); } }, [icon('chat'), 'Résumé complet avec Claude']));
+    // ranger dans une fiche
+    var sel = h('select', { id: 'crFiche' });
+    sel.appendChild(h('option', { value: '', text: '— Sans fiche (ranger quand même) —' }));
+    var sugg = c.fournisseur && (c.fournisseur.nom || c.fournisseur.societe);
+    sel.appendChild(h('option', { value: '__new', text: '+ Nouvelle fiche' + (sugg ? ' : ' + sugg : '') }));
+    FICHES.forEach(function (f) { sel.appendChild(h('option', { value: f.id, text: (f.nom || f.societe || 'Sans nom') + (f.stand ? ' · ' + f.stand : '') })); });
+    if (lastFicheId && FICHES.some(function (f) { return f.id === lastFicheId; })) sel.value = lastFicheId;
+    body.appendChild(h('div', { class: 'field' }, [h('label', { for: 'crFiche' }, [icon('card'), 'Ranger dans la fiche du fournisseur']), sel]));
+  };
+  var body = openSheet(type === 'reunion' ? 'Résumé de la réunion' : 'Résumé de la conversation', function (b) { draw(b, !WEB && caps.sample ? 'wait' : null); }, [
+    { label: 'Copier', icon: 'copy', act: function () { copyText(KL.crText(c), 'Compte rendu copié'); } },
+    { label: 'Ranger', cls: 'primary', icon: 'check', act: function () {
+      var v = ($('#crFiche') || {}).value || '';
+      if (v === '__new') {
+        var nf = Object.assign(KL.EMPTY(), { id: uid(), source: 'Compte rendu' });
+        if (c.fournisseur) { nf.nom = c.fournisseur.nom; nf.societe = c.fournisseur.societe; nf.stand = c.fournisseur.stand; nf.produits = c.fournisseur.produits; }
+        if (!nf.nom && !nf.societe) nf.nom = 'Fournisseur du ' + crDate(c);
+        saveFiche(nf); v = nf.id;
+      }
+      if (v) { var f = FICHES.filter(function (x) { return x.id === v; })[0]; c.fournisseurId = v; c.fournisseurNom = f ? (f.nom || f.societe || '') : ''; lastFicheId = v; }
+      saveCR(c); closeSheet();
+      openSheet('Compte rendu rangé ✔', function (b2) {
+        b2.appendChild(h('p', { text: (c.fournisseurNom ? 'Rangé dans la fiche « ' + c.fournisseurNom + ' ». ' : 'Rangé. ') + (WEB ? 'Tu le retrouves dans l’onglet Fournisseurs.' : 'Tu le retrouves dans l’onglet Fournisseurs, et Claude peut le relire.') }));
+      }, [
+        { label: 'Garder ' + (type === 'reunion' ? 'la réunion' : 'la conversation'), act: closeSheet },
+        { label: 'Nouvelle ' + (type === 'reunion' ? 'réunion' : 'conversation'), cls: 'primary', act: function () { closeSheet(); if (type === 'reunion') clearMeeting(); else { CONV = []; save('kylo.interp.conv', CONV); renderConvo(); } } }
+      ]);
+    } }
+  ]);
+  sheetCleanup = function () { if (ctl) ctl.abort(); };
+  if (!WEB && caps.sample) {
+    ctl = new AbortController();
+    caps.sample.json(KL.summaryPrompt(real, S.theirs), { modelTier: 'default', signal: ctl.signal, cache: false }).then(function (o) {
+      var r = KL.checkSummary(o); if (!r) throw { code: 'invalid_json' };
+      c.titre = r.titre; c.resume = r.resume; c.decisions = r.decisions; c.chiffres = r.chiffres; c.aVerifier = r.aVerifier; c.fournisseur = r.fournisseur; c.source = 'claude';
+      if (body.isConnected) draw(body, null);
+    }, function (e) { if (e && e.code === 'cancelled') return; if (body.isConnected) draw(body, null, errText(e)); });
+  }
+}
+var lastFicheId = '';
+
+// ---------- MODE RÉUNION (version site) ----------
+var MEET = loadArr('kylo.interp.meet');
+var meet = { on: false, rec: null, wake: null, interim: '', restarts: 0, lastErr: null, playing: false, paused: false };
+function meetSave() { try { localStorage.setItem('kylo.interp.meet', JSON.stringify(MEET.slice(-400))); } catch (e) { toast('Mémoire du téléphone pleine : fais le résumé et range-le.', 4200); } }
+function setMode(m) {
+  S.mode = m; saveSet();
+  $('#modeConv').setAttribute('aria-pressed', String(m !== 'meet')); $('#modeMeet').setAttribute('aria-pressed', String(m === 'meet'));
+  $('#meetView').hidden = m !== 'meet'; $('#convo').hidden = m === 'meet'; $('#composer').hidden = m === 'meet';
+  if (m === 'meet') renderMeet();
+}
+function unheard() { return MEET.filter(function (s) { return s.out && !s.heard; }); }
+function renderMeetCtl() {
+  var box = $('#meetCtl'); box.innerHTML = '';
+  if (!CAN_MIC) {
+    box.appendChild(h('div', { class: 'banner warn' }, [icon('info'), h('span', {}, [WEB ? 'Ce navigateur n’a pas la reconnaissance vocale. Ouvre l’Interprète dans Safari sur l’iPhone.' : 'Le mode Réunion a besoin du micro direct : il marche sur ton site, ouvert dans Safari : ', WEB ? '' : h('a', { href: 'https://rice117.github.io/carnet-kylo/interprete/', target: '_blank', rel: 'noopener', text: 'rice117.github.io/carnet-kylo/interprete' })])]));
+    return;
+  }
+  var B = KL.lang(S.theirs), n = unheard().length;
+  var st = h('div', { class: 'meet-status' + (meet.on && !meet.paused ? ' on' : '') }, [h('i'), h('span', { text: meet.on ? (meet.paused ? 'Écoute en pause pendant la lecture' : 'J’écoute la réunion en ' + B.native + ' · ' + MEET.length + ' phrases') : (MEET.length ? 'Écoute arrêtée · ' + MEET.length + ' phrases notées' : 'Langue de la réunion : ' + B.flag + ' ' + B.native + ' (en haut à droite)') })]);
+  box.appendChild(st);
+  box.appendChild(h('button', { class: 'go' + (meet.on ? ' stop' : ''), id: 'meetStart', onclick: function () { if (meet.on) stopMeeting(); else startMeeting(); } }, [icon(meet.on ? 'stop' : 'play'), meet.on ? 'Arrêter l’écoute' : (MEET.length ? 'Reprendre l’écoute' : 'Démarrer l’écoute')]));
+  box.appendChild(h('div', { class: 'row2' }, [
+    h('button', { class: 'btn', id: 'meetListen', disabled: !n && !meet.playing ? true : null, onclick: function () { if (meet.playing) stopPlayback(); else playUnheard(); } }, [icon(meet.playing ? 'stop' : 'sound'), meet.playing ? 'Arrêter la lecture' : 'Écouter en français' + (n ? ' (' + n + ')' : '')]),
+    h('button', { class: 'btn', id: 'meetLive', 'aria-pressed': String(!!S.meetLive), onclick: function () { S.meetLive = !S.meetLive; saveSet(); renderMeetCtl(); toast(S.meetLive ? 'Direct : chaque phrase traduite est dite tout de suite. Mets tes écouteurs.' : 'Direct arrêté : touche « Écouter en français » quand tu veux.', 3600); } }, [icon('head'), 'Direct (écouteurs)'])
+  ]));
+  box.appendChild(h('div', { class: 'row2' }, [
+    h('button', { class: 'btn primary', id: 'meetSummary', onclick: function () { openSummary(MEET.map(function (sg) { return { who: 'them', src: sg.src, out: sg.out || '', star: sg.star, t: sg.t }; }), 'reunion'); } }, [icon('note'), 'Résumé']),
+    h('button', { class: 'btn', id: 'meetClear', onclick: askClearMeeting }, [icon('trash'), 'Effacer'])
+  ]));
+}
+function segEl(sg, isNew) {
+  var t = ''; try { t = new Date(sg.t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); } catch (e) {}
+  var kp = KL.isKeyPoint(sg.src) || KL.isKeyPoint(sg.out);
+  return h('div', { class: 'mseg' + (isNew ? ' new' : '') }, [
+    h('div', { class: 'meta' }, [h('span', { text: t }), kp ? h('span', { class: 'kp' }, [icon('tag'), 'Chiffre']) : null, sg.heard ? h('span', { text: 'écouté' }) : null, h('span', { class: 'sp' }),
+      h('button', { 'aria-label': 'Écouter en français', onclick: function () { if (sg.out) { sg.heard = true; meetSave(); speak(sg.out, S.mine); renderMeet(); } } }, [icon('sound')]),
+      h('button', { class: sg.star ? 'on' : '', 'aria-pressed': String(!!sg.star), 'aria-label': 'Marquer important', onclick: function () { sg.star = !sg.star; meetSave(); renderMeet(); } }, [icon('star')])]),
+    h('div', { class: 'o', dir: 'auto', text: sg.src }),
+    sg.out ? h('div', { class: 'f', dir: 'auto', text: sg.out }) : h('div', { class: 'f', style: 'color:var(--fg-soft)', text: sg.err ? 'Traduction pas arrivée (Internet ?)' : 'Traduction…' }),
+    sg.err ? h('button', { class: 'linkbtn', onclick: function () { translateSeg(sg); } }, ['Réessayer la traduction']) : null
+  ]);
+}
+function renderMeet() {
+  var list = $('#meetList'); if (!list) return;
+  var atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+  list.innerHTML = '';
+  if (!MEET.length && !meet.interim) {
+    list.appendChild(h('div', { class: 'hintcard' }, [h('span', { class: 'big', text: '👥' }), h('div', {}, [
+      h('b', { text: 'Mode Réunion : l’Interprète écoute tout et note tout.' }),
+      h('p', { class: 'note', text: '1. Choisis la langue de la réunion en haut à droite.  2. Touche « Démarrer l’écoute » et pose le téléphone sur la table, écran allumé.  3. Chaque phrase s’écrit, traduite en français.  4. Quand tu es prêt : « Écouter en français ». Avec des écouteurs : « Direct ».  5. À la fin : « Résumé ».' })
+    ])]));
+  }
+  var un = MEET.length - 3;
+  MEET.forEach(function (sg, i) { list.appendChild(segEl(sg, i >= un && meet.on)); });
+  list.appendChild(h('div', { class: 'interim', id: 'meetInterim', dir: 'auto', hidden: !meet.interim, text: '… ' + meet.interim }));
+  if (atBottom || meet.on) list.scrollTop = list.scrollHeight;
+  renderMeetCtl();
+}
+function translateSeg(sg) {
+  sg.err = false; renderMeet();
+  return gtxCall(sg.src, KL.lang(S.theirs).gt, KL.lang(S.mine).gt).then(function (r) {
+    sg.out = r.text; meetSave(); renderMeet();
+    if (S.meetLive && meet.on && !meet.playing) { sg.heard = true; meetSave(); speak(sg.out, S.mine); }
+  }, function () { sg.err = true; meetSave(); renderMeet(); });
+}
+function addSegment(text) {
+  text = String(text || '').trim(); if (!text) return;
+  var sg = { id: uid(), t: new Date().toISOString(), src: text, out: '', heard: false };
+  MEET.push(sg); meetSave(); renderMeet(); translateSeg(sg);
+}
+function wakeOn() { try { if (navigator.wakeLock && !meet.wake) navigator.wakeLock.request('screen').then(function (w) { meet.wake = w; w.addEventListener && w.addEventListener('release', function () { meet.wake = null; }); }, function () {}); } catch (e) {} }
+function wakeOff() { try { if (meet.wake) meet.wake.release(); } catch (e) {} meet.wake = null; }
+document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && meet.on) wakeOn(); });
+function meetListen() {
+  if (!meet.on || meet.paused || meet.rec) return;
+  var r; try { r = new SR(); } catch (e) { stopMeeting(); showMeetError('start'); return; }
+  r.lang = KL.lang(S.theirs).tts; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+  var done = {};
+  r.onresult = function (e) {
+    var interim = '';
+    for (var i = (e.resultIndex || 0); i < e.results.length; i++) {
+      var res = e.results[i];
+      if (res.isFinal) { if (!done[i]) { done[i] = 1; addSegment(res[0].transcript); } }
+      else interim += res[0].transcript;
+    }
+    var changed = meet.interim !== interim; meet.interim = interim;
+    var el = $('#meetInterim');
+    if (el && changed) { el.textContent = '… ' + interim; el.hidden = !interim; var l = $('#meetList'); l.scrollTop = l.scrollHeight; }
+  };
+  r.onerror = function (e) { meet.lastErr = (e && e.error) || 'error'; };
+  r.onend = function () {
+    meet.rec = null;
+    if (meet.interim.trim()) { addSegment(meet.interim); }
+    meet.interim = '';
+    var err = meet.lastErr; meet.lastErr = null;
+    if (!meet.on || meet.paused) { renderMeet(); return; }
+    if (err === 'not-allowed' || err === 'service-not-allowed' || err === 'audio-capture' || err === 'language-not-supported') {
+      stopMeeting(); showMeetError(meet.restarts > 0 && err === 'not-allowed' ? 'restart' : err); return;
+    }
+    meet.restarts++;
+    setTimeout(meetListen, 250);
+  };
+  meet.rec = r;
+  try { r.start(); } catch (e) { meet.rec = null; stopMeeting(); showMeetError('restart'); }
+}
+function showMeetError(code) {
+  var msg = code === 'restart' ? 'L’iPhone a coupé l’écoute. Touche « Reprendre l’écoute ». Garde l’écran allumé et l’Interprète devant.'
+    : code === 'not-allowed' ? 'Le micro est refusé. iPhone : Réglages › Safari › Micro › Autoriser, puis recharge la page.'
+    : code === 'service-not-allowed' ? 'La reconnaissance vocale est coupée. iPhone : Réglages › Général › Clavier › active « Dictée ».'
+    : code === 'language-not-supported' ? 'L’iPhone ne reconnaît pas cette langue à la voix.'
+    : code === 'audio-capture' ? 'Le micro est occupé (un appel en cours ?).' : 'L’écoute s’est arrêtée. Touche « Reprendre l’écoute ».';
+  var list = $('#meetList'); list.appendChild(h('div', { class: 'banner bad' }, [icon('alert'), h('span', { text: msg })])); list.scrollTop = list.scrollHeight;
+}
+function startMeeting() {
+  if (!CAN_MIC) return renderMeetCtl();
+  if (rec) { try { rec.stop(); } catch (e) {} }
+  unlockVoice(); meet.on = true; meet.paused = false; meet.restarts = 0; wakeOn(); renderMeet(); meetListen();
+}
+function stopMeeting() {
+  meet.on = false; meet.paused = false; wakeOff();
+  if (meet.rec) { try { meet.rec.stop(); } catch (e) {} }
+  renderMeet();
+}
+function playUnheard() {
+  var q = unheard(); if (!q.length) return;
+  unlockVoice();
+  meet.playing = true;
+  // sans écouteurs, on met l'écoute en pause pendant la lecture (sinon le micro entend le téléphone)
+  if (meet.on && !S.meetLive && meet.rec) { meet.paused = true; try { meet.rec.stop(); } catch (e) {} }
+  var next = function () {
+    if (!meet.playing) return;
+    var sg = unheard()[0];
+    if (!sg) { stopPlayback(); return; }
+    sg.heard = true; meetSave(); renderMeet();
+    var r = speak(sg.out, S.mine, next);
+    if (!r.spoken) stopPlayback();
+  };
+  renderMeetCtl(); next();
+}
+function stopPlayback() {
+  meet.playing = false; try { window.speechSynthesis.cancel(); } catch (e) {}
+  if (meet.paused) { meet.paused = false; if (meet.on) setTimeout(meetListen, 200); }
+  renderMeet();
+}
+function clearMeeting() { stopMeeting(); MEET = []; meetSave(); renderMeet(); }
+function askClearMeeting() {
+  openSheet('Effacer la réunion ?', function (body) { body.appendChild(h('p', { text: 'Tout ce qui a été noté dans cette réunion sera effacé de ce téléphone. Fais le résumé et range-le d’abord si tu veux le garder.' })); }, [
+    { label: 'Garder', act: closeSheet },
+    { label: 'Résumé d’abord', cls: 'primary', act: function () { closeSheet(); $('#meetSummary').click(); } },
+    { label: 'Effacer', cls: 'danger', act: function () { closeSheet(); clearMeeting(); } }
+  ]);
+}
+
+// ---------- branchements ----------
+function showTab(name) {
+  document.querySelectorAll('.tabs button').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.tab === name)); });
+  ['parler', 'phrases', 'fiches', 'prix'].forEach(function (t) { $('#tab-' + t).hidden = t !== name; });
+  try { sessionStorage.setItem('kylo.interp.tab', name); } catch (e) {}
+  if (name === 'phrases') renderPhrases();
+  if (name === 'parler') { var c = $('#convo'); c.scrollTop = CONV.length ? c.scrollHeight : 0; }
+}
+document.querySelectorAll('.tabs button').forEach(function (b) { b.addEventListener('click', function () { showTab(b.dataset.tab); }); });
+$('#openSettings').addEventListener('click', openSettings);
+$('#btnMine').addEventListener('click', function () { langPicker('mine'); });
+$('#btnTheirs').addEventListener('click', function () { langPicker('theirs'); });
+$('#btnSwap').addEventListener('click', function () { var t = S.mine; S.mine = S.theirs; S.theirs = t; saveSet(); renderPair(); renderPhrases(); });
+$('#whoMe').addEventListener('click', function () { setSpeaker('me'); $('#say').focus(); });
+$('#whoThem').addEventListener('click', function () { setSpeaker('them'); $('#say').focus(); });
+$('#say').addEventListener('input', onType);
+$('#say').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commit(); } });
+$('#say').addEventListener('focus', function () { document.body.classList.add('typing'); });
+$('#say').addEventListener('blur', function () { setTimeout(function () { if (document.activeElement !== $('#say')) document.body.classList.remove('typing'); }, 150); });
+$('#clearSay').addEventListener('click', function () { $('#say').value = ''; onType(); $('#say').focus(); });
+$('#btnGo').addEventListener('pointerdown', function (e) { e.preventDefault(); });
+$('#btnGo').addEventListener('click', commit);
+$('#tQR').addEventListener('click', function () { if (WEB) { openScanner(); return; } $('#fileQR').value = ''; $('#fileQR').click(); });
+$('#modeConv').addEventListener('click', function () { setMode('conv'); });
+$('#modeMeet').addEventListener('click', function () { setMode('meet'); });
+$('#micMe').addEventListener('click', function () { startMic('me'); });
+$('#micThem').addEventListener('click', function () { startMic('them'); });
+if (CAN_MIC) { document.body.classList.add('mic-mode', 'empty-say'); $('#mics').hidden = false; $('#say').placeholder = '… ou écris ici'; }
+$('#tCard').addEventListener('click', function () { $('#fileCard').value = ''; $('#fileCard').click(); });
+$('#tGallery').addEventListener('click', function () { $('#fileGallery').value = ''; $('#fileGallery').click(); });
+$('#tHand').addEventListener('click', function () { editFiche(null); });
+$('#fileQR').addEventListener('change', function (e) { handleQRFile(e.target.files[0]); });
+$('#fileCard').addEventListener('change', function (e) { handleCardFile(e.target.files[0]); });
+$('#fileGallery').addEventListener('change', function (e) { handleCardFile(e.target.files[0]); });
+$('#fSearch').addEventListener('input', renderFiches);
+$('#vCards').addEventListener('click', function () { fView = 'cards'; $('#vCards').setAttribute('aria-pressed', 'true'); $('#vTable').setAttribute('aria-pressed', 'false'); renderFiches(); });
+$('#vTable').addEventListener('click', function () { fView = 'table'; $('#vTable').setAttribute('aria-pressed', 'true'); $('#vCards').setAttribute('aria-pressed', 'false'); renderFiches(); });
+$('#fExport').addEventListener('click', exportCSV);
+$('#fCopyAll').addEventListener('click', copyTSV);
+['pUnit', 'pQty'].forEach(function (id) { $('#' + id).addEventListener('input', renderPrix); });
+$('#rCny').value = S.eurCny; $('#rGnf').value = S.eurGnf; $('#rNote').textContent = RATE_INFO.note;
+$('#rCny').addEventListener('input', function () { S.eurCny = this.value; saveSet(); renderPrix(); });
+$('#rGnf').addEventListener('input', function () { S.eurGnf = this.value; saveSet(); renderPrix(); });
+$('#pSay').addEventListener('click', function () {
+  var p = KL.prices($('#pUnit').value, $('#pQty').value, S.eurCny, S.eurGnf);
+  if (!p.unitCny) return toast('Mets un prix d’abord');
+  var txt = '单价' + KL.cnySpoken(p.unitCny) + (p.qty ? '，' + fmt(p.qty).replace(/\s/g, '') + '件，一共' + KL.cnySpoken(p.totalCny) : '') + '。';
+  showBig(txt, 'zh', '', 'Prix : ' + fmt(p.unitCny, 2) + ' ¥ la pièce' + (p.qty ? ', ' + fmt(p.qty) + ' pièces, total ' + fmt(p.totalCny, 2) + ' ¥' : ''));
+});
+$('#pOfferGo').addEventListener('click', function () {
+  var v = KL.toNum($('#pOffer').value); if (!v) return toast('Écris ton prix d’abord');
+  var n = String(Math.round(v * 100) / 100);
+  showBig('我出价每件' + n + '元，可以吗？', 'zh', 'Wǒ chūjià měi jiàn ' + n + ' yuán, kěyǐ ma?', 'Je propose ' + fmt(v, 2) + ' ¥ la pièce, c’est d’accord ?');
+});
+window.addEventListener('online', function () { flushPending(); if (WEB) setState('ok', 'Prête'); });
+window.addEventListener('offline', function () { if (WEB) setState('bad', 'Hors ligne'); });
+// premier affichage
+renderPair(); renderConvo(); renderPhrases(); renderFiches(); renderPrix(); renderStore(); renderCRList();
+setMode(S.mode === 'meet' ? 'meet' : 'conv');
+var lastTab = 'parler'; try { lastTab = sessionStorage.getItem('kylo.interp.tab') || 'parler'; } catch (e) {}
+showTab(lastTab);
+if (typeof window.jsQR !== 'function') { var s2 = document.createElement('script'); s2.src = 'https://unpkg.com/jsqr@1.4.0/dist/jsQR.js'; document.head.appendChild(s2); }
+initCaps();
+})();
+</script>
+
+<script>if ('serviceWorker' in navigator) { window.addEventListener('load', function () { navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(function () {}); }); }</script>
+</body>
+</html>

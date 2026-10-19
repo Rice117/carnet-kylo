@@ -18,6 +18,14 @@ ajout sur WeChat). Fiche Achat : les francs sous le prix. Reprise des fiches de 
 ⚠ Retouche faite directement sur ce fichier (l'ordinateur du magasin n'était pas joignable) : à reporter dans
 `KYLO-Achats.html` avant la prochaine fabrication par `construire.js`, sinon elle serait perdue.
 
+Version 1.3.0 — 20/10/2026 : **Catalogues et demandes de prix**. Fiche complète par fournisseur (« Sa fiche ») :
+photo de sa carte (QR lu par le carnet), « Coller le texte de la carte » (Texte en direct de l'iPhone), pages du
+catalogue rangées dans la réserve du téléphone (IndexedDB, hors fichier .json), modèles par famille (batterie, carton,
+colisage, poids, pièces par conteneur), ⭐ « m'intéresse », prix reçus tout de suite en francs ; demande de prix et
+relance en anglais + chinois (WeChat, e-mail, WhatsApp) ; « Comparer les prix par produit » tous fournisseurs confondus ;
+« Ajouter ce que Claude a lu » (code KYLOZ:/KYLO1: collé, fichier, ou lien #kylo=… qui ne part jamais sur Internet).
+Rien de retiré. ⚠ Même remarque que la 1.2.0 : à reporter dans `KYLO-Achats.html` (module `catalogues-1.3.0.html`).
+
 ## fiche.html — page d'aide de l'Interprète KYLO (16/10/2026)
 
 Met une fiche fournisseur dans les Contacts de l'iPhone et lance l'appel. Elle ne garde rien

@@ -892,7 +892,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.2.0';
+window.KYLO_APPLICATION = '1.3.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -1533,6 +1533,8 @@ function dessiner() {
   else if (ongletActif === 'achats') z.innerHTML = ecranAchats();
   else if (ongletActif === 'frais') z.innerHTML = ecranFrais();
   else if (ongletActif === 'rencontres') z.innerHTML = ecranRencontres();
+  else if (ongletActif === 'dossier') { z.innerHTML = ecranDossier(); setTimeout(ctRemplirMinis, 0); }
+  else if (ongletActif === 'catalogues') z.innerHTML = ecranCatalogues();
   else if (ongletActif === 'comparer') z.innerHTML = ecranComparer();
   else if (ongletActif === 'prix') z.innerHTML = ecranPrix();
   else if (ongletActif === 'objectif') z.innerHTML = ecranObjectif();
@@ -1729,8 +1731,11 @@ function transformerEnAchat(idc) {
   const c = trouverComparaison(idc); if (!c) return;
   const o = (c.offres || []).find(x => x.id === c.choisi);
   if (!o) { avertir('Choisissez d\'abord une offre.'); return; }
-  C.achats.push({ id: idUnique('a'), nom: c.article, fournisseur: o.fournisseur,
-    quantite: num(c.quantite) || 1, prix_unitaire: num(o.prix), devise: o.devise,
+  const qteAchat = num(c.quantite) || 1, qteCarton = num(o.qte_carton);
+  C.achats.push({ id: idUnique('a'), nom: o.modele ? c.article + ' ' + o.modele : c.article, reference: o.modele || '', fournisseur: o.fournisseur,
+    quantite: qteAchat, prix_unitaire: num(o.prix), devise: o.devise,
+    qte_carton: qteCarton, cartons: qteCarton > 0 ? Math.ceil(qteAchat / qteCarton) : 0,
+    dim_l: num(o.dim_l) || '', dim_la: num(o.dim_la) || '', dim_h: num(o.dim_h) || '',
     categorie: '', famille: '', code_barres: '', photo: o.photo || '', marge: 0.75,
     prix_detail_gnf: num(c.prix_vente_vise_gnf) || 0, prix_grossiste_gnf: 0,
     note: [c.motif ? 'Choisi : ' + c.motif : '', o.note].filter(Boolean).join(' · '),
@@ -5098,7 +5103,8 @@ function mkListeFournisseursHtml() {
   const liste = mkFournisseursRecents().filter(f => {
     if (mkFiltre === 'rien' ? f.decision : (mkFiltre !== 'tous' && f.decision !== mkFiltre)) return false;
     if (!q) return true;
-    const offres = mkOffresDe(f).map(x => x.c.article).join(' ');
+    const offres = mkOffresDe(f).map(x => x.c.article).join(' ') + ' ' + ctProduits(f).map(p => p.ref + ' ' + p.categorie).join(' ')
+      + ' ' + [f.contact, f.email, f.mobile, f.societe].join(' ');
     return normaliserNom([f.code, f.nom, f.societe, f.wechat, f.tel, f.allee, f.marche, f.remarque, offres].join(' ')).includes(q);
   });
   if (!liste.length) return `<div class="carte"><p class="mk-aide" style="font-size:16px">${mkFournisseurs().length
@@ -5116,7 +5122,8 @@ function mkCarteFournisseurHtml(f) {
         <div class="nom"><span class="mk-code">${E(f.code || '—')}</span> ${E(f.nom || f.societe || '(sans nom)')}</div>
         ${f.societe && f.nom ? `<div class="det">${E(f.societe)}</div>` : ''}
         ${f.allee || f.marche ? `<div class="det">📍 ${E([f.marche, f.allee].filter(Boolean).join(' · '))}</div>` : ''}
-        <div class="det">${aWx ? '💬 WeChat ' + E(f.wechat && !/^https?:/i.test(f.wechat) ? f.wechat : 'gardé') : '<span class="mk-att">pas de WeChat</span>'}${f.tel ? ' · 📞 ' + E(f.tel) : ''}${f.vu_le ? ' · vu le ' + mkJour(f.vu_le) + ' à ' + mkHeure(f.vu_le) : ''}</div>
+        <div class="det">${aWx ? '💬 WeChat ' + E(f.wechat && !/^https?:/i.test(f.wechat) ? f.wechat : 'gardé') : '<span class="mk-att">pas de WeChat</span>'}${f.tel ? ' · 📞 ' + E(ctTelLisible(f.tel)) : ''}${f.vu_le ? ' · vu le ' + mkJour(f.vu_le) + ' à ' + mkHeure(f.vu_le) : ''}</div>
+        ${ctCompteursHtml(f)}
       </div>
     </div>
     <div class="mk-decision">${MK_DECISIONS.map(([k, t]) => `<button type="button" class="${f.decision === k ? 'on-' + k : ''}" onclick="mkDecider('${f.id}','${k}')">${t}</button>`).join('')}</div>
@@ -5126,6 +5133,7 @@ function mkCarteFournisseurHtml(f) {
       : '<p class="mk-aide">Aucun produit noté chez lui pour l\'instant.</p>'}
     ${f.remarque ? `<p class="mk-aide" style="font-size:15px">📝 ${E(f.remarque)}</p>` : ''}
     <div class="mk-actions">
+      <button type="button" class="b" style="grid-column:1/-1;min-height:56px;font-size:16px" onclick="ctOuvrirDossier('${f.id}')">📂 Sa fiche : carte, catalogue, prix</button>
       <button type="button" class="b wechat" onclick="mkContact('${f.id}')">💬 L'ajouter sur WeChat</button>
       <button type="button" class="b vert" onclick="marcheOuvrir({fid:'${f.id}'})">📷 Noter un produit</button>
       ${f.tel ? `<button type="button" class="b contour" onclick="location.href='tel:${E(String(f.tel).replace(/[^\d+]/g, ''))}'">📞 Appeler</button>` : ''}
@@ -5134,6 +5142,8 @@ function mkCarteFournisseurHtml(f) {
   </div>`;
 }
 function ecranRencontres() {
+  if (ongletActif === 'rencontres') ctDossier = null;
+  ctNettoyerVides();
   mkAssurerCodes();
   const n = mkCompterDecisions();
   const filtres = [['tous', 'Tous'], ['contacter', '✅ À contacter'], ['voir', '🤔 Peut-être'], ['non', '❌ Non'], ['rien', '❔ Pas décidé']];
@@ -5147,8 +5157,12 @@ function ecranRencontres() {
     <input class="mk-recherche" value="${E(mkCherche)}" placeholder="🔎 Chercher : nom, produit, WeChat, code F…" oninput="mkChercher(this.value)" style="font-size:17px">
     ${interp.length ? `<div class="alerte a-info" style="font-size:15px">${interp.length} fiche(s) fournisseur faite(s) avec l'<b>Interprète KYLO</b> ne sont pas encore dans le carnet.
       <div style="height:8px"></div><button class="b contour" style="min-height:50px;font-size:16px" onclick="mkImporterInterprete()">Les ajouter ici</button></div>` : ''}
-    <div style="height:6px"></div>
-    <button class="b vert" style="min-height:56px;font-size:17px" onclick="marcheOuvrir()">📷 Noter un produit vu au marché</button>
+    <div class="ct-entree">
+      <button class="b vert" onclick="ctNouveauParCarte()">📇 Nouveau fournisseur : sa carte + son catalogue</button>
+      <button class="b vert" onclick="marcheOuvrir()">📷 Noter un produit vu au marché</button>
+      <button class="b contour" onclick="ctBoiteImport()">🤖 Ajouter ce que Claude a lu</button>
+      <button class="b contour" onclick="allerA('catalogues')">📊 Comparer les prix par produit</button>
+    </div>
   </div>
   <div id="mk_liste_four">${mkListeFournisseursHtml()}</div>`;
 }
@@ -5229,6 +5243,7 @@ function mkEnteteComparer() {
   return `<div class="mk-entree">
     <button class="b vert" onclick="marcheOuvrir()">📷 Noter un produit vu au marché</button>
     <button class="b contour" onclick="allerA('rencontres')">👥 Fournisseurs rencontrés (${nF}) — qui contacter ?</button>
+    <button class="b contour" onclick="allerA('catalogues')">📊 Comparer les prix par produit (catalogues)</button>
     <p class="mk-compte">${nOffres} prix noté${nOffres > 1 ? 's' : ''} · ${(C.comparaisons || []).length} produit(s) · ${nF} fournisseur(s). Le dernier noté est en haut.</p>
   </div>`;
 }
@@ -5331,6 +5346,1259 @@ function majConvAchat() {
   b.onclick = () => marcheOuvrir();
   document.body.appendChild(b);
 })();
+</script>
+<style>
+/* ===================== 1.3.0 — CATALOGUES ET DEMANDES DE PRIX (20/10/2026) =====================
+   Textes jamais sous 14 px (règle de Riche). Couleurs = variables du carnet (mode clair et sombre). */
+.ct-entree{display:grid;grid-template-columns:1fr;gap:10px;margin:10px 0 4px}
+.ct-entree .b, .ct-entree label.b{min-height:56px;font-size:17px;margin:0;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.25}
+.ct-titre{font-size:20px;font-weight:900;line-height:1.25;margin:0}
+.ct-sous{font-size:15px;color:var(--texte-note);line-height:1.4;margin:4px 0}
+.ct-liens{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.ct-liens .b{min-height:52px;font-size:15px;padding:8px 10px;width:100%}
+.ct-liens .b.wechat{background:#1aad19;color:#fff}
+.ct-statut{margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--bleu-pale);color:var(--bleu);font-size:16px;font-weight:700;line-height:1.4}
+.ct-statut.att{background:var(--ambre-pale);color:var(--ambre)}
+.ct-statut.ok{background:var(--vert-pale);color:var(--vert)}
+.ct-section{background:var(--carte);border:1px solid var(--lisiere);border-radius:16px;box-shadow:var(--ombre);padding:14px;margin-bottom:12px}
+.ct-section>summary{font-size:18px;font-weight:900;color:var(--bleu);min-height:44px;display:flex;align-items:center;gap:8px}
+.ct-section>summary::-webkit-details-marker{display:none}
+.ct-section>summary::after{content:'▾';margin-left:auto;font-size:18px}
+.ct-section:not([open])>summary::after{content:'▸'}
+.ct-mini-grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;margin:10px 0}
+.ct-mini{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px;background:var(--bleu-pale);border:1px solid var(--lisiere);display:block;cursor:zoom-in}
+.ct-mini-l{position:relative}
+.ct-mini-l span{position:absolute;left:4px;bottom:4px;background:rgba(0,0,0,.65);color:#fff;font-size:14px;font-weight:700;border-radius:6px;padding:1px 6px}
+.ct-etat{font-size:15px;font-weight:700;color:var(--bleu);min-height:20px;margin:6px 0}
+.ct-champs label{font-size:15px}
+.ct-champs input,.ct-champs textarea,.ct-champs select{font-size:17px}
+.ct-claude{border:2px dashed var(--bleu);border-radius:14px;padding:12px;margin-top:10px;background:var(--bleu-pale)}
+.ct-claude ol{margin:6px 0 0;padding-left:22px;font-size:15px;line-height:1.5}
+.ct-filtres{display:flex;gap:8px;overflow-x:auto;padding:4px 0 8px}
+.ct-filtres .mk-puce{flex:none}
+.ct-famille{font-size:17px;font-weight:900;margin:14px 0 6px;color:var(--noir)}
+.ct-prod{border-top:1px solid var(--gris-clair);padding:10px 0}
+.ct-prod:first-of-type{border-top:0}
+.ct-prod-tete{display:flex;align-items:flex-start;gap:8px}
+.ct-etoile{font-size:24px;line-height:1;border:0;background:none;padding:6px 4px;min-width:40px;min-height:40px;color:var(--gris)}
+.ct-etoile.on{color:#e0a100}
+.ct-ref{font:inherit;font-size:17px;font-weight:900;border:0;background:none;color:var(--bleu);padding:6px 0;text-align:left;text-decoration:underline;min-height:40px}
+.ct-car{font-size:15px;color:var(--texte-note);line-height:1.4}
+.ct-tag{display:inline-block;font-size:14px;font-weight:800;border-radius:999px;padding:1px 9px;margin:2px 4px 2px 0}
+.ct-tag.neuf{background:var(--bleu-pale);color:var(--bleu)}
+.ct-tag.att{background:var(--ambre-pale);color:var(--ambre)}
+.ct-tag.ok{background:var(--vert-pale);color:var(--vert)}
+.ct-prix{display:grid;grid-template-columns:1fr 96px 1fr;gap:8px;margin-top:8px;align-items:end}
+.ct-prix label{font-size:14px;margin:0 0 2px}
+.ct-prix input,.ct-prix select{font-size:17px;padding:10px}
+.ct-gnf{font-size:16px;font-weight:800;color:var(--vert);margin-top:4px;line-height:1.35}
+.ct-gnf:empty{display:none}
+.ct-gnf .rendu{font-weight:600;color:var(--texte-note);font-size:15px}
+.ct-ligne-cat{display:flex;gap:10px;align-items:flex-start;border-top:1px solid var(--gris-clair);padding:10px 0}
+.ct-ligne-cat:first-of-type{border-top:0}
+.ct-ligne-cat .corps{flex:1;min-width:0}
+.ct-ligne-cat .prix{text-align:right;font-size:16px;font-weight:900;white-space:nowrap}
+.ct-ligne-cat .prix small{display:block;font-size:14px;font-weight:700;color:var(--vert)}
+.ct-boutons-ligne{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.ct-boutons-ligne button{font:inherit;font-size:15px;font-weight:800;border-radius:10px;border:2px solid var(--bleu);background:var(--carte);color:var(--bleu);padding:6px 12px;min-height:44px}
+.ct-message{font-size:15px;line-height:1.45;font-family:inherit;min-height:220px}
+.ct-apercu-import{font-size:15px;line-height:1.45}
+.ct-apercu-import .alerte{font-size:15px}
+.ct-zoom-boite{overflow:auto;max-height:70vh;width:100%;max-width:640px;border-radius:10px;background:#fff;-webkit-overflow-scrolling:touch}
+.ct-zoom-boite img{display:block;width:100%;max-height:none!important;border-radius:0}
+.ct-zoom-boite.zoom img{width:260%}
+dialog.mk-apercu .ct-actions-apercu{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;max-width:640px}
+dialog.mk-apercu .ct-actions-apercu .b{min-height:52px;font-size:15px;max-width:none}
+.ct-volume{font-size:15px;color:var(--texte-note)}
+</style>
+<script>
+'use strict';
+// ===================== 1.3.0 — CATALOGUES ET DEMANDES DE PRIX (20/10/2026) =====================
+// Riche, 19/10/2026 au soir, après sa première journée à la Foire de Canton : il a ramassé les cartes
+// de visite et les catalogues des fournisseurs, mais AUCUN prix n'est affiché sur les stands. Il veut :
+//   - photographier la carte et le catalogue, et que tout soit rangé PAR FOURNISSEUR (coordonnées,
+//     WeChat, pages du catalogue, modèles et leurs caractéristiques), par famille de produit ;
+//   - envoyer à chaque fournisseur, sur WeChat (ou e-mail), la demande de prix de tous ses modèles ;
+//   - noter les prix reçus et comparer les fournisseurs entre eux, produit par produit, en francs.
+//
+// Qui lit quoi :
+//   - le carnet lit tout seul les QR codes (WeChat, carte de visite) — sans Internet ;
+//   - l'iPhone lit le texte d'une photo (« Texte en direct » dans Photos) : on colle ce texte ici,
+//     le carnet en tire le nom, les téléphones, l'e-mail, le site, et les références des modèles ;
+//   - Claude lit les cartes ET les catalogues complets (modèles, batterie, carton, colisage, poids)
+//     sur les photos qu'on lui envoie, et rend un code « KYLOZ:… » à coller dans le carnet.
+// Les photos des catalogues sont rangées dans la réserve du téléphone (IndexedDB) : elles ne pèsent
+// pas dans la mémoire du carnet ni dans son fichier .json. Rien n'est retiré des versions d'avant.
+
+window.KYLO_CATALOGUES = '1.3.0';
+let ctDossier = null;                         // le fournisseur dont la fiche est ouverte
+let ctFiltreCat = '', ctCherche = '', ctSeulInteresse = false, ctFiltreFour = '';
+const ctMiniCache = {};                       // petites photos déjà lues (id → image)
+const CT_CONTENEURS = [['20 pieds', 28], ['40 HC', 67]];   // les mêmes volumes que l'écran Conteneur
+
+// ---------- Les familles de produits (une image vaut mieux qu'un mot) ----------
+const CT_FAMILLES = [
+  ['🏸', 'Tapette à moustiques électrique', ['tapette', 'swatter', 'racket', 'raquette', '灭蚊拍']],
+  ['🦟', 'Lampe anti-moustiques', ['anti-moustique', 'anti moustique', 'killer lamp', 'mosquito lamp', 'zapper', '灭蚊灯']],
+  ['🌀', 'Ventilateur', ['ventilateur', 'fan', '风扇']],
+  ['♨️', 'Chauffage', ['chauffage', 'heater', '取暖', '暖风']],
+  ['💡', 'Lampe de bureau', ['lampe de bureau', 'reading', 'desk lamp', '台灯']],
+  ['🚨', 'Lampe de secours', ['secours', 'emergency', '应急']],
+  ['🏮', 'Lanterne', ['lanterne', 'lantern', 'camping', '露营']],
+  ['🔦', 'Torche et projecteur', ['torche', 'torch', 'flashlight', 'search light', 'projecteur', '手电']],
+  ['⛑️', 'Lampe frontale', ['frontale', 'head lamp', 'headlamp', '头灯']],
+  ['☀️', 'Solaire', ['solaire', 'solar', '太阳能']],
+  ['📱', 'Téléphones', ['telephone', 'téléphone', 'smartphone', 'phone', '手机']],
+  ['🔌', 'Chargeurs et câbles', ['chargeur', 'charger', 'cable', 'câble', '充电器', '数据线']],
+  ['🎧', 'Écouteurs et casques', ['ecouteur', 'écouteur', 'earphone', 'earbud', 'headphone', 'casque', '耳机']],
+  ['🔋', 'Batteries externes', ['power bank', 'batterie externe', '充电宝']],
+  ['🔊', 'Enceintes', ['enceinte', 'speaker', '音箱']]
+];
+function ctFamille(cat) {
+  const n = normaliserNom(cat);
+  if (!n) return null;
+  return CT_FAMILLES.find(x => normaliserNom(x[1]) === n)
+    || CT_FAMILLES.find(x => x[2].some(m => n.includes(normaliserNom(m)))) || null;
+}
+function ctEmoji(cat) { const f = ctFamille(cat); return f ? f[0] : '📦'; }
+function ctNomFamille(cat) { const s = String(cat || '').trim(); return s || 'Sans famille'; }
+function ctCleRef(ref) { return String(ref || '').toUpperCase().replace(/[\s\-_.]/g, ''); }
+function ctCleTel(t) { const d = String(t || '').replace(/\D/g, ''); return d.length >= 8 ? d.slice(-9) : ''; }
+function ctTelPropre(t) { const s = String(t || '').trim(); const d = s.replace(/[^\d+]/g, ''); return d; }
+function ctTelLisible(t) {
+  const d = ctTelPropre(t); if (!d) return '';
+  const m = /^\+?86(1\d{2})(\d{4})(\d{4})$/.exec(d);
+  if (m) return '+86 ' + m[1] + ' ' + m[2] + ' ' + m[3];
+  return d;
+}
+
+// ---------- Les données d'un fournisseur (cases ajoutées sans toucher aux anciennes) ----------
+// Lire ne modifie rien : une fiche d'avant reste identique tant qu'on n'y ajoute rien.
+function ctProduits(f) { return Array.isArray(f.produits) ? f.produits : []; }
+function ctDocs(f) { return Array.isArray(f.docs) ? f.docs : []; }
+function ctProduit(f, pid) { return ctProduits(f).find(p => p.id === pid); }
+function ctNbPrix(f) { return ctProduits(f).filter(p => num(p.prix) > 0).length; }
+function ctJoursDepuis(iso) { const d = iso ? new Date(iso) : null; return d && !isNaN(d) ? Math.floor((Date.now() - d.getTime()) / 86400000) : null; }
+function ctFournisseurVide(f) {
+  return !['nom', 'societe', 'contact', 'mobile', 'tel', 'tel_fixe', 'email', 'wechat', 'wechat_lien', 'qr_photo', 'carte_photo', 'allee', 'remarque']
+    .some(k => String(f[k] || '').trim()) && !ctDocs(f).length && !ctProduits(f).length && !mkOffresDe(f).length;
+}
+// Un fournisseur ouvert par « Nouveau fournisseur » et laissé vide ne reste pas dans la liste.
+function ctNettoyerVides() {
+  const avant = fournisseursListe().length;
+  C.fournisseurs = fournisseursListe().filter(f => !(f.ct_neuf && f.id !== ctDossier && ctFournisseurVide(f)));
+  if (C.fournisseurs.length !== avant) sauverLocal();
+}
+
+// ---------- Le volume : combien de pièces dans un conteneur ----------
+function ctVolumeCarton(p) { const v = num(p.dim_l) * num(p.dim_la) * num(p.dim_h) / 1000000; return v > 0 ? v : 0; }
+function ctPiecesConteneur(p, m3) {
+  const v = ctVolumeCarton(p), q = num(p.colisage);
+  return v > 0 && q > 0 ? Math.floor(m3 / v) * q : 0;
+}
+function ctLigneVolumeCourte(p) {
+  const c20 = ctPiecesConteneur(p, CT_CONTENEURS[0][1]);
+  return [num(p.colisage) ? nf(p.colisage) + ' / carton' : '', c20 ? '≈ ' + nf(c20) + ' pièces par 20 pieds' : ''].filter(Boolean).join(' · ');
+}
+function ctLigneVolume(p) {
+  const bouts = [];
+  if (num(p.colisage)) bouts.push(nf(p.colisage) + ' pièces / carton');
+  if (ctVolumeCarton(p)) bouts.push('carton ' + [p.dim_l, p.dim_la, p.dim_h].map(x => nf(x, 1)).join(' × ') + ' cm');
+  if (p.poids_kg) bouts.push(String(p.poids_kg).replace('.', ',') + ' kg');
+  const c20 = ctPiecesConteneur(p, CT_CONTENEURS[0][1]), c40 = ctPiecesConteneur(p, CT_CONTENEURS[1][1]);
+  if (c20) bouts.push('≈ ' + nf(c20) + ' pièces dans un 20 pieds, ' + nf(c40) + ' dans un 40 HC');
+  return bouts.join(' · ');
+}
+// Le prix reçu, dans sa devise, et tout de suite en francs (et arrivé au magasin, frais compris).
+function ctPrixHtml(p) {
+  const prix = num(p.prix); if (!(prix > 0)) return '';
+  const d = p.devise || 'USD', t = tauxDe(d);
+  if (!(t > 0)) return `<span class="mk-att">Taux du ${E(d)} à remplir (Voyage → Taux de change)</span>`;
+  const g = prix * t;
+  return `= ${gnfStrict(g)} <span class="rendu">· arrivé au magasin ≈ ${gnfStrict(g * (1 + fraisPourcent() / 100))}</span>`;
+}
+function ctPrixGnf(p) { const prix = num(p.prix), t = tauxDe(p.devise || 'USD'); return prix > 0 && t > 0 ? prix * t : 0; }
+
+// ---------- La réserve des photos (IndexedDB) ----------
+const CT_BASE = 'kylo-carnet-docs', CT_TABLE = 'docs';
+function ctOuvrir() {
+  return new Promise((ok, ko) => {
+    if (!window.indexedDB) { ko(new Error('ce téléphone ne sait pas garder les photos du catalogue')); return; }
+    let r;
+    try { r = indexedDB.open(CT_BASE, 1); } catch (e) { ko(e); return; }
+    r.onupgradeneeded = () => { r.result.createObjectStore(CT_TABLE); };
+    r.onsuccess = () => ok(r.result);
+    r.onerror = () => ko(r.error || new Error('la réserve des photos ne s\'ouvre pas'));
+  });
+}
+function ctOp(mode, travail) {
+  return ctOuvrir().then(db => new Promise((ok, ko) => {
+    let res, tx;
+    try {
+      tx = db.transaction(CT_TABLE, mode);
+      const req = travail(tx.objectStore(CT_TABLE));
+      if (req) req.onsuccess = () => { res = req.result; };
+    } catch (e) { try { db.close(); } catch (e2) {} ko(e); return; }
+    tx.oncomplete = () => { db.close(); ok(res); };
+    tx.onerror = tx.onabort = () => { db.close(); ko(tx.error || new Error('le téléphone refuse de ranger la photo (mémoire pleine ?)')); };
+  }));
+}
+function ctEcrire(k, v) { return ctOp('readwrite', s => s.put(v, k)); }
+function ctLire(k) { return ctOp('readonly', s => s.get(k)); }
+function ctEffacer(k) { return ctOp('readwrite', s => s.delete(k)); }
+function ctRemplirMinis() {
+  document.querySelectorAll('img.ct-mini[data-doc]').forEach(img => {
+    const id = img.getAttribute('data-doc');
+    if (ctMiniCache[id]) { img.src = ctMiniCache[id]; return; }
+    ctLire(id + '~m').then(src => {
+      if (src) { ctMiniCache[id] = src; img.src = src; }
+      else img.alt = 'photo restée sur un autre appareil';
+    }).catch(() => { img.alt = 'photo illisible'; });
+  });
+}
+
+// ---------- Ranger des photos (carte ou pages du catalogue) ----------
+async function ctAjouterPhotos(fid, type, input) {
+  const fichiers = Array.from((input && input.files) || []);
+  if (input) input.value = '';
+  const f = mkFournisseur(fid);
+  if (!f || !fichiers.length) return;
+  const etat = document.getElementById('ct_etat_' + type);
+  let ranges = 0, rates = 0, qrLu = false;
+  for (let i = 0; i < fichiers.length; i++) {
+    if (etat) etat.textContent = 'Rangement de la photo ' + (i + 1) + ' sur ' + fichiers.length + '…';
+    try {
+      const img = await mkLireFichier(fichiers[i]);
+      const id = idUnique('d');
+      // Assez grande pour lire les petites lignes d'un catalogue (batterie, carton, poids).
+      await ctEcrire(id, mkReduire(img, 1800, 0.74));
+      const mini = mkReduire(img, 280, 0.62);
+      await ctEcrire(id + '~m', mini);
+      ctMiniCache[id] = mini;
+      if (!Array.isArray(f.docs)) f.docs = [];
+      f.docs.push({ id, type, le: mkMaintenant() });
+      ranges++;
+      if (type === 'carte' && !qrLu) qrLu = await ctLireQrCarte(f, img);
+      delete f.ct_neuf;
+      f.vu_le = f.vu_le || mkMaintenant();
+      sauverLocal();
+    } catch (e) { rates++; }
+  }
+  if (ctDossier === fid && ongletActif === 'dossier') dessiner();
+  const quoi = type === 'carte' ? 'photo(s) de carte' : 'page(s) du catalogue';
+  avertir((ranges ? '✅ ' + ranges + ' ' + quoi + ' rangée(s) chez ' + mkNomFournisseur(f) + '.' : '')
+    + (qrLu ? '\n💬 QR code lu : ' + (f.wechat_lien ? 'son WeChat est gardé.' : 'coordonnées ajoutées.') : '')
+    + (type === 'carte' && ranges && !qrLu ? '\nPas de QR lisible sur la carte : touchez « Coller le texte de la carte ».' : '')
+    + (rates ? '\n⚠ ' + rates + ' photo(s) non rangée(s) : la mémoire du téléphone est peut-être pleine.' : ''), 6500);
+}
+// Le QR de la carte (WeChat, carte de visite) est lu tout de suite, sans Internet.
+async function ctLireQrCarte(f, img) {
+  try {
+    const res = await mkLireQR(img, [1200, 800, 1700, 2400]);
+    if (!res) return false;
+    const a = mkAnalyserQR(res.texte), ch = a.champs || {};
+    Object.keys(ch).forEach(k => {
+      if (k === 'note') return;
+      if (k === 'tel') { if (!f.mobile) f.mobile = ch.tel; if (!f.tel) f.tel = ch.tel; return; }
+      if (k === 'allee') { if (!f.adresse) f.adresse = ch.allee; return; }
+      if (!String(f[k] || '').trim()) f[k] = ch[k];
+    });
+    if (a.type !== 'wechat' && res.texte) f.qr_texte = String(res.texte).slice(0, 600);
+    if (!f.qr_photo) f.qr_photo = mkDecouperQR(res.toile, res.points);
+    return true;
+  } catch (e) { return false; }
+}
+
+// ---------- Lire le texte d'une carte (copié avec « Texte en direct » de l'iPhone) ----------
+const CT_TITRES = /(sales\s*(?:representative|manager|director)?|manager|representative|director|general\s+manager|ceo|owner|boss|assistant|export|marketing|purchas\w*|merchandiser|经理|总监|销售|业务员?|总经理|董事长|主管|代表)/i;
+function ctLireTexteCarte(texte) {
+  const brut = String(texte || '').replace(/\r/g, '');
+  const r = {};
+  const mails = brut.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+  if (mails[0]) r.email = mails[0];
+  const sansMail = brut.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, ' ');
+  (sansMail.match(/(?:https?:\/\/)?(?:www\.)?[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.(?:com\.cn|com|cn|net|org|hk|co|shop)(?:\/[^\s]*)?/gi) || [])
+    .forEach(s => {
+      const u = /^https?:/i.test(s) ? s : 'https://' + s;
+      if (/alibaba|1688/i.test(s)) { if (!r.alibaba) r.alibaba = u; } else if (!r.site) r.site = u;
+    });
+  const wx = brut.match(/(?:wechat|weixin|微信|wx)\s*(?:id|号)?\s*[:：]?\s*([A-Za-z][A-Za-z0-9_-]{4,29})/i);
+  if (wx) r.wechat = wx[1];
+  const lignes = brut.split('\n').map(s => s.trim()).filter(Boolean);
+  lignes.forEach(l => {
+    if (/fax|传真/i.test(l)) return;
+    (l.match(/(?:\+|00)?\d[\d\s().-]{6,}\d/g) || []).forEach(m => {
+      let d = m.replace(/[^\d+]/g, '').replace(/^00/, '+');
+      const chiffres = d.replace(/\D/g, '');
+      if (chiffres.length < 8 || chiffres.length > 15) return;
+      const sans86 = chiffres.replace(/^86/, '');
+      if (/^1[3-9]\d{9}$/.test(sans86)) { if (!r.mobile) r.mobile = '+86' + sans86; return; }
+      if (/whatsapp|wa\b/i.test(l) && !r.whatsapp) { r.whatsapp = d.startsWith('+') ? d : '+' + d; return; }
+      if (!r.tel_fixe) r.tel_fixe = d.startsWith('+') ? d : (chiffres.startsWith('86') ? '+' + chiffres : d);
+    });
+  });
+  const estSociete = (l) => /(co\.?,?\s*ltd|company|limited|factory|trading|industr|manufactur|appliance|electronics?|technology|有限公司|公司|工厂|厂|商行)/i.test(l);
+  const societes = lignes.filter(l => estSociete(l) && !/@/.test(l)).sort((a, b) => /ltd|有限公司/i.test(b) - /ltd|有限公司/i.test(a) || b.length - a.length);
+  if (societes[0]) r.societe = societes[0];
+  const adresse = lignes.filter(l => l !== r.societe && !/@/.test(l)
+    && /(road|rd\.|street|avenue|district|city|province|building|bldg|room|floor|no\.|town|village|zone|park|center|centre|expressway|路|街|区|市|省|号|楼|室|镇|村)/i.test(l));
+  if (adresse.length) r.adresse = adresse.join(', ');
+  for (let i = 0; i < lignes.length; i++) {
+    const l = lignes[i];
+    if (/@|\d{5,}|www\.|\.com/i.test(l) || l === r.societe) continue;
+    const m = l.match(CT_TITRES);
+    if (!m) continue;
+    const avant = l.slice(0, m.index).replace(/[|,·:–-]+$/, '').trim();
+    r.poste = l.slice(m.index).trim();
+    if (avant && avant.length <= 30) r.contact = avant;
+    else if (i > 0 && lignes[i - 1].length <= 25 && !/\d|@/.test(lignes[i - 1]) && lignes[i - 1] !== r.societe) r.contact = lignes[i - 1];
+    break;
+  }
+  return r;
+}
+const CT_LIBELLES = { contact: 'Contact', poste: 'Poste', societe: 'Société', mobile: 'Portable', tel_fixe: 'Téléphone fixe',
+  whatsapp: 'WhatsApp', email: 'E-mail', site: 'Site', alibaba: 'Boutique Alibaba', wechat: 'WeChat', adresse: 'Adresse' };
+function ctBoiteTexteCarte(fid) {
+  boite(`<div class="mk-dlg ct-champs">
+    <h3>📋 Coller le texte de la carte</h3>
+    <ol class="mk-etapes">
+      <li>Ouvrez la photo de la carte dans <b>Photos</b>.</li>
+      <li>Touchez l'icône <b>Texte en direct</b> (le petit cadre avec des lignes, en bas à droite), puis <b>Tout copier</b>.</li>
+      <li>Revenez ici et touchez <b>Coller</b>.</li></ol>
+    <div style="height:8px"></div>
+    <button class="b contour" style="min-height:52px;font-size:16px" onclick="ctColler('ct_texte_carte', () => ctApercuCarte('${fid}'))">📋 Coller</button>
+    <textarea id="ct_texte_carte" rows="6" placeholder="ou écrivez / collez le texte ici" oninput="ctApercuCarte('${fid}')"></textarea>
+    <div id="ct_apercu_carte" class="ct-apercu-import"></div>
+    <div class="mk-boutons">
+      <button class="b vert" onclick="ctAppliquerCarte('${fid}')">✅ Remplir la fiche</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button>
+    </div></div>`);
+}
+function ctApercuCarte(fid) {
+  const z = document.getElementById('ct_apercu_carte'), t = document.getElementById('ct_texte_carte');
+  if (!z || !t) return;
+  const r = ctLireTexteCarte(t.value);
+  const f = mkFournisseur(fid) || {};
+  const lignes = Object.keys(CT_LIBELLES).filter(k => r[k]).map(k => `<li><b>${CT_LIBELLES[k]} :</b> ${E(r[k])}${String(f[k] || '').trim() && f[k] !== r[k] ? ' <span class="mk-att">(déjà rempli : on garde « ' + E(f[k]) + ' »)</span>' : ''}</li>`);
+  z.innerHTML = t.value.trim() ? (lignes.length ? `<p style="margin:8px 0 4px"><b>Trouvé sur la carte :</b></p><ul style="margin:0;padding-left:20px">${lignes.join('')}</ul>`
+    : '<div class="alerte a-ambre">Rien de reconnu. Vérifiez que c\'est bien le texte de la carte.</div>') : '';
+}
+function ctAppliquerCarte(fid) {
+  const f = mkFournisseur(fid), t = document.getElementById('ct_texte_carte');
+  if (!f || !t) return;
+  const r = ctLireTexteCarte(t.value);
+  let n = 0;
+  Object.keys(CT_LIBELLES).forEach(k => { if (r[k] && !String(f[k] || '').trim()) { f[k] = r[k]; n++; } });
+  if (!f.nom && (r.contact || r.societe)) {
+    const marque = r.societe ? r.societe.replace(/^(guangdong|guangzhou|shenzhen|zhejiang|yiwu|ningbo|foshan|dongguan|jieyang|shantou)\s+/i, '').split(/\s+/)[0] : '';
+    f.nom = [marque, r.contact].filter(Boolean).join(' — ');
+  }
+  if (!f.tel && (r.mobile || r.tel_fixe)) f.tel = r.mobile || r.tel_fixe;
+  if (r.whatsapp && !f.whatsapp) f.whatsapp = r.whatsapp;
+  if (!f.texte_carte) f.texte_carte = String(t.value).slice(0, 2000);
+  delete f.ct_neuf;
+  ctSynchroNom(f);
+  sauverLocal(); fermerBoite(); dessiner();
+  avertir(n ? '✅ ' + n + ' case(s) remplie(s) depuis la carte.' : 'Rien de nouveau : les cases étaient déjà remplies.');
+}
+// Le bouton « Coller » : le presse-papiers si le téléphone le permet, sinon on colle à la main.
+function ctColler(champId, suite) {
+  const ch = document.getElementById(champId);
+  const finir = () => { if (typeof suite === 'function') suite(); };
+  try {
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      navigator.clipboard.readText().then(t => { if (ch) { ch.value = t; finir(); } },
+        () => { if (ch) ch.focus(); avertir('Appuyez longuement dans la case, puis « Coller ».'); });
+      return;
+    }
+  } catch (e) {}
+  if (ch) ch.focus();
+  avertir('Appuyez longuement dans la case, puis « Coller ».');
+}
+
+// ---------- Les modèles écrits sur une page de catalogue ----------
+const CT_PAS_MODELE = /^(ISO|IP|ROHS|SMD|AC|DC|USB|LED|CTN|GW|NW|KG|MAH|CE|FCC|UL|CB|EPA|KC|BSCI|UKCA|PCS|TYPE|V|W|HZ|MM|CM|QTY|MOQ|FOB|EXW|RMB|USD|CNY|NO|PAGE|TEL|FAX)$/;
+function ctSpecs(seg) {
+  const s = {}, t = String(seg || '');
+  const bat = t.match(/(?:lithium|li-?polymer|battery|电池)[^:\n：]{0,20}[:：]?\s*([\d\/]{3,})\s*mAh/i);
+  if (bat) s.batterie = bat[1];
+  const ctn = t.match(/(?:CTN|carton|外箱)[^\d\n]{0,12}([\d.]+)\s*[x×*X]\s*([\d.]+)\s*[x×*X]\s*([\d.]+)/i);
+  if (ctn) { s.dim_l = num(ctn[1]); s.dim_la = num(ctn[2]); s.dim_h = num(ctn[3]); }
+  const pk = t.match(/(?:packing|pcs\s*\/\s*ctn|装箱)[^\d\n]{0,12}(\d{1,4})/i);
+  if (pk) s.colisage = num(pk[1]);
+  const gw = t.match(/(?:GW|G\.W\.?|毛重)[^\d\n]{0,6}([\d.\/]+)\s*KG/i);
+  if (gw) s.poids_kg = gw[1];
+  const led = t.match(/(\d{1,2})\s*(?:PCS|SMD)\b/);
+  if (led) s.led = led[1];
+  return s;
+}
+function ctModelesDansTexte(texte) {
+  const t = String(texte || '');
+  const re = /\b([A-Z]{1,5})[- ]?(\d{2,6}[A-Z]{0,3})((?:\/[A-Z]{0,2}\d{2,6}[A-Z]{0,3})*)\b/g;
+  const vus = [], cles = new Set();
+  let m;
+  while ((m = re.exec(t))) {
+    if (CT_PAS_MODELE.test(m[1])) continue;
+    const ref = m[1] + '-' + m[2] + (m[3] || '');
+    vus.push({ ref, pos: m.index, fin: re.lastIndex });
+  }
+  const res = [];
+  vus.forEach((v, i) => {
+    const k = ctCleRef(v.ref);
+    if (cles.has(k)) return;
+    cles.add(k);
+    // Les caractéristiques ne sont reprises que si le morceau de texte n'en a qu'un jeu :
+    // un catalogue lu en lignes mélange les colonnes, et un faux carton est pire qu'un carton vide.
+    const seg = t.slice(v.fin, i + 1 < vus.length ? vus[i + 1].pos : t.length);
+    const nb = (re2) => (seg.match(re2) || []).length;
+    // « PCS/CTN » n'est pas un second carton : on compte les DIMENSIONS (77x36x44.5), pas le mot.
+    const sur = nb(/\d\s*[x×*X]\s*[\d.]+\s*[x×*X]\s*\d/g) <= 1 && nb(/mAh/gi) <= 1 && nb(/packing|装箱/gi) <= 1;
+    res.push({ ref: v.ref, specs: sur ? ctSpecs(seg) : {} });
+  });
+  return res;
+}
+function ctBoiteTextePage(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  boite(`<div class="mk-dlg ct-champs">
+    <h3>📋 Les modèles d'une page du catalogue</h3>
+    <ol class="mk-etapes">
+      <li>Dans <b>Photos</b>, ouvrez la photo de la page, touchez <b>Texte en direct</b> puis <b>Tout copier</b>.</li>
+      <li>Revenez ici et touchez <b>Coller</b> : le carnet trouve les références (WD-959, YT-208…).</li></ol>
+    <p class="mk-aide">Pour avoir aussi la batterie, le carton et le poids sans erreur, envoyez plutôt les photos à Claude.</p>
+    <button class="b contour" style="min-height:52px;font-size:16px" onclick="ctColler('ct_texte_page', () => ctApercuPage('${fid}'))">📋 Coller</button>
+    <textarea id="ct_texte_page" rows="6" placeholder="texte de la page" oninput="ctApercuPage('${fid}')"></textarea>
+    <label for="ct_famille_page">Famille de ces produits</label>
+    <input id="ct_famille_page" list="ct_liste_familles" placeholder="ex : Tapette à moustiques électrique" value="${E(ctDerniereFamille(f))}">
+    ${ctListeFamillesHtml()}
+    <div id="ct_apercu_page" class="ct-apercu-import"></div>
+    <div class="mk-boutons">
+      <button class="b vert" onclick="ctAppliquerPage('${fid}')">✅ Ajouter ces modèles</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button>
+    </div></div>`);
+}
+function ctDerniereFamille(f) { const p = ctProduits(f); return p.length ? p[p.length - 1].categorie || '' : ''; }
+function ctListeFamillesHtml() {
+  const vues = new Set(CT_FAMILLES.map(x => x[1]));
+  fournisseursListe().forEach(f => ctProduits(f).forEach(p => { if (p.categorie) vues.add(p.categorie); }));
+  return `<datalist id="ct_liste_familles">${[...vues].map(v => `<option value="${E(v)}">`).join('')}</datalist>`;
+}
+function ctApercuPage(fid) {
+  const z = document.getElementById('ct_apercu_page'), t = document.getElementById('ct_texte_page');
+  const f = mkFournisseur(fid); if (!z || !t || !f) return;
+  const trouves = ctModelesDansTexte(t.value);
+  const deja = new Set(ctProduits(f).map(p => ctCleRef(p.ref)));
+  z.innerHTML = !t.value.trim() ? '' : trouves.length
+    ? `<p style="margin:8px 0 4px"><b>${trouves.length} modèle(s) trouvé(s) :</b></p><p style="margin:0">${trouves.map(x => E(x.ref)
+      + (deja.has(ctCleRef(x.ref)) ? ' <span class="mk-att">(déjà là)</span>' : '')).join(' · ')}</p>`
+    : '<div class="alerte a-ambre">Aucune référence de modèle reconnue dans ce texte.</div>';
+}
+function ctAppliquerPage(fid) {
+  const f = mkFournisseur(fid), t = document.getElementById('ct_texte_page');
+  if (!f || !t) return;
+  const fam = (document.getElementById('ct_famille_page') || {}).value || '';
+  const trouves = ctModelesDansTexte(t.value);
+  let n = 0;
+  trouves.forEach(x => {
+    const s = x.specs, car = [s.led ? s.led + ' LED' : '', s.batterie ? 'batterie ' + s.batterie + ' mAh' : ''].filter(Boolean).join(' · ');
+    if (ctAjouterProduit(f, { ref: x.ref, categorie: fam, caracteristiques: car, colisage: s.colisage, dim_l: s.dim_l, dim_la: s.dim_la,
+      dim_h: s.dim_h, poids_kg: s.poids_kg, source: 'texte' })) n++;
+  });
+  delete f.ct_neuf;
+  sauverLocal(); fermerBoite(); dessiner();
+  avertir(n ? '✅ ' + n + ' modèle(s) ajouté(s).' : 'Aucun modèle nouveau.');
+}
+function ctAjouterProduit(f, d) {
+  const k = ctCleRef(d.ref);
+  if (k && ctProduits(f).some(p => ctCleRef(p.ref) === k)) return false;
+  if (!Array.isArray(f.produits)) f.produits = [];
+  f.produits.push(Object.assign({ id: idUnique('p'), ref: '', categorie: '', caracteristiques: '', colisage: 0,
+    dim_l: 0, dim_la: 0, dim_h: 0, poids_kg: '', page: '', interesse: false, prix: 0, devise: f.prix_devise || 'USD',
+    moq: 0, prix_le: '', note: '', ajoute_le: mkMaintenant() }, d));
+  return true;
+}
+
+// ---------- La fiche complète d'un fournisseur ----------
+function ctOuvrirDossier(fid) { ctDossier = fid; fermerBoite(); allerA('dossier'); }
+function ctNouveauParCarte() {
+  const f = { id: idUnique('f'), code: mkProchainCode(), nom: '', marche: '', batiment: '', allee: '', wechat: '', tel: '',
+    qualite: '', remarque: '', le: mkMaintenant().slice(0, 10), vu_le: mkMaintenant(), source: 'carte', decision: '',
+    ct_neuf: true, docs: [], produits: [] };
+  fournisseursListe().unshift(f);
+  sauverLocal();
+  ctOuvrirDossier(f.id);
+}
+function ctStatutPrixHtml(f) {
+  const n = ctProduits(f).length, np = ctNbPrix(f);
+  const j = ctJoursDepuis(f.demande_le), jr = ctJoursDepuis(f.relance_le);
+  if (!f.demande_le) return `<div class="ct-statut att">⏳ Prix pas encore demandés${n ? ' · ' + n + ' modèle(s) notés' : ''}</div>`;
+  const quand = 'Prix demandés le ' + mkJour(f.demande_le) + (jr !== null ? ', relancé le ' + mkJour(f.relance_le) : '');
+  if (n && np >= n) return `<div class="ct-statut ok">✅ Tous les prix reçus (${np}/${n})</div>`;
+  const relancer = np === 0 && (jr !== null ? jr : j) >= 2;
+  return `<div class="ct-statut${relancer ? ' att' : ''}">✉️ ${quand} · 💰 ${np}/${n || '?'} prix reçus${relancer ? ' · 🔔 à relancer' : ''}</div>`;
+}
+function ctCompteursHtml(f) {
+  const nd = ctDocs(f).length, np = ctProduits(f).length;
+  if (!nd && !np && !f.demande_le) return '';
+  return `<div class="det">${nd ? '📖 ' + nd + ' photo(s)' : ''}${nd && np ? ' · ' : ''}${np ? '📦 ' + np + ' modèle(s) · 💰 ' + ctNbPrix(f) + ' prix' : ''}${f.demande_le ? ' · ✉️ demandés le ' + mkJour(f.demande_le) : ''}</div>`;
+}
+function ecranDossier() {
+  const f = mkFournisseur(ctDossier);
+  if (!f) { ongletActif = 'rencontres'; return ecranRencontres(); }
+  const docs = ctDocs(f), cartes = docs.filter(d => d.type === 'carte'), pages = docs.filter(d => d.type !== 'carte');
+  const tel = ctTelPropre(f.mobile || f.tel || f.tel_fixe);
+  const aWx = f.wechat || f.wechat_lien || f.qr_photo;
+  const site = f.site || f.alibaba;
+  return `<button class="b gris" style="margin-bottom:12px;min-height:50px;font-size:16px" onclick="ctDossier=null;allerA('rencontres')">← Tous les fournisseurs</button>
+  <div class="carte">
+    <div class="mk-fiche-tete">
+      ${f.qr_photo ? `<img class="qr" src="${f.qr_photo}" alt="QR WeChat" onclick="mkVoirQR('${f.id}')">` : '<div class="sans" aria-hidden="true">🏭</div>'}
+      <div style="flex:1;min-width:0">
+        <p class="ct-titre"><span class="mk-code">${E(f.code || '—')}</span> ${E(f.nom || f.societe || 'Nouveau fournisseur')}</p>
+        ${f.societe ? `<p class="ct-sous">${E(f.societe)}</p>` : ''}
+        ${f.contact || f.poste ? `<p class="ct-sous">👤 ${E([f.contact, f.poste].filter(Boolean).join(' · '))}</p>` : ''}
+        ${tel ? `<p class="ct-sous">📞 ${E(ctTelLisible(tel))}${f.tel_fixe && ctTelPropre(f.tel_fixe) !== tel ? ' · ☎️ ' + E(ctTelLisible(f.tel_fixe)) : ''}</p>` : ''}
+        ${f.email ? `<p class="ct-sous">✉️ ${E(f.email)}</p>` : ''}
+      </div>
+    </div>
+    <div class="mk-decision">${MK_DECISIONS.map(([k, t]) => `<button type="button" class="${f.decision === k ? 'on-' + k : ''}" onclick="mkDecider('${f.id}','${k}')">${t}</button>`).join('')}</div>
+    ${ctStatutPrixHtml(f)}
+    <div class="ct-entree">
+      <button class="b vert" onclick="ctBoiteDemande('${f.id}')">✉️ ${f.demande_le ? 'Redemander' : 'Demander'} les prix (WeChat, e-mail)</button>
+      ${f.demande_le && ctNbPrix(f) < Math.max(1, ctProduits(f).length) ? `<button class="b contour" onclick="ctBoiteDemande('${f.id}', true)">🔔 Relancer</button>` : ''}
+    </div>
+    <div class="ct-liens">
+      <button class="b wechat" onclick="mkContact('${f.id}')">💬 ${aWx ? 'Son WeChat' : 'WeChat'}</button>
+      ${tel ? `<button class="b contour" onclick="location.href='tel:${E(tel)}'">📞 Appeler</button>` : ''}
+      ${f.email ? `<button class="b contour" onclick="ctEcrireMail('${f.id}')">✉️ E-mail</button>` : ''}
+      ${site ? `<button class="b contour" onclick="window.open(${E(JSON.stringify(site))},'_blank')">🌐 Son site</button>` : ''}
+    </div>
+  </div>
+
+  <details class="ct-section" open><summary>📇 Sa carte et ses coordonnées</summary>
+    ${cartes.length ? `<div class="ct-mini-grille">${cartes.map(d => ctMiniHtml(f, d)).join('')}</div>` : ''}
+    <div class="mk-deux" style="margin-top:8px">
+      <label class="b vert" for="ct_carte">📷 Photo de sa carte</label>
+      <button type="button" class="b contour" onclick="ctBoiteTexteCarte('${f.id}')">📋 Coller le texte de la carte</button>
+    </div>
+    <input type="file" id="ct_carte" accept="image/*" multiple class="champ-cache" onchange="ctAjouterPhotos('${f.id}','carte',this)">
+    <div class="ct-etat" id="ct_etat_carte" role="status"></div>
+    <div class="ct-champs">${ctChampsHtml(f)}</div>
+  </details>
+
+  <details class="ct-section" open><summary>📖 Son catalogue (${pages.length} photo${pages.length > 1 ? 's' : ''})</summary>
+    ${pages.length ? `<div class="ct-mini-grille">${pages.map((d, i) => ctMiniHtml(f, d, i + 1)).join('')}</div>`
+      : '<p class="mk-aide" style="font-size:15px">Photographiez la couverture, le sommaire et les pages des produits qui vous intéressent.</p>'}
+    <div class="mk-deux">
+      <label class="b vert" for="ct_pages">📷 Ajouter des pages</label>
+      <button type="button" class="b contour" onclick="ctPartagerDocs('${f.id}')"${docs.length ? '' : ' disabled'}>📤 Envoyer ces photos</button>
+    </div>
+    <input type="file" id="ct_pages" accept="image/*" multiple class="champ-cache" onchange="ctAjouterPhotos('${f.id}','page',this)">
+    <div class="ct-etat" id="ct_etat_page" role="status"></div>
+    ${f.catalogue ? `<p class="ct-sous">📑 ${E(f.catalogue)}</p>` : ''}
+    <div class="ct-claude"><b style="font-size:16px">🤖 Faire lire le catalogue par Claude</b>
+      <ol><li>Touchez <b>📤 Envoyer ces photos</b> → Claude (ou « Enregistrer les images », puis envoyez-les à Claude).</li>
+      <li>Claude lit les modèles, la batterie, le carton, le poids, et vous renvoie un code <b>KYLOZ:…</b></li>
+      <li>Touchez <b>🤖 Ajouter ce que Claude a lu</b> et collez le code.</li></ol>
+      <div style="height:8px"></div>
+      <button class="b contour" style="min-height:52px;font-size:16px" onclick="ctBoiteImport()">🤖 Ajouter ce que Claude a lu</button></div>
+  </details>
+
+  <details class="ct-section" open><summary>📦 Ses produits (${ctProduits(f).length}) · 💰 ${ctNbPrix(f)} prix</summary>
+    ${ctListeProduitsDossier(f)}
+    <div class="mk-deux" style="margin-top:10px">
+      <button type="button" class="b contour" onclick="ctBoiteProduit('${f.id}')">➕ Ajouter un modèle</button>
+      <button type="button" class="b contour" onclick="ctBoiteTextePage('${f.id}')">📋 Coller le texte d'une page</button>
+    </div>
+  </details>
+
+  <div class="carte"><label for="ct_rem" style="font-size:15px">📝 Remarques — dictez avec le micro du clavier 🎙️</label>
+    <textarea id="ct_rem" rows="3" oninput="ctMajChamp('${f.id}','remarque',this.value)">${E(f.remarque)}</textarea>
+    <div style="height:12px"></div>
+    <button class="b rouge" style="min-height:52px;font-size:16px" onclick="ctSupprimerFournisseur('${f.id}')">🗑 Supprimer ce fournisseur</button>
+  </div>`;
+}
+function ctMiniHtml(f, d, n) {
+  return `<div class="ct-mini-l"><img class="ct-mini" data-doc="${E(d.id)}" alt="${d.type === 'carte' ? 'Carte' : 'Page ' + (n || '')}" onclick="ctVoirDoc('${f.id}','${d.id}')">${n ? `<span>${n}</span>` : ''}</div>`;
+}
+const CT_CHAMPS = [['nom', 'Nom affiché (marque — contact)', 'ex : Weidasi — Emily'], ['societe', 'Société', ''], ['contact', 'Contact', 'ex : Emily'],
+  ['poste', 'Poste', 'ex : Sales Representative'], ['mobile', 'Portable (souvent aussi son WeChat)', '+86…'], ['tel_fixe', 'Téléphone fixe', ''],
+  ['email', 'E-mail', ''], ['wechat', 'WeChat (identifiant)', ''], ['site', 'Site', ''], ['alibaba', 'Boutique Alibaba', ''],
+  ['allee', 'Stand (hall, numéro)', 'ex : 11.2 C23'], ['adresse', 'Adresse de l\'usine', ''], ['certifications', 'Certifications', 'CE, RoHS…']];
+function ctChampsHtml(f) {
+  const remplis = CT_CHAMPS.filter(([k]) => String(f[k] || '').trim()).length;
+  return `<details${remplis < 3 ? ' open' : ''}><summary style="font-size:16px;font-weight:800;min-height:44px;display:flex;align-items:center">✏️ Voir et corriger les coordonnées (${remplis}/${CT_CHAMPS.length})</summary>
+    ${CT_CHAMPS.map(([k, l, ph]) => `<label for="ctc_${k}">${l}</label>
+      <input id="ctc_${k}" value="${E(/^https?:/i.test(f[k] || '') && k === 'wechat' ? '' : f[k])}" placeholder="${E(ph)}"${/mobile|tel/.test(k) ? ' inputmode="tel"' : ''}${/email|site|alibaba|wechat/.test(k) ? ' autocapitalize="off"' : ''}
+        oninput="ctMajChamp('${f.id}','${k}',this.value)">`).join('')}</details>`;
+}
+let ctMinuterie = null;
+function ctPlusTard(f) {
+  clearTimeout(ctMinuterie);
+  ctMinuterie = setTimeout(() => { ctMinuterie = null; ctSynchroNom(f); sauverLocal(); }, 450);
+}
+function ctToutDeSuite() { if (ctMinuterie) { clearTimeout(ctMinuterie); ctMinuterie = null; sauverLocal(); } }
+window.addEventListener('pagehide', ctToutDeSuite);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') ctToutDeSuite(); });
+function ctMajChamp(fid, champ, val) {
+  const f = mkFournisseur(fid); if (!f) return;
+  f[champ] = val;
+  if ((champ === 'mobile' || champ === 'tel_fixe') && !String(f.tel || '').trim()) f.tel = val;
+  if (String(val).trim()) delete f.ct_neuf;
+  ctPlusTard(f);
+}
+// Le nom affiché dans Comparer suit la fiche.
+function ctSynchroNom(f) {
+  (C.comparaisons || []).forEach(c => (c.offres || []).forEach(o => { if (o.fournisseur_id === f.id) o.fournisseur = mkNomFournisseur(f); }));
+}
+function ctSupprimerFournisseur(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  if (!confirmerEnDeuxTemps('ct-supf-' + fid, 'Supprimer ' + mkNomFournisseur(f) + ', ses photos et ses ' + ctProduits(f).length + ' modèle(s) ?')) return;
+  ctDocs(f).forEach(d => { ctEffacer(d.id).catch(() => {}); ctEffacer(d.id + '~m').catch(() => {}); });
+  C.fournisseurs = fournisseursListe().filter(x => x.id !== fid);
+  (C.comparaisons || []).forEach(c => (c.offres || []).forEach(o => { if (o.fournisseur_id === fid) o.fournisseur_id = ''; }));
+  ctDossier = null; sauverLocal(); allerA('rencontres');
+}
+
+// ---------- La liste des produits dans la fiche ----------
+function ctListeProduitsDossier(f) {
+  const ps = ctProduits(f);
+  if (!ps.length) return '<p class="mk-aide" style="font-size:15px">Aucun modèle pour l\'instant. Ajoutez-les à la main, collez le texte d\'une page, ou faites lire le catalogue par Claude.</p>';
+  const groupes = {};
+  ps.forEach(p => { const k = ctNomFamille(p.categorie); (groupes[k] = groupes[k] || []).push(p); });
+  const nbInt = ps.filter(p => p.interesse).length;
+  return `<p class="mk-aide" style="font-size:15px">⭐ = ce modèle m'intéresse : ses cases de prix restent ouvertes, et la demande de prix peut ne porter que sur eux. Quand le fournisseur répond, tapez son prix : les francs s'affichent tout de suite.</p>
+    ${nbInt ? `<p class="ct-sous"><b>⭐ ${nbInt} modèle(s) m'intéressent.</b></p>` : ''}
+    ${Object.keys(groupes).map(k => `<div class="ct-famille">${ctEmoji(k)} ${E(k)} (${groupes[k].length})</div>
+      ${groupes[k].map(p => ctLigneProduitDossier(f, p)).join('')}`).join('')}`;
+}
+function ctTags(p) {
+  return (p.nouveau ? '<span class="ct-tag neuf">nouveau</span>' : '')
+    + (p.incertain ? '<span class="ct-tag att">à vérifier</span>' : '')
+    + (p.a_demander && !ctVolumeCarton(p) ? '<span class="ct-tag att">carton à demander</span>' : '')
+    + (num(p.prix) > 0 ? '<span class="ct-tag ok">prix reçu</span>' : '');
+}
+const ctPrixOuverts = new Set();
+function ctOuvrirPrix(fid, pid) {
+  const f = mkFournisseur(fid), p = f && ctProduit(f, pid); if (!p) return;
+  ctPrixOuverts.add(pid);
+  const el = document.getElementById('ctp_' + pid);
+  if (el) el.outerHTML = ctLigneProduitDossier(f, p);
+  const ch = document.getElementById('ctpx_' + pid); if (ch) ch.focus();
+}
+function ctLigneProduitDossier(f, p) {
+  const devs = codesDevises();
+  const casesPrix = p.interesse || num(p.prix) > 0 || ctPrixOuverts.has(p.id);
+  const d = p.devise || f.prix_devise || 'USD';
+  return `<div class="ct-prod" id="ctp_${p.id}">
+    <div class="ct-prod-tete">
+      <button type="button" class="ct-etoile${p.interesse ? ' on' : ''}" aria-label="M'intéresse" onclick="ctInteresse('${f.id}','${p.id}')">${p.interesse ? '★' : '☆'}</button>
+      <div style="flex:1;min-width:0">
+        <button type="button" class="ct-ref" onclick="ctBoiteProduit('${f.id}','${p.id}')">${E(p.ref || '(sans référence)')}</button> ${ctTags(p)}
+        ${p.caracteristiques ? `<div class="ct-car">${E(p.caracteristiques)}</div>` : ''}
+        ${ctLigneVolume(p) ? `<div class="ct-volume">${E(ctLigneVolume(p))}</div>` : ''}
+        ${p.page ? `<div class="ct-volume">📖 ${E(p.page)}</div>` : ''}
+      </div>
+    </div>
+    ${casesPrix ? `<div class="ct-prix">
+      <div><label for="ctpx_${p.id}">Prix / pièce</label><input id="ctpx_${p.id}" inputmode="decimal" value="${E(num(p.prix) ? p.prix : '')}" placeholder="—"
+        oninput="ctMajPrix('${f.id}','${p.id}','prix',this.value)"></div>
+      <div><label for="ctdv_${p.id}">Devise</label><select id="ctdv_${p.id}" onchange="ctMajPrix('${f.id}','${p.id}','devise',this.value)">
+        ${devs.map(x => `<option value="${x}" ${x === d ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
+      <div><label for="ctmq_${p.id}">Minimum (MOQ)</label><input id="ctmq_${p.id}" inputmode="numeric" value="${E(num(p.moq) ? p.moq : '')}" placeholder="—"
+        oninput="ctMajPrix('${f.id}','${p.id}','moq',this.value)"></div>
+    </div>
+    <div class="ct-gnf" id="ctg_${p.id}">${ctPrixHtml(p)}</div>`
+    : `<div class="ct-boutons-ligne"><button type="button" onclick="ctOuvrirPrix('${f.id}','${p.id}')">💰 Noter son prix</button></div>`}
+  </div>`;
+}
+function ctInteresse(fid, pid) {
+  const f = mkFournisseur(fid), p = f && ctProduit(f, pid); if (!p) return;
+  p.interesse = !p.interesse; sauverLocal(); dessiner();
+}
+function ctMajPrix(fid, pid, champ, val) {
+  const f = mkFournisseur(fid), p = f && ctProduit(f, pid); if (!p) return;
+  if (champ === 'devise') { p.devise = val; f.prix_devise = val; }
+  else {
+    const v = num(val);
+    if (champ === 'prix' && v !== num(p.prix)) {
+      if (num(p.prix) > 0 && p.prix_le && ctJoursDepuis(p.prix_le) >= 1) {
+        p.historique = Array.isArray(p.historique) ? p.historique : [];
+        p.historique.push({ prix: p.prix, devise: p.devise, moq: p.moq, le: p.prix_le });
+      }
+      p.prix_le = mkMaintenant();
+    }
+    p[champ] = v;
+    if (!p.devise) p.devise = f.prix_devise || 'USD';
+  }
+  const z = document.getElementById('ctg_' + pid); if (z) z.innerHTML = ctPrixHtml(p);
+  ctMajOffreDuProduit(f, p);
+  ctPlusTard(f);
+}
+// Un produit déjà mis dans Comparer suit son prix.
+function ctMajOffreDuProduit(f, p) {
+  (C.comparaisons || []).forEach(c => (c.offres || []).forEach(o => {
+    if (o.produit_id === p.id) { o.prix = num(p.prix); o.devise = p.devise || 'USD'; o.moq = num(p.moq); }
+  }));
+}
+
+// ---------- Un modèle : voir, corriger, demander son prix, le comparer ----------
+function ctBoiteProduit(fid, pid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const p = pid ? ctProduit(f, pid) : null;
+  const v = p || { ref: '', categorie: ctDerniereFamille(f), caracteristiques: '', colisage: '', dim_l: '', dim_la: '', dim_h: '', poids_kg: '', page: '', note: '' };
+  boite(`<div class="mk-dlg ct-champs">
+    <h3>${p ? '📦 ' + E(p.ref || 'Modèle') : '➕ Nouveau modèle'} <span class="mk-code">${E(f.code || '')}</span></h3>
+    ${p && p.incertain ? `<div class="alerte a-ambre">À vérifier : ${E(p.incertain)}</div>` : ''}
+    ${p && p.a_demander ? `<div class="alerte a-ambre">À demander : ${E(p.a_demander)}</div>` : ''}
+    <label for="ctm_ref">Référence du modèle</label><input id="ctm_ref" value="${E(v.ref)}" placeholder="ex : WD-959" autocapitalize="characters">
+    <label for="ctm_cat">Famille</label><input id="ctm_cat" list="ct_liste_familles" value="${E(v.categorie)}" placeholder="ex : Tapette à moustiques électrique">
+    ${ctListeFamillesHtml()}
+    <label for="ctm_car">Caractéristiques</label><textarea id="ctm_car" rows="2" placeholder="ex : 6 LED · batterie 1200 mAh · charge Type-C">${E(v.caracteristiques)}</textarea>
+    <div class="duo"><div><label for="ctm_col">Pièces par carton</label><input id="ctm_col" inputmode="numeric" value="${E(num(v.colisage) || '')}"></div>
+      <div><label for="ctm_kg">Poids du carton (kg)</label><input id="ctm_kg" inputmode="decimal" value="${E(v.poids_kg)}"></div></div>
+    <label>Carton (cm) : longueur × largeur × hauteur</label>
+    <div class="trio" style="grid-template-columns:1fr 1fr 1fr"><input id="ctm_l" inputmode="decimal" placeholder="L" value="${E(num(v.dim_l) || '')}">
+      <input id="ctm_la" inputmode="decimal" placeholder="l" value="${E(num(v.dim_la) || '')}"><input id="ctm_h" inputmode="decimal" placeholder="H" value="${E(num(v.dim_h) || '')}"></div>
+    <label for="ctm_page">Page du catalogue</label><input id="ctm_page" value="${E(v.page)}" placeholder="ex : p. 08">
+    <label for="ctm_note">Note</label><textarea id="ctm_note" rows="2">${E(v.note)}</textarea>
+    <div class="mk-boutons">
+      <button class="b vert" onclick="ctEnregistrerProduit('${f.id}','${p ? p.id : ''}')">✅ Enregistrer</button>
+      ${p ? `<button class="b contour" onclick="ctBoiteUnPrix('${f.id}','${p.id}')">💬 Demander le prix de ce modèle</button>
+      <button class="b contour" onclick="ctVersComparer('${f.id}','${p.id}')">➕ Mettre dans Comparer</button>
+      <button class="b rouge" onclick="ctSupprimerProduit('${f.id}','${p.id}')">🗑 Supprimer ce modèle</button>` : ''}
+      <button class="b gris" onclick="fermerBoite()">Fermer</button>
+    </div></div>`);
+}
+function ctEnregistrerProduit(fid, pid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const val = (id) => (document.getElementById(id) || {}).value || '';
+  const d = { ref: val('ctm_ref').trim(), categorie: val('ctm_cat').trim(), caracteristiques: val('ctm_car').trim(),
+    colisage: num(val('ctm_col')), poids_kg: val('ctm_kg').trim(), dim_l: num(val('ctm_l')), dim_la: num(val('ctm_la')),
+    dim_h: num(val('ctm_h')), page: val('ctm_page').trim(), note: val('ctm_note').trim() };
+  if (!d.ref && !d.caracteristiques) { avertir('Écrivez au moins la référence du modèle.'); return; }
+  if (pid) {
+    const p = ctProduit(f, pid); if (!p) return;
+    Object.assign(p, d);
+    if (ctVolumeCarton(p) && num(p.colisage)) delete p.a_demander;
+  } else if (!ctAjouterProduit(f, Object.assign(d, { source: 'main' }))) { avertir('Ce modèle est déjà dans la liste.'); return; }
+  delete f.ct_neuf;
+  sauverLocal(); fermerBoite(); dessiner();
+}
+function ctSupprimerProduit(fid, pid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  if (!confirmerEnDeuxTemps('ct-supp-' + pid, 'Supprimer ce modèle ?')) return;
+  f.produits = ctProduits(f).filter(p => p.id !== pid);
+  sauverLocal(); fermerBoite(); dessiner();
+}
+// Le produit rejoint Comparer : la comparaison de sa famille, une offre par modèle.
+function ctVersComparer(fid, pid) {
+  const f = mkFournisseur(fid), p = f && ctProduit(f, pid); if (!p) return;
+  const article = ctNomFamille(p.categorie);
+  C.comparaisons = C.comparaisons || [];
+  let c = C.comparaisons.find(x => normaliserNom(x.article) === normaliserNom(article));
+  if (!c) {
+    c = { id: idUnique('c'), article, quantite: num(p.moq) || 500, prix_vente_vise_gnf: 0, offres: [], choisi: null, motif: '', note: '', source: 'catalogue' };
+    C.comparaisons.push(c);
+  }
+  c.offres = c.offres || [];
+  c.maj = mkMaintenant();
+  let o = c.offres.find(x => x.produit_id === p.id);
+  if (!o) {
+    o = { id: idUnique('o'), produit_id: p.id, delai: 0, qualite: 0, photo: '', photo2: '', vu_le: mkMaintenant() };
+    c.offres.push(o);
+  }
+  Object.assign(o, { fournisseur: mkNomFournisseur(f), fournisseur_id: f.id, prix: num(p.prix), devise: p.devise || 'USD', moq: num(p.moq),
+    modele: p.ref, note: [p.ref, p.caracteristiques].filter(Boolean).join(' · '), qte_carton: num(p.colisage),
+    dim_l: num(p.dim_l), dim_la: num(p.dim_la), dim_h: num(p.dim_h) });
+  p.dans_comparer = true;
+  sauverLocal(); fermerBoite();
+  if (ongletActif === 'dossier' || ongletActif === 'catalogues') dessiner();
+  avertir('➕ ' + p.ref + ' est dans Comparer → « ' + article + ' »' + (num(p.prix) > 0 ? '.' : ' (sans prix pour l\'instant).'), 5000);
+}
+
+// ---------- La demande de prix, en anglais ET en chinois ----------
+function ctLieu(code, langue) {
+  const L = { foire: ['at the Canton Fair', '在广交会'], marche: ['at your shop in the market', '在市场的店铺'], usine: ['at your factory', '在贵工厂'] };
+  return (L[code] || L.foire)[langue === 'cn' ? 1 : 0];
+}
+function ctSignature() { return String((C.voyage && C.voyage.signature) || 'Riche – KYLO EURGUINE').trim(); }
+function ctDateEn(iso) { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }); }
+function ctDateCn(iso) { const d = new Date(iso); return isNaN(d) ? '' : (d.getMonth() + 1) + '月' + d.getDate() + '日'; }
+function ctModelesChoisis(f, portee) {
+  const ps = ctProduits(f);
+  return portee === 'interesse' ? ps.filter(p => p.interesse) : portee === 'tous-liste' ? ps : [];
+}
+function ctMessageDemande(f, o) {
+  const contact = String(f.contact || '').trim();
+  const ps = ctModelesChoisis(f, o.portee);
+  const refs = ps.map(p => p.ref).filter(Boolean);
+  const sansCarton = ps.filter(p => !(ctVolumeCarton(p) && num(p.colisage))).map(p => p.ref).filter(Boolean);
+  const tous = !refs.length;
+  const sansCartonTous = tous ? ctProduits(f).filter(p => p.a_demander).map(p => p.ref).filter(Boolean) : sansCarton;
+  const familles = [...new Set(ctProduits(f).map(p => p.categorie).filter(Boolean))];
+  const sig = ctSignature();
+  const en = [
+    'Hello' + (contact ? ' ' + contact : '') + ',',
+    'This is ' + sig.split('–')[0].trim() + ' from KYLO EURGUINE (Conakry, Guinea – West Africa). We met ' + ctLieu(o.lieu, 'en') + ', thank you for your catalogue.',
+    'Please send me your price list (Excel) for ' + (tous ? 'all models in your catalogue' : 'these models: ' + refs.join(', ')) + ', with for each model:',
+    '1. Unit price in USD (FOB and EXW)',
+    '2. MOQ and price for 500 / 1,000 / 3,000 pcs',
+    '3. Carton size, pcs per carton, gross weight' + (sansCartonTous.length && sansCartonTous.length < 15 ? ' (missing for ' + sansCartonTous.join(', ') + ')' : ''),
+    '4. Production lead time and sample price',
+    '5. Can you print French on the box and manual, with our logo (OEM)? MOQ for OEM?',
+    '6. Do you accept Alibaba Trade Assurance?',
+    'Thank you!', sig].join('\n');
+  const cn = [
+    (contact ? contact + ' ' : '') + '您好！',
+    '我是西非几内亚科纳克里 KYLO EURGUINE 公司的 ' + sig.split('–')[0].trim() + '。我们' + ctLieu(o.lieu, 'cn') + '见过面，谢谢您的产品目录。',
+    '麻烦您把' + (tous ? '目录里所有型号' : '以下型号（' + refs.join('、') + '）') + '的报价单（Excel）发给我，每个型号请注明：',
+    '1. 美元单价（FOB 价和出厂价 EXW）',
+    '2. 最小起订量，以及 500 / 1000 / 3000 件的价格',
+    '3. 外箱尺寸、每箱数量、毛重' + (sansCartonTous.length && sansCartonTous.length < 15 ? '（' + sansCartonTous.join('、') + ' 目录上没有）' : ''),
+    '4. 生产交期和样品价格',
+    '5. 能否在彩盒和说明书上印法语和我们的标志（OEM）？OEM 起订量是多少？',
+    '6. 是否接受阿里巴巴信用保障（Trade Assurance）付款？',
+    '谢谢！', sig].join('\n');
+  void familles;
+  return en + '\n\n' + cn;
+}
+function ctMessageRelance(f) {
+  const contact = String(f.contact || '').trim(), sig = ctSignature();
+  const qui = sig.split('–')[0].trim();
+  const le = f.demande_le || mkMaintenant();
+  return ['Hello' + (contact ? ' ' + contact : '') + ', this is ' + qui + ' from KYLO EURGUINE (Guinea). I am following up on my price request of '
+    + ctDateEn(le) + '. Could you send me the price list today? Thank you!', '',
+    (contact ? contact + ' ' : '') + '您好！我是几内亚 KYLO EURGUINE 的 ' + qui + '。跟进一下我' + ctDateCn(le) + '的报价请求，麻烦您今天发一下报价单，谢谢！', '', sig].join('\n');
+}
+function ctMessageUnPrix(p) {
+  return ['Hello, please quote model ' + p.ref + ': unit price in USD, MOQ, pcs per carton. Thank you!', '',
+    '您好，请报一下 ' + p.ref + ' 型号的价格：美元单价、最小起订量、每箱数量。谢谢！'].join('\n');
+}
+let ctDemande = { fid: '', portee: 'tous', lieu: 'foire', relance: false };
+function ctBoiteDemande(fid, relance) {
+  const f = mkFournisseur(fid); if (!f) return;
+  ctToutDeSuite();
+  const nInt = ctProduits(f).filter(p => p.interesse).length;
+  ctDemande = { fid, portee: ctDemande.fid === fid ? ctDemande.portee : (nInt ? 'interesse' : 'tous'), lieu: f.lieu_rencontre || ctDemande.lieu || 'foire', relance: !!relance };
+  if (ctDemande.portee === 'interesse' && !nInt) ctDemande.portee = 'tous';
+  ctDessinerDemande();
+}
+function ctDessinerDemande() {
+  const f = mkFournisseur(ctDemande.fid); if (!f) return;
+  const nInt = ctProduits(f).filter(p => p.interesse).length, n = ctProduits(f).length;
+  const msg = ctDemande.relance ? ctMessageRelance(f) : ctMessageDemande(f, ctDemande);
+  const tel = ctTelPropre(f.whatsapp || f.mobile || '');
+  const puce = (k, t, on) => `<button type="button" class="mk-puce${on ? ' on' : ''}" onclick="ctDemande.${k};ctDessinerDemande()">${t}</button>`;
+  mkBoite(`<div class="mk-dlg ct-champs">
+    <h3>${ctDemande.relance ? '🔔 Relancer' : '✉️ Demander les prix à'} ${E(mkNomFournisseur(f))}</h3>
+    ${ctDemande.relance ? '' : `<p class="mk-aide">Le message part en <b>anglais et en chinois</b> : il comprend forcément l'un des deux.</p>
+    <label>Quels modèles ?</label>
+    <div class="mk-puces">${puce("portee='tous'", 'Tout son catalogue', ctDemande.portee === 'tous')}
+      ${n ? puce("portee='tous-liste'", 'Les ' + n + ' modèles notés', ctDemande.portee === 'tous-liste') : ''}
+      ${nInt ? puce("portee='interesse'", '⭐ Les ' + nInt + ' qui m\'intéressent', ctDemande.portee === 'interesse') : ''}</div>
+    <label>Où l'avez-vous rencontré ?</label>
+    <div class="mk-puces">${puce("lieu='foire'", 'Foire de Canton', ctDemande.lieu === 'foire')}
+      ${puce("lieu='marche'", 'Au marché', ctDemande.lieu === 'marche')}${puce("lieu='usine'", 'À l\'usine', ctDemande.lieu === 'usine')}</div>`}
+    <label for="ct_msg">Le message (vous pouvez le modifier)</label>
+    <textarea id="ct_msg" class="ct-message" rows="12">${E(msg)}</textarea>
+    <label for="ct_sig">Signé</label>
+    <input id="ct_sig" value="${E(ctSignature())}" onchange="C.voyage.signature=this.value;sauverLocal();ctDessinerDemande()">
+    <div class="mk-boutons">
+      <button class="b" style="background:#1aad19;color:#fff" onclick="ctEnvoyer('wechat')">💬 Copier et ouvrir WeChat</button>
+      ${f.email ? `<button class="b contour" onclick="ctEnvoyer('email')">✉️ Envoyer par e-mail (${E(f.email)})</button>` : ''}
+      ${tel ? `<button class="b contour" onclick="ctEnvoyer('whatsapp')">🟢 WhatsApp</button>` : ''}
+      <button class="b contour" onclick="ctEnvoyer('copier')">📋 Copier seulement</button>
+      <button class="b vert" onclick="ctMarquerEnvoye()">✅ C'est envoyé — noter la date</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button>
+    </div>
+    <p class="mk-aide" style="margin-top:10px">Sur WeChat : ouvrez la discussion avec ${E(f.contact || 'le fournisseur')}${f.code ? ' (nommez-le « ' + E(f.code) + ' » dans WeChat)' : ''}, appuyez longuement dans la case de texte → <b>Coller</b> → Envoyer.
+    ${f.mobile ? 'Pas encore dans WeChat ? Cherchez son portable ' + E(ctTelLisible(f.mobile)) + ' dans WeChat (+ → Ajouter des contacts).' : ''}</p>
+  </div>`);
+}
+// Les sorties vers WeChat, l'e-mail, WhatsApp passent par ici (les tests peuvent les observer).
+function ctAller(url) { location.href = url; }
+function ctNouvelOnglet(url) { window.open(url, '_blank'); }
+function ctTexteMessage() { const t = document.getElementById('ct_msg'); return t ? t.value : ''; }
+function ctEnvoyer(canal) {
+  const f = mkFournisseur(ctDemande.fid); if (!f) return;
+  const texte = ctTexteMessage();
+  if (canal === 'email') {
+    const sujet = ctDemande.relance ? 'Follow-up: price list – KYLO EURGUINE (Guinea) / 报价跟进' : 'Price list request – KYLO EURGUINE (Guinea) / 报价请求';
+    ctAller('mailto:' + encodeURIComponent(f.email) + '?subject=' + encodeURIComponent(sujet) + '&body=' + encodeURIComponent(texte));
+    f.demande_canal = 'email';
+    return;
+  }
+  if (canal === 'whatsapp') {
+    const d = ctTelPropre(f.whatsapp || f.mobile).replace(/\D/g, '');
+    ctNouvelOnglet('https://wa.me/' + d + '?text=' + encodeURIComponent(texte));
+    f.demande_canal = 'whatsapp';
+    return;
+  }
+  mkCopier(texte, canal === 'wechat' ? 'Message copié. Dans WeChat : ouvrez sa discussion → appui long → Coller → Envoyer.' : 'Message copié.');
+  if (canal === 'wechat') { f.demande_canal = 'wechat'; setTimeout(() => { ctAller('weixin://'); }, 600); }
+}
+function ctMarquerEnvoye() {
+  const f = mkFournisseur(ctDemande.fid); if (!f) return;
+  if (ctDemande.relance) f.relance_le = mkMaintenant();
+  else {
+    f.demande_le = mkMaintenant();
+    f.demande_modeles = ctModelesChoisis(f, ctDemande.portee).map(p => p.ref);
+    f.lieu_rencontre = ctDemande.lieu;
+    delete f.relance_le;
+  }
+  delete f.ct_neuf;
+  sauverLocal(); fermerBoite(); dessiner();
+  avertir('✅ Noté : ' + (ctDemande.relance ? 'relancé' : 'prix demandés') + ' le ' + mkJour(mkMaintenant()) + '. Le carnet vous dira s\'il faut relancer.');
+}
+function ctBoiteUnPrix(fid, pid) {
+  const f = mkFournisseur(fid), p = f && ctProduit(f, pid); if (!p) return;
+  ctDemande = { fid, portee: 'tous', lieu: 'foire', relance: false };
+  mkBoite(`<div class="mk-dlg ct-champs"><h3>💬 Le prix de ${E(p.ref)}</h3>
+    <textarea id="ct_msg" class="ct-message" style="min-height:140px" rows="6">${E(ctMessageUnPrix(p))}</textarea>
+    <div class="mk-boutons">
+      <button class="b" style="background:#1aad19;color:#fff" onclick="ctEnvoyer('wechat')">💬 Copier et ouvrir WeChat</button>
+      <button class="b contour" onclick="ctEnvoyer('copier')">📋 Copier seulement</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+}
+function ctEcrireMail(fid) {
+  const f = mkFournisseur(fid); if (!f || !f.email) return;
+  ctAller('mailto:' + encodeURIComponent(f.email));
+}
+
+// ---------- Voir une photo en grand, l'envoyer ----------
+async function ctVoirDoc(fid, did) {
+  const f = mkFournisseur(fid); if (!f) return;
+  let src = '';
+  try { src = await ctLire(did); } catch (e) {}
+  if (!src) { avertir('Cette photo n\'est plus dans ce téléphone.'); return; }
+  const docs = ctDocs(f), i = docs.findIndex(d => d.id === did), doc = docs[i];
+  const dlg = document.createElement('dialog'); dlg.className = 'mk-apercu';
+  dlg.innerHTML = `<div class="leg">${E(mkNomFournisseur(f))} — ${doc && doc.type === 'carte' ? 'carte' : 'page ' + (docs.filter(d => d.type !== 'carte').indexOf(doc) + 1)}</div>
+    <div class="ct-zoom-boite"><img src="${src}" alt=""></div>
+    <div class="ct-actions-apercu">
+      <button type="button" class="b contour" data-a="zoom">🔍 Agrandir</button>
+      <button type="button" class="b" style="background:#1aad19;color:#fff" data-a="envoyer">💬 L'envoyer (WeChat…)</button>
+      <button type="button" class="b rouge" data-a="suppr">🗑 Supprimer</button>
+      <button type="button" class="b gris" data-a="fermer">Fermer</button></div>`;
+  document.body.appendChild(dlg);
+  const fermer = () => { try { dlg.close(); } catch (e) {} dlg.remove(); };
+  dlg.addEventListener('close', () => dlg.remove());
+  dlg.querySelector('[data-a="fermer"]').onclick = fermer;
+  dlg.querySelector('[data-a="zoom"]').onclick = (ev) => { const b = dlg.querySelector('.ct-zoom-boite'); b.classList.toggle('zoom'); ev.target.textContent = b.classList.contains('zoom') ? '🔍 Réduire' : '🔍 Agrandir'; };
+  dlg.querySelector('[data-a="envoyer"]').onclick = () => {
+    mkCopier('Hello, please quote the price of every model on this page (USD, MOQ, pcs per carton). Thank you!\n您好，请报这一页所有型号的价格（美元单价、起订量、每箱数量），谢谢！',
+      'Question copiée : après la photo, collez-la dans WeChat.');
+    ctPartagerFichiers([{ nom: (f.code || 'fournisseur') + '-page.jpg', src }], mkNomFournisseur(f));
+  };
+  dlg.querySelector('[data-a="suppr"]').onclick = () => {
+    if (!confirmerEnDeuxTemps('ct-supd-' + did, 'Supprimer cette photo ?')) return;
+    f.docs = docs.filter(d => d.id !== did);
+    ctEffacer(did).catch(() => {}); ctEffacer(did + '~m').catch(() => {});
+    delete ctMiniCache[did];
+    sauverLocal(); fermer(); dessiner();
+  };
+  if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
+}
+function ctFichierDepuis(src, nom) {
+  const [tete, donnees] = String(src).split(',');
+  const bin = atob(donnees); const oct = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) oct[i] = bin.charCodeAt(i);
+  return new File([oct], nom, { type: (/data:([^;]+)/.exec(tete) || [])[1] || 'image/jpeg' });
+}
+function ctPartagerFichiers(liste, titre) {
+  try {
+    const fichiers = liste.map(x => ctFichierDepuis(x.src, x.nom));
+    if (navigator.canShare && navigator.canShare({ files: fichiers })) {
+      navigator.share({ files: fichiers, title: titre }).catch(() => {});
+      return true;
+    }
+  } catch (e) {}
+  avertir('Ce téléphone ne sait pas envoyer les photos depuis le carnet. Faites une capture d\'écran de la photo agrandie.', 6500);
+  return false;
+}
+async function ctPartagerDocs(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const docs = ctDocs(f); if (!docs.length) return;
+  const liste = [];
+  for (let i = 0; i < docs.length; i++) {
+    try { const src = await ctLire(docs[i].id); if (src) liste.push({ nom: (f.code || 'F') + '-' + (docs[i].type === 'carte' ? 'carte' : 'page') + '-' + (i + 1) + '.jpg', src }); } catch (e) {}
+  }
+  if (!liste.length) { avertir('Ces photos ne sont plus dans ce téléphone.'); return; }
+  ctPartagerFichiers(liste, mkNomFournisseur(f) + ' — carte et catalogue');
+}
+
+// ---------- Ce que Claude a lu : le code KYLOZ:… ----------
+async function ctDecoder(code) {
+  const net = String(code || '').replace(/\s+/g, '');
+  const m = net.match(/KYLO([Z1]):([A-Za-z0-9_\-+\/=]+)/);
+  if (!m) {
+    const brut = String(code || '').trim();
+    if (brut.startsWith('{')) return JSON.parse(brut);
+    throw new Error('Ce n\'est pas un code de Claude : il doit commencer par KYLOZ:');
+  }
+  let b64 = m[2].replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '');
+  b64 += '='.repeat((4 - b64.length % 4) % 4);
+  let bin;
+  try { bin = atob(b64); } catch (e) { throw new Error('Code abîmé : il manque peut-être un morceau. Recopiez-le en entier.'); }
+  const oct = Uint8Array.from(bin, c => c.charCodeAt(0));
+  let texte;
+  if (m[1] === 'Z') {
+    if (typeof DecompressionStream !== 'function') throw new Error('Ce téléphone ne lit pas le code court : demandez à Claude le code « KYLO1 ».');
+    try {
+      const flux = new Blob([oct]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+      texte = await new Response(flux).text();
+    } catch (e) { throw new Error('Code abîmé : il manque peut-être un morceau. Recopiez-le en entier.'); }
+  } else texte = new TextDecoder().decode(oct);
+  return JSON.parse(texte);
+}
+function ctValider(imp) {
+  if (!imp || imp.format !== 'kylo-import' || !Array.isArray(imp.fournisseurs)) throw new Error('Ce code n\'est pas un ajout pour le carnet.');
+  return imp;
+}
+function ctTrouverFournisseur(x) {
+  const L = fournisseursListe();
+  const em = String(x.email || '').trim().toLowerCase();
+  const tels = [x.mobile, x.tel, x.tel_fixe, x.whatsapp].map(ctCleTel).filter(Boolean);
+  const so = normaliserNom(x.societe), no = normaliserNom(x.nom);
+  return L.find(f => em && String(f.email || '').trim().toLowerCase() === em)
+    || L.find(f => tels.length && [f.mobile, f.tel, f.tel_fixe, f.whatsapp].map(ctCleTel).filter(Boolean).some(t => tels.includes(t)))
+    || L.find(f => x.wechat_lien && f.wechat_lien === x.wechat_lien)
+    || L.find(f => so && normaliserNom(f.societe) === so)
+    || L.find(f => no && normaliserNom(f.nom) === no) || null;
+}
+const CT_CHAMPS_IMPORT = ['nom', 'societe', 'contact', 'poste', 'mobile', 'tel_fixe', 'whatsapp', 'email', 'site', 'alibaba', 'wechat', 'wechat_lien',
+  'adresse', 'marche', 'allee', 'certifications', 'categories', 'catalogue'];
+// Ajoute sans jamais effacer ce que Riche a écrit : une case remplie reste telle quelle ;
+// un prix nouveau remplace l'ancien, qui est gardé dans l'historique.
+function ctFusion(imp, appliquer) {
+  const bilan = [];
+  imp.fournisseurs.forEach(x => {
+    let f = ctTrouverFournisseur(x);
+    const b = { nom: x.nom || x.societe || x.contact || '(sans nom)', existe: !!f, code: f ? f.code : '', nouveaux: 0, completes: 0, prix: 0, cases: 0 };
+    if (appliquer && !f) {
+      f = { id: idUnique('f'), code: mkProchainCode(), nom: '', marche: '', batiment: '', allee: '', wechat: '', tel: '', qualite: '', remarque: '',
+        le: mkMaintenant().slice(0, 10), vu_le: mkMaintenant(), source: 'claude', decision: '', docs: [], produits: [] };
+      fournisseursListe().unshift(f);
+      b.code = f.code;
+    }
+    const cible = f || {};
+    CT_CHAMPS_IMPORT.forEach(k => { if (x[k] && !String(cible[k] || '').trim()) { b.cases++; if (appliquer) f[k] = String(x[k]); } });
+    if (appliquer) {
+      if (!f.tel && (x.mobile || x.tel || x.tel_fixe)) f.tel = x.mobile || x.tel || x.tel_fixe;
+      if (x.remarque && String(f.remarque || '').indexOf(x.remarque) < 0) f.remarque = [f.remarque, x.remarque].filter(Boolean).join('\n');
+      delete f.ct_neuf;
+    }
+    const existants = f ? ctProduits(f) : [];
+    (Array.isArray(x.produits) ? x.produits : []).forEach(xp => {
+      const k = ctCleRef(xp.ref);
+      const p = k ? existants.find(e => ctCleRef(e.ref) === k) : null;
+      const d = { ref: xp.ref || '', categorie: xp.categorie || '', caracteristiques: xp.caracteristiques || '', colisage: num(xp.colisage),
+        dim_l: Array.isArray(xp.carton) ? num(xp.carton[0]) : num(xp.dim_l), dim_la: Array.isArray(xp.carton) ? num(xp.carton[1]) : num(xp.dim_la),
+        dim_h: Array.isArray(xp.carton) ? num(xp.carton[2]) : num(xp.dim_h), poids_kg: xp.poids_kg ? String(xp.poids_kg) : '', page: xp.page || '',
+        nouveau: !!xp.nouveau, incertain: xp.incertain || '', a_demander: xp.a_demander || '', note: xp.note || '' };
+      const aPrix = num(xp.prix) > 0;
+      if (!p) {
+        b.nouveaux++; if (aPrix) b.prix++;
+        if (appliquer) ctAjouterProduit(f, Object.assign(d, { source: 'claude' }, aPrix ? { prix: num(xp.prix), devise: xp.devise || 'USD',
+          moq: num(xp.moq), prix_le: mkMaintenant(), prix_note: xp.prix_note || '' } : {}));
+        return;
+      }
+      let change = false;
+      Object.keys(d).forEach(c => {
+        if (c === 'nouveau') return;
+        const vide = p[c] === undefined || p[c] === '' || p[c] === 0 || p[c] === null;
+        if (vide && d[c]) { change = true; if (appliquer) p[c] = d[c]; }
+      });
+      if (appliquer && ctVolumeCarton(p) && num(p.colisage) && !xp.a_demander) delete p.a_demander;
+      if (change) b.completes++;
+      if (aPrix && (num(p.prix) !== num(xp.prix) || (p.devise || 'USD') !== (xp.devise || 'USD') || num(p.moq) !== num(xp.moq))) {
+        b.prix++;
+        if (appliquer) {
+          if (num(p.prix) > 0) { p.historique = Array.isArray(p.historique) ? p.historique : []; p.historique.push({ prix: p.prix, devise: p.devise, moq: p.moq, le: p.prix_le }); }
+          p.prix = num(xp.prix); p.devise = xp.devise || 'USD'; p.moq = num(xp.moq) || p.moq; p.prix_le = mkMaintenant();
+          if (xp.prix_note) p.prix_note = xp.prix_note;
+          ctMajOffreDuProduit(f, p);
+        }
+      }
+    });
+    if (appliquer && f) ctSynchroNom(f);
+    b.id = f ? f.id : '';
+    bilan.push(b);
+  });
+  return bilan;
+}
+// Un fournisseur ajouté par Claude a le LIEN WeChat (lu sur sa carte) mais pas l'image du QR :
+// le carnet dessine le QR lui-même (lecteur ZXing, déjà rangé hors ligne). Enregistré dans Photos,
+// WeChat le relit (+ → Scanner → icône image).
+async function ctQrDepuisLien(texte) {
+  const Z = await mkChargerZXing();
+  const qr = Z.QRCodeEncoder.encode(texte, Z.QRCodeDecoderErrorCorrectionLevel.M, new Map());
+  const m = qr.getMatrix(), n = m.getWidth(), marge = 4, k = 10;
+  const c = document.createElement('canvas'); c.width = c.height = (n + 2 * marge) * k;
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#000';
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (m.get(x, y) === 1) g.fillRect((x + marge) * k, (y + marge) * k, k, k);
+  return c.toDataURL('image/png');
+}
+async function ctDessinerQrManquants() {
+  let n = 0;
+  for (const f of fournisseursListe()) {
+    if (f.wechat_lien && !f.qr_photo) {
+      try { f.qr_photo = await ctQrDepuisLien(f.wechat_lien); f.qr_dessine = true; n++; } catch (e) { /* le lien reste utilisable */ }
+    }
+  }
+  if (n) { sauverLocal(); if (ongletActif === 'dossier' || ongletActif === 'rencontres') dessiner(); }
+  return n;
+}
+let ctImportEnCours = null;
+function ctBoiteImport(code) {
+  ctImportEnCours = null;
+  boite(`<div class="mk-dlg ct-champs">
+    <h3>🤖 Ajouter ce que Claude a lu</h3>
+    <p class="mk-aide" style="font-size:15px">Envoyez à Claude les photos des cartes et des catalogues (ou la réponse de prix d'un fournisseur).
+    Claude vous renvoie un code qui commence par <b>KYLOZ:</b>. Copiez-le en entier, puis :</p>
+    <button class="b vert" style="min-height:56px;font-size:17px" onclick="ctColler('ct_code', ctApercuImport)">📋 Coller le code de Claude</button>
+    <textarea id="ct_code" rows="4" placeholder="KYLOZ:…" autocapitalize="off" autocorrect="off" spellcheck="false" oninput="ctApercuImport()">${E(code || '')}</textarea>
+    <label class="b contour" for="ct_fichier_import" style="display:flex;min-height:50px;font-size:15px;margin-top:8px">📄 Ou choisir le fichier envoyé par Claude</label>
+    <input type="file" id="ct_fichier_import" accept=".json,.txt,application/json,text/plain" class="champ-cache" onchange="ctLireFichierImport(this)">
+    <div id="ct_apercu_import" class="ct-apercu-import"></div>
+    <div class="mk-boutons">
+      <button class="b vert" id="ct_bouton_import" onclick="ctAppliquerImport()" disabled>✅ Ajouter au carnet</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button>
+    </div></div>`);
+  if (code) ctApercuImport();
+}
+function ctLireFichierImport(input) {
+  const fichier = input.files && input.files[0]; input.value = ''; if (!fichier) return;
+  const l = new FileReader();
+  l.onload = () => { const t = document.getElementById('ct_code'); if (t) { t.value = String(l.result || ''); ctApercuImport(); } };
+  l.readAsText(fichier);
+}
+async function ctApercuImport() {
+  const z = document.getElementById('ct_apercu_import'), t = document.getElementById('ct_code'), bouton = document.getElementById('ct_bouton_import');
+  if (!z || !t) return;
+  ctImportEnCours = null; if (bouton) bouton.disabled = true;
+  const texte = t.value;
+  if (!texte.trim()) { z.innerHTML = ''; return; }
+  z.innerHTML = '<p class="ct-etat">Lecture du code…</p>';
+  try {
+    const imp = ctValider(await ctDecoder(texte));
+    if (t.value !== texte) return;   // le champ a changé pendant la lecture
+    const bilan = ctFusion(imp, false);
+    ctImportEnCours = imp;
+    z.innerHTML = `${imp.titre ? `<p style="margin:10px 0 4px"><b>${E(imp.titre)}</b></p>` : ''}
+      <ul style="margin:6px 0;padding-left:20px">${bilan.map(b => `<li><b>${E(b.nom)}</b> — ${b.existe ? 'déjà dans le carnet (' + E(b.code) + ')' : '<b>nouveau fournisseur</b>'}<br>
+        ${b.nouveaux} modèle(s) nouveau(x)${b.completes ? ' · ' + b.completes + ' complété(s)' : ''}${b.prix ? ' · <b>' + b.prix + ' prix</b>' : ''}${b.cases ? ' · ' + b.cases + ' coordonnée(s)' : ''}</li>`).join('')}</ul>
+      <div class="alerte a-vert">Rien de ce que vous avez écrit ne sera effacé.</div>`;
+    if (bouton) bouton.disabled = false;
+  } catch (e) {
+    z.innerHTML = `<div class="alerte a-rouge">${E(e.message || String(e))}</div>`;
+  }
+}
+function ctAppliquerImport() {
+  const imp = ctImportEnCours; if (!imp) return;
+  const bilan = ctFusion(imp, true);
+  sauverLocal();
+  ctImportEnCours = null;
+  const total = bilan.reduce((s, b) => s + b.nouveaux, 0), prix = bilan.reduce((s, b) => s + b.prix, 0);
+  fermerBoite();
+  ctDessinerQrManquants();
+  if (bilan.length === 1 && bilan[0].id) ctOuvrirDossier(bilan[0].id); else allerA('rencontres');
+  avertir('✅ Ajouté : ' + bilan.length + ' fournisseur(s), ' + total + ' modèle(s) nouveau(x)' + (prix ? ', ' + prix + ' prix' : '') + '.', 6000);
+}
+// Un lien …/carnet-kylo/#kylo=KYLOZ:… ouvre directement l'ajout (le code ne part jamais sur Internet).
+function ctImportDepuisLien() {
+  let h = '';
+  try { h = decodeURIComponent(location.hash || ''); } catch (e) { h = location.hash || ''; }
+  const m = h.match(/kylo=(KYLO[Z1]:[A-Za-z0-9_\-+\/=]+)/);
+  if (!m) return;
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+  let essais = 0;
+  const attendre = () => {
+    if ((typeof kyloReserveLue !== 'undefined' && !kyloReserveLue) && essais++ < 50) { setTimeout(attendre, 200); return; }
+    ctBoiteImport(m[1]);
+  };
+  attendre();
+}
+window.addEventListener('load', () => setTimeout(ctImportDepuisLien, 300));
+window.addEventListener('hashchange', ctImportDepuisLien);   // carnet déjà ouvert : le lien change seulement le #
+
+// ---------- Comparer les prix PAR PRODUIT, tous fournisseurs confondus ----------
+function ctTousProduits() {
+  const res = [];
+  fournisseursListe().forEach(f => ctProduits(f).forEach(p => res.push({ f, p })));
+  return res;
+}
+function ctDonneesCatalogues() {
+  const tous = ctTousProduits();
+  const familles = {};
+  tous.forEach(x => { const k = ctNomFamille(x.p.categorie); (familles[k] = familles[k] || []).push(x); });
+  const noms = Object.keys(familles).sort((a, b) => familles[b].length - familles[a].length);
+  if (ctFiltreCat && !familles[ctFiltreCat]) ctFiltreCat = '';
+  const q = normaliserNom(ctCherche);
+  const filtre = (x) => (!ctSeulInteresse || x.p.interesse) && (!ctFiltreFour || x.f.id === ctFiltreFour)
+    && (!q || normaliserNom([x.p.ref, x.p.caracteristiques, x.p.categorie, x.f.code, x.f.nom, x.f.societe].join(' ')).includes(q));
+  return { tous, familles, noms, filtre };
+}
+function ecranCatalogues() {
+  const { tous, familles, noms, filtre } = ctDonneesCatalogues();
+  const nbPrix = tous.filter(x => num(x.p.prix) > 0).length;
+  const fournisseurs = fournisseursListe().filter(f => ctProduits(f).length);
+  const entete = `<button class="b gris" style="margin-bottom:12px;min-height:50px;font-size:16px" onclick="allerA('rencontres')">← Fournisseurs rencontrés</button>
+  <div class="carte"><h2 style="font-size:19px">📊 Comparer les prix par produit</h2>
+    <p class="mk-aide" style="font-size:15px">Tous les modèles de tous vos fournisseurs, rangés par famille. Dans chaque famille, <b>le moins cher en francs est en haut</b>,
+    puis ceux qui attendent leur prix. ${tous.length} modèle(s) · ${nbPrix} prix reçu(s) · ${fournisseurs.length} fournisseur(s).</p>
+    <div class="ct-filtres"><button type="button" class="mk-puce${!ctFiltreCat ? ' on' : ''}" onclick="ctFiltreCat='';dessiner()">Toutes (${tous.length})</button>
+      ${noms.map(k => `<button type="button" class="mk-puce${ctFiltreCat === k ? ' on' : ''}" onclick="ctFiltreCat=${E(JSON.stringify(k))};dessiner()">${ctEmoji(k)} ${E(k)} (${familles[k].length})</button>`).join('')}</div>
+    ${fournisseurs.length > 1 ? `<div class="ct-filtres"><button type="button" class="mk-puce${!ctFiltreFour ? ' on' : ''}" onclick="ctFiltreFour='';dessiner()">Tous les fournisseurs</button>
+      ${fournisseurs.map(f => `<button type="button" class="mk-puce${ctFiltreFour === f.id ? ' on' : ''}" onclick="ctFiltreFour='${f.id}';dessiner()">${E(mkNomFournisseur(f))}</button>`).join('')}</div>` : ''}
+    <div class="mk-puces"><button type="button" class="mk-puce${ctSeulInteresse ? ' on' : ''}" onclick="ctSeulInteresse=!ctSeulInteresse;dessiner()">⭐ Seulement ceux qui m'intéressent</button></div>
+    <input class="mk-recherche" value="${E(ctCherche)}" placeholder="🔎 Chercher : WD-959, 1200 mAh, Type-C…" oninput="ctCherche=this.value;ctMajListeCatalogues()" style="font-size:17px">
+  </div>`;
+  if (!tous.length) return entete + `<div class="carte"><p class="mk-aide" style="font-size:16px">Aucun modèle pour l'instant.
+    Ouvrez la fiche d'un fournisseur → « Ses produits », ou touchez « 🤖 Ajouter ce que Claude a lu ».</p>
+    <button class="b contour" style="min-height:52px" onclick="ctBoiteImport()">🤖 Ajouter ce que Claude a lu</button></div>`;
+  return entete + `<div id="ct_liste_cat">${ctListeCataloguesHtml(familles, noms, filtre)}</div>`;
+}
+function ctMajListeCatalogues() {
+  const z = document.getElementById('ct_liste_cat'); if (!z) return;
+  const { familles, noms, filtre } = ctDonneesCatalogues();
+  z.innerHTML = ctListeCataloguesHtml(familles, noms, filtre);
+}
+function ctListeCataloguesHtml(familles, noms, filtre) {
+  const blocs = noms.filter(k => !ctFiltreCat || ctFiltreCat === k).map(k => {
+    const lignes = familles[k].filter(filtre).sort((a, b) => {
+      const ga = ctPrixGnf(a.p), gb = ctPrixGnf(b.p);
+      if (ga && gb) return ga - gb;
+      if (ga || gb) return ga ? -1 : 1;
+      return (b.p.interesse ? 1 : 0) - (a.p.interesse ? 1 : 0) || String(a.p.ref).localeCompare(String(b.p.ref), 'fr', { numeric: true });
+    });
+    if (!lignes.length) return '';
+    const min = lignes.find(x => ctPrixGnf(x.p));
+    return `<div class="carte"><h2 style="font-size:18px">${ctEmoji(k)} ${E(k)} <span class="muet" style="font-size:15px">(${lignes.length})</span></h2>
+      ${lignes.map(x => ctLigneCatalogue(x, min)).join('')}</div>`;
+  }).join('');
+  return blocs || '<div class="carte"><p class="mk-aide" style="font-size:16px">Aucun modèle dans ce choix.</p></div>';
+}
+function ctLigneCatalogue(x, min) {
+  const { f, p } = x, g = ctPrixGnf(p);
+  const ecart = g && min && min.p !== p ? g - ctPrixGnf(min.p) : 0;
+  return `<div class="ct-ligne-cat">
+    <button type="button" class="ct-etoile${p.interesse ? ' on' : ''}" aria-label="M'intéresse" onclick="ctInteresse('${f.id}','${p.id}')">${p.interesse ? '★' : '☆'}</button>
+    <div class="corps">
+      <button type="button" class="ct-ref" onclick="ctBoiteProduit('${f.id}','${p.id}')">${E(p.ref || '(sans référence)')}</button>
+      <span class="mk-code" style="cursor:pointer" onclick="ctOuvrirDossier('${f.id}')">${E(f.code || '')}</span> ${ctTags(p)}
+      <div class="ct-car"><b>${E(f.nom || f.societe || '')}</b></div>
+      ${p.caracteristiques ? `<div class="ct-car">${E(p.caracteristiques)}</div>` : ''}
+      ${ctLigneVolumeCourte(p) ? `<div class="ct-volume">📦 ${E(ctLigneVolumeCourte(p))}</div>` : ''}
+      ${g ? `<div class="ct-gnf">${ctPrixHtml(p)}${ecart > 0 ? ` <span class="mk-att">(+${gnfStrict(ecart)} vs le moins cher)</span>` : (min && min.p === p ? ' <span class="ct-tag ok">le moins cher</span>' : '')}</div>` : ''}
+      <div class="ct-boutons-ligne">
+        ${g ? '' : `<button type="button" onclick="ctBoiteUnPrix('${f.id}','${p.id}')">💬 Demander le prix</button>`}
+        <button type="button" onclick="ctVersComparer('${f.id}','${p.id}')">${p.dans_comparer ? '✓ Dans Comparer' : '➕ Comparer'}</button>
+      </div>
+    </div>
+    <div class="prix">${g ? E(nf(p.prix, 2) + ' ' + (p.devise || 'USD')) + (num(p.moq) ? `<small>min. ${nf(p.moq)}</small>` : '') : '<span class="mk-att">prix ?</span>'}</div>
+  </div>`;
+}
 </script>
 <script>
 

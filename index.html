@@ -6543,9 +6543,10 @@ async function ctApercuImport() {
 async function ctAppliquerImport() {
   const imp = ctImportEnCours; if (!imp) return;
   const bouton = document.getElementById('ct_bouton_import');
+  let nPhotosImport = 0;
   if (trNbPhotosImport(imp)) {
     if (bouton) { bouton.disabled = true; bouton.textContent = '⏳ Rangement des photos…'; }
-    try { await trPhotosImport(imp, (n, t) => { if (bouton) bouton.textContent = '⏳ Rangement des photos : ' + n + ' / ' + t; }); }
+    try { nPhotosImport = await trPhotosImport(imp, (n, t) => { if (bouton) bouton.textContent = '⏳ Rangement des photos : ' + n + ' / ' + t; }); }
     catch (e) { avertir('⚠ Certaines photos de produits n\'ont pas pu être rangées (mémoire pleine ?).'); }
   }
   trFichierImport = '';
@@ -6556,7 +6557,8 @@ async function ctAppliquerImport() {
   fermerBoite();
   ctDessinerQrManquants();
   if (bilan.length === 1 && bilan[0].id) ctOuvrirDossier(bilan[0].id); else allerA('rencontres');
-  avertir('✅ Ajouté : ' + bilan.length + ' fournisseur(s), ' + total + ' modèle(s) nouveau(x)' + (prix ? ', ' + prix + ' prix' : '') + '.', 6000);
+  avertir('✅ Ajouté : ' + bilan.length + ' fournisseur(s), ' + total + ' modèle(s) nouveau(x)' + (prix ? ', ' + prix + ' prix' : '')
+    + (nPhotosImport ? ', ' + nPhotosImport + ' photo(s) de produits' : '') + '.', 6000);
 }
 // Un lien …/carnet-kylo/#kylo=KYLOZ:… ouvre directement l'ajout (le code ne part jamais sur Internet).
 function ctImportDepuisLien() {
@@ -7753,8 +7755,9 @@ function trRefVendeur(ref) { return String(ref || '').replace(/\s*\(.*\)\s*$/, '
 function trResume(p) {
   const t = String(p.caracteristiques || '');
   const premier = t.split('·')[0].trim();
-  const couleur = premier && !/\d/.test(premier) ? premier : '';
-  const r = [couleur, trCourt(p)].filter(Boolean).join(' · ');
+  // La 1re caractéristique (« noir mat », « 4 LED anti-moustiques ») si elle est courte, puis les chiffres utiles.
+  const tete = premier && premier.length <= 34 && !/capacit|puissance|contenance|mAh/i.test(premier) ? premier : '';
+  const r = [tete, trCourt(p)].filter(Boolean).join(' · ');
   return r || (t.length > 70 ? t.slice(0, 68) + '…' : t);
 }
 // ---------- La grille des produits (photos) ou la liste détaillée (1.3.0) ----------
@@ -7890,7 +7893,7 @@ function trCourt(p) {
   const t = String(p.caracteristiques || '');
   const L = (t.match(/capacit[^·]*/i) || [''])[0].match(/\d+(?:[.,]\d+)?/g) || t.match(/\d+(?:[.,]\d+)?(?=\s*L\b)/g);
   const W = (t.match(/puissance[^·]*/i) || [''])[0].match(/\d{2,4}/g) || t.match(/\d{2,4}(?=\s*W\b)/g);
-  const mah = t.match(/(\d{3,5})\s*mAh/i);
+  const mah = t.match(/(\d{3,5}(?:\/\d{3,5})*)\s*mAh/i);   // « 1200/1800 mAh » reste entier (pas seulement 1800)
   const ml = t.match(/(\d{2,4})\s*mL/i);
   const bouts = [];
   if (L && L.length) bouts.push(L.length > 1 ? L[0] + '–' + L[L.length - 1] + ' L' : L[0] + ' L');

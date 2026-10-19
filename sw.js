@@ -4,13 +4,13 @@
 // Une nouvelle version change le nom VERSION : l'appareil la range a la prochaine
 // ouverture avec Internet, puis jette l'ancienne. Les achats, eux, ne sont jamais ici :
 // ils restent dans la memoire du carnet et dans votre fichier.
-const VERSION = 'carnet-kylo-1.3.0-8a50172526';
+const VERSION = 'carnet-kylo-1.4.0-bb805862a1';
 const FICHIERS = ["./","./index.html","./manifest.webmanifest","./lecteur-codes.js","./icones/icone-180.png","./icones/icone-192.png","./icones/icone-512-masquable.png","./icones/icone-512.png"];
 // L'empreinte exacte (SHA-256) de chaque fichier de CETTE version. 1.0.3 : si Internet donne un
 // fichier different (copie en retard chez l'hebergeur, fichier d'une autre fabrication), on ne
 // range RIEN sous le nom de cette version : l'ancienne version reste en place, intacte, et on
 // reessaiera a la prochaine ouverture avec Internet.
-const EMPREINTES = {"./":"8a50172526902c0fc4b4912a87f8da4811d4852fb8add7c1fdb976f214c1db1c","./index.html":"8a50172526902c0fc4b4912a87f8da4811d4852fb8add7c1fdb976f214c1db1c","./manifest.webmanifest":"206117d1f2fe00f5deb4cbaf42a9ddf61c62f4d7d5afa38f7810b28abbfe47eb","./lecteur-codes.js":"3e6840539ee0b66b9d70323bfdb67de1dad7da7d005c7a433c74da29bab2e0ba","./icones/icone-180.png":"ad6843165e8129d65fa23fdcd1a1ae3cc653ca5e6de44f3153aeef797589e510","./icones/icone-192.png":"59d586d2d7cb9c66ca035055a9a1ff71e8260e15a8722624cda9f128d0229bd2","./icones/icone-512-masquable.png":"9bbd5f30c9ac77b48daa6b80f73f33f40b2aba60ec6b49e7102b1f08e7958a85","./icones/icone-512.png":"9339df7ecec70578c8db3084bf5d2ad7a1bc26788793eabd963a387a656def97"};
+const EMPREINTES = {"./":"bb805862a105b0f2a193a5cd00ff646d2d5486ba07179845344194cd33382911","./index.html":"bb805862a105b0f2a193a5cd00ff646d2d5486ba07179845344194cd33382911","./manifest.webmanifest":"206117d1f2fe00f5deb4cbaf42a9ddf61c62f4d7d5afa38f7810b28abbfe47eb","./lecteur-codes.js":"3e6840539ee0b66b9d70323bfdb67de1dad7da7d005c7a433c74da29bab2e0ba","./icones/icone-180.png":"ad6843165e8129d65fa23fdcd1a1ae3cc653ca5e6de44f3153aeef797589e510","./icones/icone-192.png":"59d586d2d7cb9c66ca035055a9a1ff71e8260e15a8722624cda9f128d0229bd2","./icones/icone-512-masquable.png":"9bbd5f30c9ac77b48daa6b80f73f33f40b2aba60ec6b49e7102b1f08e7958a85","./icones/icone-512.png":"9339df7ecec70578c8db3084bf5d2ad7a1bc26788793eabd963a387a656def97"};
 const hexa = (buf) => Array.from(new Uint8Array(buf)).map((o) => o.toString(16).padStart(2, '0')).join('');
 
 self.addEventListener('install', (e) => {
@@ -35,6 +35,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || !req.url.startsWith(self.registration.scope)) return;
+  if (req.url.indexOf('/ocr/') >= 0) return;   // 1.4.0 : la lecture sans Internet a son propre rangement (kylo-ocr-1)
   e.respondWith(caches.open(VERSION).then((c) => c.match(req, { ignoreSearch: true }).then((trouve) => {
     if (trouve) return trouve;
     return fetch(req).then((rep) => {

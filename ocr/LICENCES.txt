@@ -1,0 +1,12 @@
+Lecture du texte sans Internet (carnet 1.4.0) — logiciels libres utilisés, sans modification :
+
+- tesseract.min.js, worker.min.js : tesseract.js 5.1.1 — https://github.com/naptha/tesseract.js
+  Licence Apache 2.0.
+- tesseract-core-simd-lstm.wasm.js, tesseract-core-lstm.wasm.js : tesseract.js-core 5.1.1
+  (moteur Tesseract OCR compilé en WebAssembly) — https://github.com/naptha/tesseract.js-core
+  Licence Apache 2.0.
+- lang/eng.traineddata.gz, lang/chi_sim.traineddata.gz : @tesseract.js-data/eng et chi_sim 1.0.0,
+  modèles « 4.0.0_best_int » de https://github.com/tesseract-ocr/tessdata — Licence Apache 2.0.
+
+Le carnet télécharge ces fichiers UNE fois (environ 9 Mo) dans son propre rangement du téléphone
+(« kylo-ocr-1 »), puis lit les cartes de visite sans Internet. Aucune photo ne quitte le téléphone.

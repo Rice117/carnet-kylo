@@ -892,7 +892,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.3.0';
+window.KYLO_APPLICATION = '1.4.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -1071,7 +1071,8 @@ KyloLecteurCodes.prototype.detect = function (source) {
   le vrai prix de revient rendu magasin. Chaque onglet ci-dessous a son explication en haut.</span>
   <button class="note-x" onclick="cacherNoteAccueil()" aria-label="Cacher cette note">✕</button></div>
 <nav>
-  <button data-onglet="voyage" class="actif">Voyage</button>
+  <button data-onglet="rencontres" class="actif">🏭 Fournisseurs</button>
+  <button data-onglet="voyage">Voyage</button>
   <button data-onglet="radar">Radar</button>
   <button data-onglet="negocier">Négocier</button>
   <button data-onglet="enquete">Questions</button>
@@ -1390,8 +1391,11 @@ function beneficeAttendu() { return venteAttendueGnf() - totalInvestiGnf(); }
 // ---------- navigation ----------
 function allerA(nom) {
   if (nom === 'armes') { armeActive = null; const f = document.getElementById('filArme'); if (f) f.remove(); }
+  if (typeof trQuitterEcran === 'function') trQuitterEcran(nom);
   ongletActif = nom;
-  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('actif', b.dataset.onglet === nom));
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('actif', b.dataset.onglet === nom
+    || (b.dataset.onglet === 'rencontres' && typeof TR_SOUS_FOURNISSEURS !== 'undefined' && TR_SOUS_FOURNISSEURS.includes(nom))));
+  if (typeof trGarderOnglet === 'function') trGarderOnglet(nom);
   dessiner();
 }
 document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => allerA(b.dataset.onglet)));
@@ -1532,9 +1536,11 @@ function dessiner() {
   else if (ongletActif === 'courses') z.innerHTML = ecranCourses();
   else if (ongletActif === 'achats') z.innerHTML = ecranAchats();
   else if (ongletActif === 'frais') z.innerHTML = ecranFrais();
-  else if (ongletActif === 'rencontres') z.innerHTML = ecranRencontres();
+  else if (ongletActif === 'rencontres') { z.innerHTML = ecranRencontres(); setTimeout(() => { ctRemplirMinis(); trOcrAuto(); }, 0); }
+  else if (ongletActif === 'stand') z.innerHTML = ecranStand();
+  else if (ongletActif === 'pile') z.innerHTML = ecranPile();
   else if (ongletActif === 'dossier') { z.innerHTML = ecranDossier(); setTimeout(ctRemplirMinis, 0); }
-  else if (ongletActif === 'catalogues') z.innerHTML = ecranCatalogues();
+  else if (ongletActif === 'catalogues') { z.innerHTML = ecranCatalogues(); setTimeout(ctRemplirMinis, 0); }
   else if (ongletActif === 'comparer') z.innerHTML = ecranComparer();
   else if (ongletActif === 'prix') z.innerHTML = ecranPrix();
   else if (ongletActif === 'objectif') z.innerHTML = ecranObjectif();
@@ -2502,7 +2508,7 @@ function ecranEnquete() {
     et ce qu'on perd si on l'oublie. Vous notez la réponse ici, devant le stand.</span></div>`;
   const e = enquetesListe().find(x => x.id === enqueteActive);
   if (!e) {
-    return note + `<div class="carte"><h2>Ouvrir une liste de questions</h2>
+    return note + trCarteQuestionsChinois() + `<div class="carte"><h2>Ouvrir une liste de questions</h2>
       ${Object.entries(MODELES_ENQUETE).map(([cle, m]) => `
         <div class="q-modele" onclick="nouvelleEnquete('${cle}')">
           <div class="q-m-nom">${E(m.nom)}</div>
@@ -5097,7 +5103,7 @@ function mkCompterDecisions() {
   return n;
 }
 function mkFiltrer(v) { mkFiltre = v; dessiner(); }
-function mkChercher(v) { mkCherche = v; const z = document.getElementById('mk_liste_four'); if (z) z.innerHTML = mkListeFournisseursHtml(); }
+function mkChercher(v) { mkCherche = v; const z = document.getElementById('mk_liste_four'); if (z) { z.innerHTML = mkListeFournisseursHtml(); ctRemplirMinis(); } }
 function mkListeFournisseursHtml() {
   const q = normaliserNom(mkCherche);
   const liste = mkFournisseursRecents().filter(f => {
@@ -5119,7 +5125,7 @@ function mkCarteFournisseurHtml(f) {
       ${f.qr_photo ? `<img class="qr" src="${f.qr_photo}" alt="QR WeChat" onclick="mkVoirQR('${f.id}')">`
         : f.carte_photo ? `<img class="qr" src="${f.carte_photo}" alt="Carte" onclick="mkVoirQR('${f.id}')">` : '<div class="sans" aria-hidden="true">👤</div>'}
       <div style="flex:1;min-width:0">
-        <div class="nom"><span class="mk-code">${E(f.code || '—')}</span> ${E(f.nom || f.societe || '(sans nom)')}</div>
+        <div class="nom" style="cursor:pointer" onclick="ctOuvrirDossier('${f.id}')"><span class="mk-code">${E(f.code || '—')}</span> ${E(f.nom || f.societe || '(sans nom)')}</div>
         ${f.societe && f.nom ? `<div class="det">${E(f.societe)}</div>` : ''}
         ${f.allee || f.marche ? `<div class="det">📍 ${E([f.marche, f.allee].filter(Boolean).join(' · '))}</div>` : ''}
         <div class="det">${aWx ? '💬 WeChat ' + E(f.wechat && !/^https?:/i.test(f.wechat) ? f.wechat : 'gardé') : '<span class="mk-att">pas de WeChat</span>'}${f.tel ? ' · 📞 ' + E(ctTelLisible(f.tel)) : ''}${f.vu_le ? ' · vu le ' + mkJour(f.vu_le) + ' à ' + mkHeure(f.vu_le) : ''}</div>
@@ -5127,10 +5133,11 @@ function mkCarteFournisseurHtml(f) {
       </div>
     </div>
     <div class="mk-decision">${MK_DECISIONS.map(([k, t]) => `<button type="button" class="${f.decision === k ? 'on-' + k : ''}" onclick="mkDecider('${f.id}','${k}')">${t}</button>`).join('')}</div>
+    ${trBandeProduits(f)}
     ${offres.length ? `<div class="mk-produits">${offres.map(({ c, o }) => `<div class="mk-prod">
         ${o.photo ? `<img src="${o.photo}" alt="" onclick="mkVoirOffre('${c.id}','${o.id}')">` : '<div class="vide">📦</div>'}
         <div class="t"><b>${E(c.article)}</b>${E(mkPrixCourt(o))}${num(o.moq) ? '<br>min. ' + nf(o.moq) : ''}${o.note ? '<br><span class="mk-aide">' + E(String(o.note).slice(0, 60)) + '</span>' : ''}</div></div>`).join('')}</div>`
-      : '<p class="mk-aide">Aucun produit noté chez lui pour l\'instant.</p>'}
+      : (ctProduits(f).length ? '' : '<p class="mk-aide">Aucun produit noté chez lui pour l\'instant.</p>')}
     ${f.remarque ? `<p class="mk-aide" style="font-size:15px">📝 ${E(f.remarque)}</p>` : ''}
     <div class="mk-actions">
       <button type="button" class="b" style="grid-column:1/-1;min-height:56px;font-size:16px" onclick="ctOuvrirDossier('${f.id}')">📂 Sa fiche : carte, catalogue, prix</button>
@@ -5148,8 +5155,21 @@ function ecranRencontres() {
   const n = mkCompterDecisions();
   const filtres = [['tous', 'Tous'], ['contacter', '✅ À contacter'], ['voir', '🤔 Peut-être'], ['non', '❌ Non'], ['rien', '❔ Pas décidé']];
   const interp = mkFichesInterprete();
-  return `<button class="b gris" style="margin-bottom:12px;min-height:50px;font-size:16px" onclick="allerA('comparer')">← Retour à Comparer</button>
-  <div class="carte"><h2 style="font-size:19px">👥 Fournisseurs rencontrés (${n.tous})</h2>
+  return `<div class="carte"><h2 style="font-size:19px">🏭 Fournisseurs rencontrés (${n.tous})</h2>
+    <div class="ct-entree">
+      <button class="b vert tr-gros" onclick="trStandOuvrir()">⚡ Scanner un stand<small>carte + catalogue : tout se range chez lui</small></button>
+      <button class="b tr-gros" onclick="trPileOuvrir()">📚 Ranger une pile de photos<small>à l'hôtel : le carnet trie tout seul</small></button>
+    </div>
+    <div class="mk-deux tr-entree2">
+      <button class="b contour" onclick="ctBoiteImport()">🤖 Ajouter ce que Claude a lu</button>
+      <button class="b contour" onclick="allerA('catalogues')">📊 Comparer les prix par produit</button>
+      <button class="b contour" onclick="ctNouveauParCarte()">📇 Nouveau fournisseur : sa carte + son catalogue</button>
+      <button class="b contour" onclick="marcheOuvrir()">📷 Noter un produit vu au marché</button>
+    </div>
+    ${trOcrEtatHtml()}
+  </div>
+  ${trARangerHtml()}
+  <div class="carte">
     <p class="mk-aide" style="font-size:15px">Chaque fournisseur avec ses produits, ses prix et son WeChat. Le soir, marquez
     <b>✅ à contacter</b>, <b>🤔 peut-être</b> ou <b>❌ non</b>. Son <b>code</b> (F01, F02…) est le nom à lui donner dans WeChat :
     vous le retrouvez ensuite tout de suite.</p>
@@ -5157,14 +5177,9 @@ function ecranRencontres() {
     <input class="mk-recherche" value="${E(mkCherche)}" placeholder="🔎 Chercher : nom, produit, WeChat, code F…" oninput="mkChercher(this.value)" style="font-size:17px">
     ${interp.length ? `<div class="alerte a-info" style="font-size:15px">${interp.length} fiche(s) fournisseur faite(s) avec l'<b>Interprète KYLO</b> ne sont pas encore dans le carnet.
       <div style="height:8px"></div><button class="b contour" style="min-height:50px;font-size:16px" onclick="mkImporterInterprete()">Les ajouter ici</button></div>` : ''}
-    <div class="ct-entree">
-      <button class="b vert" onclick="ctNouveauParCarte()">📇 Nouveau fournisseur : sa carte + son catalogue</button>
-      <button class="b vert" onclick="marcheOuvrir()">📷 Noter un produit vu au marché</button>
-      <button class="b contour" onclick="ctBoiteImport()">🤖 Ajouter ce que Claude a lu</button>
-      <button class="b contour" onclick="allerA('catalogues')">📊 Comparer les prix par produit</button>
-    </div>
   </div>
-  <div id="mk_liste_four">${mkListeFournisseursHtml()}</div>`;
+  <div id="mk_liste_four">${mkListeFournisseursHtml()}</div>
+  ${trAstucesHtml()}`;
 }
 // Les fiches d'avant n'ont pas de code : on leur en donne un, une fois, sans rien changer d'autre.
 function mkAssurerCodes() {
@@ -5438,6 +5453,8 @@ const CT_CONTENEURS = [['20 pieds', 28], ['40 HC', 67]];   // les mêmes volumes
 
 // ---------- Les familles de produits (une image vaut mieux qu'un mot) ----------
 const CT_FAMILLES = [
+  ['☕', 'Tasse cuiseuse électrique', ['tasse cuiseuse', 'cooking mug', 'electric mug', '电煮杯', '煮面杯']],
+  ['🍚', 'Cuiseur à riz', ['cuiseur', 'rice cooker', '电饭煲', '电饭锅']],
   ['🏸', 'Tapette à moustiques électrique', ['tapette', 'swatter', 'racket', 'raquette', '灭蚊拍']],
   ['🦟', 'Lampe anti-moustiques', ['anti-moustique', 'anti moustique', 'killer lamp', 'mosquito lamp', 'zapper', '灭蚊灯']],
   ['🌀', 'Ventilateur', ['ventilateur', 'fan', '风扇']],
@@ -5452,7 +5469,16 @@ const CT_FAMILLES = [
   ['🔌', 'Chargeurs et câbles', ['chargeur', 'charger', 'cable', 'câble', '充电器', '数据线']],
   ['🎧', 'Écouteurs et casques', ['ecouteur', 'écouteur', 'earphone', 'earbud', 'headphone', 'casque', '耳机']],
   ['🔋', 'Batteries externes', ['power bank', 'batterie externe', '充电宝']],
-  ['🔊', 'Enceintes', ['enceinte', 'speaker', '音箱']]
+  ['🔊', 'Enceintes', ['enceinte', 'speaker', '音箱']],
+  ['🍲', 'Électroménager de cuisine', ['blender', 'mixeur', 'bouilloire', 'kettle', 'friteuse', 'air fryer', 'electromenager', '电水壶', '搅拌机']],
+  ['💄', 'Beauté et cosmétiques', ['beaute', 'cosmetique', 'creme', 'parfum', 'perruque', 'wig', 'cheveux', 'hair', '化妆', '假发']],
+  ['🔧', 'Outils et bricolage', ['outil', 'bricolage', 'tool', 'perceuse', 'drill', '工具']],
+  ['🍳', 'Cuisine et maison', ['cuisine', 'casserole', 'marmite', 'poele', 'vaisselle', 'kitchen', 'cookware', '厨房']],
+  ['👕', 'Vêtements et tissus', ['vetement', 'tissu', 'textile', 't-shirt', 'robe', 'pagne', '服装']],
+  ['👟', 'Chaussures et sacs', ['chaussure', 'sandale', 'basket', 'sac a main', 'sac a dos', 'sacs', 'shoe', 'handbag', 'backpack', '鞋']],
+  ['🧸', 'Jouets', ['jouet', 'toy', 'poupee', '玩具']],
+  ['🥫', 'Alimentaire', ['alimentaire', 'conserve', 'food', 'boisson', 'biscuit', '食品']],
+  ['🛋️', 'Meubles', ['meuble', 'chaise', 'canape', 'furniture', '家具']]
 ];
 function ctFamille(cat) {
   const n = normaliserNom(cat);
@@ -5576,7 +5602,7 @@ async function ctAjouterPhotos(fid, type, input) {
       await ctEcrire(id + '~m', mini);
       ctMiniCache[id] = mini;
       if (!Array.isArray(f.docs)) f.docs = [];
-      f.docs.push({ id, type, le: mkMaintenant() });
+      f.docs.push(Object.assign({ id, type, le: mkMaintenant() }, type === 'carte' ? { a_lire: true } : {}));
       ranges++;
       if (type === 'carte' && !qrLu) qrLu = await ctLireQrCarte(f, img);
       delete f.ct_neuf;
@@ -5584,11 +5610,12 @@ async function ctAjouterPhotos(fid, type, input) {
       sauverLocal();
     } catch (e) { rates++; }
   }
+  if (type === 'carte') trLancerLectures();
   if (ctDossier === fid && ongletActif === 'dossier') dessiner();
   const quoi = type === 'carte' ? 'photo(s) de carte' : 'page(s) du catalogue';
   avertir((ranges ? '✅ ' + ranges + ' ' + quoi + ' rangée(s) chez ' + mkNomFournisseur(f) + '.' : '')
     + (qrLu ? '\n💬 QR code lu : ' + (f.wechat_lien ? 'son WeChat est gardé.' : 'coordonnées ajoutées.') : '')
-    + (type === 'carte' && ranges && !qrLu ? '\nPas de QR lisible sur la carte : touchez « Coller le texte de la carte ».' : '')
+    + (type === 'carte' && ranges ? (trOcrEtat.pret ? '\n🔎 Le carnet lit le texte de la carte…' : (!qrLu ? '\nPas de QR lisible sur la carte : touchez « Coller le texte de la carte ».' : '')) : '')
     + (rates ? '\n⚠ ' + rates + ' photo(s) non rangée(s) : la mémoire du téléphone est peut-être pleine.' : ''), 6500);
 }
 // Le QR de la carte (WeChat, carte de visite) est lu tout de suite, sans Internet.
@@ -5862,12 +5889,15 @@ function ecranDossier() {
     </div>
     <div class="mk-decision">${MK_DECISIONS.map(([k, t]) => `<button type="button" class="${f.decision === k ? 'on-' + k : ''}" onclick="mkDecider('${f.id}','${k}')">${t}</button>`).join('')}</div>
     ${ctStatutPrixHtml(f)}
+    ${trLuAutoHtml(f)}${trEnLecture(f) ? '<div class="ct-statut">⏳ Le carnet lit sa carte…</div>' : ''}
     <div class="ct-entree">
-      <button class="b vert" onclick="ctBoiteDemande('${f.id}')">✉️ ${f.demande_le ? 'Redemander' : 'Demander'} les prix (WeChat, e-mail)</button>
+      <button class="b vert" onclick="trDemander('${f.id}')">✉️ ${f.demande_le ? 'Redemander' : 'Demander'} les prix (WeChat, e-mail)</button>
+      ${ctProduits(f).length ? `<button class="b contour" onclick="trBoiteReponse('${f.id}')">💬 Coller sa réponse : les prix se placent seuls</button>` : ''}
       ${f.demande_le && ctNbPrix(f) < Math.max(1, ctProduits(f).length) ? `<button class="b contour" onclick="ctBoiteDemande('${f.id}', true)">🔔 Relancer</button>` : ''}
     </div>
     <div class="ct-liens">
       <button class="b wechat" onclick="mkContact('${f.id}')">💬 ${aWx ? 'Son WeChat' : 'WeChat'}</button>
+      ${f.whatsapp_lien || f.whatsapp ? `<button class="b tr-wa" onclick="trOuvrirWhatsApp('${f.id}')">🟢 WhatsApp</button>` : ''}
       ${tel ? `<button class="b contour" onclick="location.href='tel:${E(tel)}'">📞 Appeler</button>` : ''}
       ${f.email ? `<button class="b contour" onclick="ctEcrireMail('${f.id}')">✉️ E-mail</button>` : ''}
       ${site ? `<button class="b contour" onclick="window.open(${E(JSON.stringify(site))},'_blank')">🌐 Son site</button>` : ''}
@@ -5891,6 +5921,8 @@ function ecranDossier() {
     <div class="mk-deux">
       <label class="b vert" for="ct_pages">📷 Ajouter des pages</label>
       <button type="button" class="b contour" onclick="ctPartagerDocs('${f.id}')"${docs.length ? '' : ' disabled'}>📤 Envoyer ces photos</button>
+      <button type="button" class="b contour" onclick="trStandOuvrir('${f.id}')">⚡ Photos en rafale</button>
+      <button type="button" class="b contour" onclick="trDecoupeOuvrir('${f.id}')"${pages.length ? '' : ' disabled'}>✂️ Découper les produits</button>
     </div>
     <input type="file" id="ct_pages" accept="image/*" multiple class="champ-cache" onchange="ctAjouterPhotos('${f.id}','page',this)">
     <div class="ct-etat" id="ct_etat_page" role="status"></div>
@@ -5910,6 +5942,7 @@ function ecranDossier() {
       <button type="button" class="b contour" onclick="ctBoiteTextePage('${f.id}')">📋 Coller le texte d'une page</button>
     </div>
   </details>
+  ${trReponsesHtml(f)}
 
   <div class="carte"><label for="ct_rem" style="font-size:15px">📝 Remarques — dictez avec le micro du clavier 🎙️</label>
     <textarea id="ct_rem" rows="3" oninput="ctMajChamp('${f.id}','remarque',this.value)">${E(f.remarque)}</textarea>
@@ -5954,6 +5987,7 @@ function ctSupprimerFournisseur(fid) {
   const f = mkFournisseur(fid); if (!f) return;
   if (!confirmerEnDeuxTemps('ct-supf-' + fid, 'Supprimer ' + mkNomFournisseur(f) + ', ses photos et ses ' + ctProduits(f).length + ' modèle(s) ?')) return;
   ctDocs(f).forEach(d => { ctEffacer(d.id).catch(() => {}); ctEffacer(d.id + '~m').catch(() => {}); });
+  ctProduits(f).forEach(p => { if (p.photo_doc) { ctEffacer(p.photo_doc).catch(() => {}); ctEffacer(p.photo_doc + '~m').catch(() => {}); } });
   C.fournisseurs = fournisseursListe().filter(x => x.id !== fid);
   (C.comparaisons || []).forEach(c => (c.offres || []).forEach(o => { if (o.fournisseur_id === fid) o.fournisseur_id = ''; }));
   ctDossier = null; sauverLocal(); allerA('rencontres');
@@ -5963,10 +5997,11 @@ function ctSupprimerFournisseur(fid) {
 function ctListeProduitsDossier(f) {
   const ps = ctProduits(f);
   if (!ps.length) return '<p class="mk-aide" style="font-size:15px">Aucun modèle pour l\'instant. Ajoutez-les à la main, collez le texte d\'une page, ou faites lire le catalogue par Claude.</p>';
+  if (trVueGrille(f)) return trGrilleProduits(f);
   const groupes = {};
   ps.forEach(p => { const k = ctNomFamille(p.categorie); (groupes[k] = groupes[k] || []).push(p); });
   const nbInt = ps.filter(p => p.interesse).length;
-  return `<p class="mk-aide" style="font-size:15px">⭐ = ce modèle m'intéresse : ses cases de prix restent ouvertes, et la demande de prix peut ne porter que sur eux. Quand le fournisseur répond, tapez son prix : les francs s'affichent tout de suite.</p>
+  return `${trBasculeVue(f)}<p class="mk-aide" style="font-size:15px">⭐ = ce modèle m'intéresse : ses cases de prix restent ouvertes, et la demande de prix peut ne porter que sur eux. Quand le fournisseur répond, tapez son prix : les francs s'affichent tout de suite.</p>
     ${nbInt ? `<p class="ct-sous"><b>⭐ ${nbInt} modèle(s) m'intéressent.</b></p>` : ''}
     ${Object.keys(groupes).map(k => `<div class="ct-famille">${ctEmoji(k)} ${E(k)} (${groupes[k].length})</div>
       ${groupes[k].map(p => ctLigneProduitDossier(f, p)).join('')}`).join('')}`;
@@ -5982,7 +6017,7 @@ function ctOuvrirPrix(fid, pid) {
   const f = mkFournisseur(fid), p = f && ctProduit(f, pid); if (!p) return;
   ctPrixOuverts.add(pid);
   const el = document.getElementById('ctp_' + pid);
-  if (el) el.outerHTML = ctLigneProduitDossier(f, p);
+  if (el) { el.outerHTML = ctLigneProduitDossier(f, p); ctRemplirMinis(); }
   const ch = document.getElementById('ctpx_' + pid); if (ch) ch.focus();
 }
 function ctLigneProduitDossier(f, p) {
@@ -5991,9 +6026,10 @@ function ctLigneProduitDossier(f, p) {
   const d = p.devise || f.prix_devise || 'USD';
   return `<div class="ct-prod" id="ctp_${p.id}">
     <div class="ct-prod-tete">
+      ${trPhotoProduitHtml(f, p)}
       <button type="button" class="ct-etoile${p.interesse ? ' on' : ''}" aria-label="M'intéresse" onclick="ctInteresse('${f.id}','${p.id}')">${p.interesse ? '★' : '☆'}</button>
       <div style="flex:1;min-width:0">
-        <button type="button" class="ct-ref" onclick="ctBoiteProduit('${f.id}','${p.id}')">${E(p.ref || '(sans référence)')}</button> ${ctTags(p)}
+        ${trNumHtml(f, p)}<button type="button" class="ct-ref" onclick="ctBoiteProduit('${f.id}','${p.id}')">${E(p.ref || '(sans référence)')}</button> ${ctTags(p)}
         ${p.caracteristiques ? `<div class="ct-car">${E(p.caracteristiques)}</div>` : ''}
         ${ctLigneVolume(p) ? `<div class="ct-volume">${E(ctLigneVolume(p))}</div>` : ''}
         ${p.page ? `<div class="ct-volume">📖 ${E(p.page)}</div>` : ''}
@@ -6087,6 +6123,7 @@ function ctEnregistrerProduit(fid, pid) {
 function ctSupprimerProduit(fid, pid) {
   const f = mkFournisseur(fid); if (!f) return;
   if (!confirmerEnDeuxTemps('ct-supp-' + pid, 'Supprimer ce modèle ?')) return;
+  const pp = ctProduit(f, pid); if (pp && pp.photo_doc) { ctEffacer(pp.photo_doc).catch(() => {}); ctEffacer(pp.photo_doc + '~m').catch(() => {}); }
   f.produits = ctProduits(f).filter(p => p.id !== pid);
   sauverLocal(); fermerBoite(); dessiner();
 }
@@ -6160,15 +6197,15 @@ function ctMessageDemande(f, o) {
     '6. 是否接受阿里巴巴信用保障（Trade Assurance）付款？',
     '谢谢！', sig].join('\n');
   void familles;
-  return en + '\n\n' + cn;
+  return cn + '\n\n' + en;
 }
 function ctMessageRelance(f) {
   const contact = String(f.contact || '').trim(), sig = ctSignature();
   const qui = sig.split('–')[0].trim();
   const le = f.demande_le || mkMaintenant();
-  return ['Hello' + (contact ? ' ' + contact : '') + ', this is ' + qui + ' from KYLO EURGUINE (Guinea). I am following up on my price request of '
-    + ctDateEn(le) + '. Could you send me the price list today? Thank you!', '',
-    (contact ? contact + ' ' : '') + '您好！我是几内亚 KYLO EURGUINE 的 ' + qui + '。跟进一下我' + ctDateCn(le) + '的报价请求，麻烦您今天发一下报价单，谢谢！', '', sig].join('\n');
+  return [(contact ? contact + ' ' : '') + '您好！我是几内亚 KYLO EURGUINE 的 ' + qui + '。跟进一下我' + ctDateCn(le) + '的报价请求，麻烦您今天发一下报价单，谢谢！', '',
+    'Hello' + (contact ? ' ' + contact : '') + ', this is ' + qui + ' from KYLO EURGUINE (Guinea). I am following up on my price request of '
+    + ctDateEn(le) + '. Could you send me the price list today? Thank you!', '', sig].join('\n');
 }
 function ctMessageUnPrix(p) {
   return ['Hello, please quote model ' + p.ref + ': unit price in USD, MOQ, pcs per carton. Thank you!', '',
@@ -6191,7 +6228,7 @@ function ctDessinerDemande() {
   const puce = (k, t, on) => `<button type="button" class="mk-puce${on ? ' on' : ''}" onclick="ctDemande.${k};ctDessinerDemande()">${t}</button>`;
   mkBoite(`<div class="mk-dlg ct-champs">
     <h3>${ctDemande.relance ? '🔔 Relancer' : '✉️ Demander les prix à'} ${E(mkNomFournisseur(f))}</h3>
-    ${ctDemande.relance ? '' : `<p class="mk-aide">Le message part en <b>anglais et en chinois</b> : il comprend forcément l'un des deux.</p>
+    ${ctDemande.relance ? '' : `<p class="mk-aide">Le message part en <b>chinois</b>, avec l'anglais en dessous.</p>
     <label>Quels modèles ?</label>
     <div class="mk-puces">${puce("portee='tous'", 'Tout son catalogue', ctDemande.portee === 'tous')}
       ${n ? puce("portee='tous-liste'", 'Les ' + n + ' modèles notés', ctDemande.portee === 'tous-liste') : ''}
@@ -6366,7 +6403,7 @@ function ctTrouverFournisseur(x) {
     || L.find(f => so && normaliserNom(f.societe) === so)
     || L.find(f => no && normaliserNom(f.nom) === no) || null;
 }
-const CT_CHAMPS_IMPORT = ['nom', 'societe', 'contact', 'poste', 'mobile', 'tel_fixe', 'whatsapp', 'email', 'site', 'alibaba', 'wechat', 'wechat_lien',
+const CT_CHAMPS_IMPORT = ['nom', 'societe', 'contact', 'poste', 'mobile', 'tel_fixe', 'whatsapp', 'whatsapp_lien', 'email', 'site', 'alibaba', 'wechat', 'wechat_lien',
   'adresse', 'marche', 'allee', 'certifications', 'categories', 'catalogue'];
 // Ajoute sans jamais effacer ce que Riche a écrit : une case remplie reste telle quelle ;
 // un prix nouveau remplace l'ancien, qui est gardé dans l'historique.
@@ -6395,7 +6432,7 @@ function ctFusion(imp, appliquer) {
       const d = { ref: xp.ref || '', categorie: xp.categorie || '', caracteristiques: xp.caracteristiques || '', colisage: num(xp.colisage),
         dim_l: Array.isArray(xp.carton) ? num(xp.carton[0]) : num(xp.dim_l), dim_la: Array.isArray(xp.carton) ? num(xp.carton[1]) : num(xp.dim_la),
         dim_h: Array.isArray(xp.carton) ? num(xp.carton[2]) : num(xp.dim_h), poids_kg: xp.poids_kg ? String(xp.poids_kg) : '', page: xp.page || '',
-        nouveau: !!xp.nouveau, incertain: xp.incertain || '', a_demander: xp.a_demander || '', note: xp.note || '' };
+        nouveau: !!xp.nouveau, incertain: xp.incertain || '', a_demander: xp.a_demander || '', note: xp.note || '', photo_doc: xp.photo_doc || '' };
       const aPrix = num(xp.prix) > 0;
       if (!p) {
         b.nouveaux++; if (aPrix) b.prix++;
@@ -6457,7 +6494,7 @@ function ctBoiteImport(code) {
     <p class="mk-aide" style="font-size:15px">Envoyez à Claude les photos des cartes et des catalogues (ou la réponse de prix d'un fournisseur).
     Claude vous renvoie un code qui commence par <b>KYLOZ:</b>. Copiez-le en entier, puis :</p>
     <button class="b vert" style="min-height:56px;font-size:17px" onclick="ctColler('ct_code', ctApercuImport)">📋 Coller le code de Claude</button>
-    <textarea id="ct_code" rows="4" placeholder="KYLOZ:…" autocapitalize="off" autocorrect="off" spellcheck="false" oninput="ctApercuImport()">${E(code || '')}</textarea>
+    <textarea id="ct_code" rows="4" placeholder="KYLOZ:…" autocapitalize="off" autocorrect="off" spellcheck="false" oninput="delete this.dataset.fichier;ctApercuImport()">${E(code || '')}</textarea>
     <label class="b contour" for="ct_fichier_import" style="display:flex;min-height:50px;font-size:15px;margin-top:8px">📄 Ou choisir le fichier envoyé par Claude</label>
     <input type="file" id="ct_fichier_import" accept=".json,.txt,application/json,text/plain" class="champ-cache" onchange="ctLireFichierImport(this)">
     <div id="ct_apercu_import" class="ct-apercu-import"></div>
@@ -6470,32 +6507,48 @@ function ctBoiteImport(code) {
 function ctLireFichierImport(input) {
   const fichier = input.files && input.files[0]; input.value = ''; if (!fichier) return;
   const l = new FileReader();
-  l.onload = () => { const t = document.getElementById('ct_code'); if (t) { t.value = String(l.result || ''); ctApercuImport(); } };
+  l.onload = () => {
+    const t = document.getElementById('ct_code'); if (!t) return;
+    const texte = String(l.result || '');
+    // Un fichier avec les photos des produits pèse lourd : il reste en mémoire, pas dans la case.
+    if (texte.length > 20000) { trFichierImport = texte; t.value = '📄 ' + fichier.name + ' (' + Math.round(fichier.size / 1024) + ' Ko)'; t.dataset.fichier = '1'; }
+    else { trFichierImport = ''; t.value = texte; delete t.dataset.fichier; }
+    ctApercuImport();
+  };
   l.readAsText(fichier);
 }
 async function ctApercuImport() {
   const z = document.getElementById('ct_apercu_import'), t = document.getElementById('ct_code'), bouton = document.getElementById('ct_bouton_import');
   if (!z || !t) return;
   ctImportEnCours = null; if (bouton) bouton.disabled = true;
-  const texte = t.value;
+  const texteDe = () => (t.dataset.fichier === '1' && trFichierImport ? trFichierImport : t.value);
+  const texte = texteDe();
   if (!texte.trim()) { z.innerHTML = ''; return; }
   z.innerHTML = '<p class="ct-etat">Lecture du code…</p>';
   try {
     const imp = ctValider(await ctDecoder(texte));
-    if (t.value !== texte) return;   // le champ a changé pendant la lecture
+    if (texteDe() !== texte) return;   // le champ a changé pendant la lecture
     const bilan = ctFusion(imp, false);
     ctImportEnCours = imp;
     z.innerHTML = `${imp.titre ? `<p style="margin:10px 0 4px"><b>${E(imp.titre)}</b></p>` : ''}
       <ul style="margin:6px 0;padding-left:20px">${bilan.map(b => `<li><b>${E(b.nom)}</b> — ${b.existe ? 'déjà dans le carnet (' + E(b.code) + ')' : '<b>nouveau fournisseur</b>'}<br>
         ${b.nouveaux} modèle(s) nouveau(x)${b.completes ? ' · ' + b.completes + ' complété(s)' : ''}${b.prix ? ' · <b>' + b.prix + ' prix</b>' : ''}${b.cases ? ' · ' + b.cases + ' coordonnée(s)' : ''}</li>`).join('')}</ul>
+      ${trNbPhotosImport(imp) ? `<p style="margin:4px 0">📸 <b>${trNbPhotosImport(imp)} photo(s) de produits</b>, découpées une par une.</p>` : ''}
       <div class="alerte a-vert">Rien de ce que vous avez écrit ne sera effacé.</div>`;
     if (bouton) bouton.disabled = false;
   } catch (e) {
     z.innerHTML = `<div class="alerte a-rouge">${E(e.message || String(e))}</div>`;
   }
 }
-function ctAppliquerImport() {
+async function ctAppliquerImport() {
   const imp = ctImportEnCours; if (!imp) return;
+  const bouton = document.getElementById('ct_bouton_import');
+  if (trNbPhotosImport(imp)) {
+    if (bouton) { bouton.disabled = true; bouton.textContent = '⏳ Rangement des photos…'; }
+    try { await trPhotosImport(imp, (n, t) => { if (bouton) bouton.textContent = '⏳ Rangement des photos : ' + n + ' / ' + t; }); }
+    catch (e) { avertir('⚠ Certaines photos de produits n\'ont pas pu être rangées (mémoire pleine ?).'); }
+  }
+  trFichierImport = '';
   const bilan = ctFusion(imp, true);
   sauverLocal();
   ctImportEnCours = null;
@@ -6563,6 +6616,7 @@ function ctMajListeCatalogues() {
   const z = document.getElementById('ct_liste_cat'); if (!z) return;
   const { familles, noms, filtre } = ctDonneesCatalogues();
   z.innerHTML = ctListeCataloguesHtml(familles, noms, filtre);
+  ctRemplirMinis();
 }
 function ctListeCataloguesHtml(familles, noms, filtre) {
   const blocs = noms.filter(k => !ctFiltreCat || ctFiltreCat === k).map(k => {
@@ -6583,6 +6637,7 @@ function ctLigneCatalogue(x, min) {
   const { f, p } = x, g = ctPrixGnf(p);
   const ecart = g && min && min.p !== p ? g - ctPrixGnf(min.p) : 0;
   return `<div class="ct-ligne-cat">
+    ${trPhotoProduitHtml(f, p)}
     <button type="button" class="ct-etoile${p.interesse ? ' on' : ''}" aria-label="M'intéresse" onclick="ctInteresse('${f.id}','${p.id}')">${p.interesse ? '★' : '☆'}</button>
     <div class="corps">
       <button type="button" class="ct-ref" onclick="ctBoiteProduit('${f.id}','${p.id}')">${E(p.ref || '(sans référence)')}</button>
@@ -6598,6 +6653,2033 @@ function ctLigneCatalogue(x, min) {
     </div>
     <div class="prix">${g ? E(nf(p.prix, 2) + ' ' + (p.devise || 'USD')) + (num(p.moq) ? `<small>min. ${nf(p.moq)}</small>` : '') : '<span class="mk-att">prix ?</span>'}</div>
   </div>`;
+}
+</script>
+<style>
+/* ===================== 1.4.0 — SUR LE TERRAIN (20/10/2026) =====================
+   Textes jamais sous 14 px (règle de Riche). Couleurs = variables du carnet (clair et sombre). */
+/* L'en-tête (solde du voyage) ne reste plus collé en haut : il cachait plus de la moitié de l'écran dès qu'on
+   descendait. Il est toujours en haut de chaque écran ; ce sont les onglets qui restent visibles. */
+header{position:relative}
+nav{top:0}
+/* Le mode Stand prend tout l'écran : la caméra d'abord. */
+body.tr-plein header, body.tr-plein #noteAccueil, body.tr-plein .barre-bas, body.tr-plein .mk-fab{display:none!important}
+body.tr-plein main{padding-bottom:40px}
+.tr-entree2{margin-top:10px}
+.tr-entree2 .b{min-height:60px!important;font-size:15px!important}
+.tr-gros{min-height:72px!important;font-size:18px!important;flex-direction:column;gap:2px}
+.tr-gros small{display:block;font-size:15px;font-weight:600;opacity:.92}
+.tr-ocr{font-size:15px;font-weight:700;line-height:1.4;padding:10px 12px;border-radius:12px;margin:10px 0 0;background:var(--bleu-pale);color:var(--bleu)}
+.tr-ocr.ok{background:var(--vert-pale);color:var(--vert)}
+.tr-ocr.att{background:var(--ambre-pale);color:var(--ambre)}
+.tr-barre{height:8px;border-radius:99px;background:var(--gris-clair);overflow:hidden;margin-top:6px}
+.tr-barre i{display:block;height:100%;background:var(--vert);border-radius:99px;transition:width .3s}
+.tr-astuces summary{font-size:17px;font-weight:900;color:var(--bleu);min-height:44px;display:flex;align-items:center}
+.tr-astuces ol{margin:6px 0 0;padding-left:22px;font-size:15px;line-height:1.5}
+.tr-astuces li{margin-bottom:6px}
+.tr-cn{font-size:17px;font-weight:700}
+/* Mode Stand */
+.tr-stand-tete{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:17px;font-weight:900;margin-bottom:8px}
+.tr-cam{position:relative;width:100%;aspect-ratio:3/4;max-height:47vh;background:#000;border-radius:16px;overflow:hidden}
+.tr-cam video{width:100%;height:100%;object-fit:cover;display:block}
+.tr-cam .vise{position:absolute;inset:8% 6%;border:3px solid rgba(255,255,255,.85);border-radius:14px;pointer-events:none}
+.tr-cam .vise.vise-carte{inset:28% 8%}
+.tr-cam .msg{position:absolute;left:10px;right:10px;bottom:10px;background:rgba(0,0,0,.6);color:#fff;font-size:15px;font-weight:700;border-radius:10px;padding:8px 10px;text-align:center}
+.tr-cam .eclair{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s}
+.tr-cam .eclair.on{opacity:.85;transition:none}
+.tr-types{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0}
+.tr-types button{font:inherit;font-size:14px;font-weight:800;min-height:56px;border-radius:12px;border:2px solid var(--lisiere);background:var(--carte);color:var(--noir);padding:4px;line-height:1.2}
+.tr-types button.on{border-color:var(--vert);background:var(--vert);color:#fff}
+html[data-theme="sombre"] .tr-types button.on{color:#0c1526}
+.tr-declencheur{display:block;margin:4px auto 10px;width:84px;height:84px;border-radius:50%;border:6px solid var(--vert);background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.tr-declencheur:active{transform:scale(.94)}
+.tr-bande{display:flex;gap:8px;overflow-x:auto;padding:4px 0 8px;min-height:20px}
+.tr-bande .v{position:relative;flex:none;width:74px}
+.tr-bande img{width:74px;height:98px;object-fit:cover;border-radius:10px;border:1px solid var(--lisiere);background:var(--bleu-pale);display:block}
+.tr-bande .v span{position:absolute;left:3px;bottom:3px;background:rgba(0,0,0,.68);color:#fff;font-size:14px;border-radius:6px;padding:0 5px}
+.tr-etat{font-size:16px;font-weight:700;line-height:1.4;padding:10px 12px;border-radius:12px;background:var(--bleu-pale);color:var(--bleu);margin:6px 0 10px}
+.tr-etat.ok{background:var(--vert-pale);color:var(--vert)}
+/* Pile */
+.tr-pile-prog{font-size:17px;font-weight:800;margin:8px 0}
+.tr-groupe{border-left:6px solid var(--vert)}
+.tr-groupe.ranger{border-left-color:var(--ambre)}
+.tr-groupe .tete{font-size:18px;font-weight:900;line-height:1.3}
+.tr-groupe .det{font-size:15px;color:var(--texte-note);line-height:1.45;margin-top:4px}
+.tr-vignettes{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px;margin-top:10px}
+.tr-vignette{border:1px solid var(--lisiere);border-radius:12px;overflow:hidden;background:var(--carte)}
+.tr-vignette img{width:100%;aspect-ratio:3/4;object-fit:cover;display:block;background:var(--bleu-pale)}
+.tr-vignette button{font:inherit;font-size:14px;font-weight:800;width:100%;border:0;border-top:1px solid var(--lisiere);background:var(--carte);color:var(--bleu);min-height:40px}
+.tr-vignette select{font-size:14px;padding:6px;border-radius:0;border:0;border-top:1px solid var(--lisiere);min-height:40px}
+.tr-a-ranger{border:2px dashed var(--ambre);background:var(--ambre-pale)}
+.tr-lu{font-size:15px;line-height:1.4;padding:10px 12px;border-radius:12px;background:var(--ambre-pale);color:var(--ambre);font-weight:700;margin-top:10px}
+.tr-lu button{font:inherit;font-size:15px;font-weight:800;border:0;background:none;color:inherit;text-decoration:underline;padding:6px 0;min-height:40px}
+.tr-wa{background:#25d366!important;color:#fff!important}
+/* Produits en photo : la grille */
+.tr-grille{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:8px 0 4px}
+.tr-cp{border:1px solid var(--lisiere);border-radius:14px;overflow:hidden;background:var(--carte);display:flex;flex-direction:column}
+.tr-cp .ph{position:relative;background:#fff;aspect-ratio:1/1}
+.tr-cp .ph img{width:100%;height:100%;object-fit:contain;display:block;cursor:zoom-in;border:0;border-radius:0;aspect-ratio:auto;background:#fff}
+.tr-cp .ph .vide{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:42px;background:var(--bleu-pale)}
+.tr-cp .ph .tr-num{position:absolute;left:6px;top:6px;font-size:15px}
+.tr-cp .ph .ct-etoile{position:absolute;right:4px;top:4px;background:rgba(255,255,255,.9);border-radius:50%;width:44px;height:44px;min-width:44px;padding:0}
+.tr-cp .ref{font:inherit;font-size:16px;font-weight:900;color:var(--bleu);border:0;background:none;text-align:left;padding:8px 10px 0;min-height:36px;text-decoration:underline}
+.tr-cp .res{font-size:14px;color:var(--texte-note);line-height:1.35;padding:2px 10px 0;flex:1}
+.tr-cp .px{font:inherit;font-size:15px;font-weight:800;margin:8px;border-radius:10px;border:2px solid var(--bleu);background:var(--carte);color:var(--bleu);min-height:46px;padding:4px 6px;line-height:1.25}
+.tr-cp .px.ok{border-color:var(--vert);background:var(--vert-pale);color:var(--vert)}
+.tr-cp .px small{display:block;font-size:14px;font-weight:700}
+/* Produits en photo */
+.tr-prod-photo{flex:none;width:92px;height:92px;object-fit:contain;background:#fff;border:1px solid var(--lisiere);border-radius:12px;cursor:zoom-in;aspect-ratio:auto}
+.tr-num{display:inline-block;min-width:30px;text-align:center;font-size:14px;font-weight:900;border-radius:999px;background:var(--noir);color:var(--carte);padding:1px 7px;margin-right:4px}
+.tr-bande-prod{display:flex;gap:8px;overflow-x:auto;padding:6px 0 4px;margin-top:6px}
+.tr-bande-prod .p{flex:none;width:96px;text-align:center;font-size:14px;font-weight:800;line-height:1.25;cursor:pointer}
+.tr-bande-prod img{width:96px;height:96px;object-fit:contain;background:#fff;border:1px solid var(--lisiere);border-radius:10px;display:block;margin-bottom:3px}
+.tr-planches{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.tr-planches img{width:100%;border-radius:10px;border:1px solid var(--lisiere);background:#fff;cursor:zoom-in}
+.tr-etape{display:flex;gap:10px;align-items:flex-start;margin:10px 0}
+.tr-etape .n{flex:none;width:32px;height:32px;border-radius:50%;background:var(--vert);color:#fff;font-weight:900;font-size:17px;display:flex;align-items:center;justify-content:center}
+.tr-etape .c{flex:1;min-width:0}
+.tr-etape .b{min-height:54px;font-size:16px}
+.tr-rep-ligne{display:flex;gap:10px;align-items:center;border-top:1px solid var(--gris-clair);padding:8px 0;font-size:15px}
+.tr-rep-ligne img{width:56px;height:56px;object-fit:contain;background:#fff;border-radius:8px;border:1px solid var(--lisiere);flex:none}
+.tr-rep-ligne input[type=checkbox]{width:26px;height:26px;flex:none}
+.tr-rep-ligne .corps{flex:1;min-width:0;line-height:1.35}
+.tr-rep-ligne .px{font-size:17px;font-weight:900;white-space:nowrap;color:var(--vert)}
+/* Découper */
+.tr-decoupe{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;margin:8px 0}
+.tr-decoupe canvas{width:100%;display:block;border-radius:10px;background:#000}
+.tr-poignee{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;border:4px solid #fff;background:rgba(21,115,71,.85);box-shadow:0 2px 8px rgba(0,0,0,.5);touch-action:none}
+.tr-pas{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:800;margin:8px 0}
+.tr-pas span{flex:1}
+.tr-dec-dlg{overflow-x:hidden}
+.tr-pas button{font:inherit;font-size:22px;font-weight:900;width:48px;height:48px;border-radius:12px;border:2px solid var(--bleu);background:var(--carte);color:var(--bleu)}
+.tr-pas b{min-width:28px;text-align:center;font-size:20px}
+.tr-cases{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:10px}
+.tr-case{border:1px solid var(--lisiere);border-radius:12px;padding:6px;background:var(--carte)}
+.tr-case img{width:100%;aspect-ratio:1/1;object-fit:contain;background:#fff;border-radius:8px;display:block}
+.tr-case input{font-size:16px;padding:8px;margin-top:6px}
+.tr-case .lu{font-size:14px;color:var(--texte-note);line-height:1.3;margin-top:4px}
+/* Questions au vendeur (en chinois) */
+.tr-vd{position:fixed;inset:0;z-index:10001;background:var(--fond);overflow-y:auto;padding:calc(14px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom))}
+.tr-vd .haut{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.tr-vd .haut .prog{flex:1;font-size:16px;font-weight:800;color:var(--gris)}
+.tr-vd .haut button{font:inherit;font-size:14px;font-weight:700;border:1px solid var(--lisiere);background:var(--carte);color:var(--gris);border-radius:10px;padding:8px 10px;min-height:44px}
+.tr-vd .bonjour{font-size:20px;font-weight:900;color:var(--bleu);line-height:1.35;margin:4px 0 12px}
+.tr-vd .q{font-size:28px;font-weight:900;line-height:1.35;margin:10px 0 4px;color:var(--noir)}
+.tr-vd .fr{font-size:15px;color:var(--gris);margin-bottom:14px}
+.tr-vd .choix{display:grid;grid-template-columns:1fr;gap:10px}
+.tr-vd .choix button{font:inherit;font-size:24px;font-weight:800;min-height:64px;border-radius:14px;border:2px solid var(--bleu);background:var(--carte);color:var(--bleu)}
+.tr-vd .choix button.on{background:var(--bleu);color:#fff}
+.tr-vd input{font-size:30px;font-weight:900;padding:14px;text-align:center}
+.tr-vd .unite{font-size:22px;font-weight:800;color:var(--gris);text-align:center;margin-top:6px}
+.tr-vd .nav{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:8px;margin-top:20px}
+.tr-vd .nav button{font:inherit;font-size:20px;font-weight:900;min-height:60px;border-radius:14px;border:0;background:var(--gris-clair);color:var(--anthracite)}
+.tr-vd .nav button.go{background:var(--vert);color:#fff}
+.tr-vd .produit{display:flex;gap:12px;align-items:center;background:var(--carte);border:1px solid var(--lisiere);border-radius:14px;padding:10px;margin:6px 0 10px}
+.tr-vd .produit img{width:120px;height:120px;object-fit:contain;background:#fff;border-radius:10px;flex:none}
+.tr-vd .produit b{font-size:24px}
+.tr-vd .devises{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.tr-vd .devises button{font:inherit;font-size:20px;font-weight:800;min-height:54px;border-radius:12px;border:2px solid var(--lisiere);background:var(--carte);color:var(--noir)}
+.tr-vd .devises button.on{border-color:var(--vert);background:var(--vert-pale);color:var(--vert)}
+.tr-rep{font-size:15px;line-height:1.45}
+.tr-rep li{margin-bottom:4px}
+.tr-qliste{font-size:15px;line-height:1.5;padding-left:22px}
+</style>
+<script>
+'use strict';
+// ===================== 1.4.0 — SUR LE TERRAIN (20/10/2026) =====================
+// Riche, 20/10 à 1 h du matin, après la 1re journée de la Foire de Canton : « sur le terrain on n'a pas
+// le temps ». Il ramasse cartes et catalogues, et veut qu'en prenant 2, 3, 4 photos (carte recto-verso,
+// catalogue) tout se range TOUT SEUL chez le même fournisseur, la carte remplissant ses coordonnées comme
+// un scanner. À l'hôtel, il veut tout trier d'un coup (« tu peux trier derrière moi »).
+// Ce module ajoute :
+//   - la LECTURE SANS INTERNET du texte des cartes (Tesseract, rangé une fois dans le téléphone) ;
+//   - la lecture de TOUS les QR d'une carte (WeChat ET WhatsApp) ;
+//   - ⚡ le mode Stand : la caméra dans le carnet, une rafale de photos rangées chez le fournisseur du stand ;
+//   - 📚 Ranger une pile : toutes les photos d'un coup, triées par fournisseur (QR, e-mail, téléphone, ordre) ;
+//   - l'onglet 🏭 Fournisseurs en tête du carnet, et le carnet qui se rouvre là où on l'a laissé.
+// Ce que le téléphone lit seul : QR, téléphones, e-mails, société, contact (vérifiés ensuite d'un coup d'œil).
+// Ce qu'il ne lit pas bien : les étiquettes des catalogues → Claude les lit et découpe chaque produit.
+
+window.KYLO_TERRAIN = '1.4.0';
+
+// ---------- 1. La lecture du texte, sans Internet (Tesseract.js 5, rangé dans le téléphone) ----------
+const TR_OCR_CACHE = 'kylo-ocr-1';
+const TR_OCR_SIMD = (() => { try { return WebAssembly.validate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11])); } catch (e) { return false; } })();
+const TR_OCR_TAILLES = { 'ocr/tesseract.min.js': 66695, 'ocr/worker.min.js': 123724, 'ocr/tesseract-core-simd-lstm.wasm.js': 3938657,
+  'ocr/tesseract-core-lstm.wasm.js': 3938277, 'ocr/lang/eng.traineddata.gz': 2952873, 'ocr/lang/chi_sim.traineddata.gz': 1718768 };
+function trOcrFichiers() {
+  return ['ocr/tesseract.min.js', 'ocr/worker.min.js', TR_OCR_SIMD ? 'ocr/tesseract-core-simd-lstm.wasm.js' : 'ocr/tesseract-core-lstm.wasm.js',
+    'ocr/lang/eng.traineddata.gz', 'ocr/lang/chi_sim.traineddata.gz'];
+}
+const trOcrEtat = { pret: null, enCours: false, pct: 0, erreur: '', tente: false };
+async function trOcrVerifier() {
+  if (!('caches' in window)) { trOcrEtat.pret = false; return false; }
+  try {
+    const c = await caches.open(TR_OCR_CACHE);
+    for (const f of trOcrFichiers()) { if (!(await c.match(f))) { trOcrEtat.pret = false; return false; } }
+    trOcrEtat.pret = true; return true;
+  } catch (e) { trOcrEtat.pret = false; return false; }
+}
+// Télécharge ce qui manque (une seule fois, environ 9 Mo), avec la progression à l'écran.
+async function trOcrPreparer() {
+  if (trOcrEtat.enCours || trOcrEtat.pret) return trOcrEtat.pret;
+  if (!('caches' in window)) return false;
+  trOcrEtat.enCours = true; trOcrEtat.tente = true; trOcrEtat.erreur = ''; trOcrMajEtat();
+  try {
+    const c = await caches.open(TR_OCR_CACHE);
+    const liste = trOcrFichiers();
+    const total = liste.reduce((s, f) => s + (TR_OCR_TAILLES[f] || 1000000), 0);
+    let fait = 0;
+    for (const f of liste) {
+      if (await c.match(f)) { fait += TR_OCR_TAILLES[f] || 0; continue; }
+      const rep = await fetch(new Request(f, { cache: 'reload' }));
+      if (!rep.ok) { try { await rep.body.cancel(); } catch (e) {} throw new Error('fichier ' + f + ' absent (' + rep.status + ')'); }
+      let blob;
+      if (rep.body && rep.body.getReader) {
+        const lecteur = rep.body.getReader(), morceaux = [];
+        for (;;) {
+          const { done, value } = await lecteur.read();
+          if (done) break;
+          morceaux.push(value); fait += value.length;
+          trOcrEtat.pct = Math.min(99, Math.round(fait * 100 / total)); trOcrMajEtat();
+        }
+        blob = new Blob(morceaux);
+      } else { blob = await rep.blob(); fait += blob.size; }
+      await c.put(f, new Response(blob, { headers: { 'Content-Type': /\.js$/.test(f) ? 'text/javascript' : 'application/octet-stream' } }));
+    }
+    trOcrEtat.pret = true; trOcrEtat.pct = 100;
+  } catch (e) {
+    trOcrEtat.erreur = e && e.message ? e.message : String(e);
+    trOcrEtat.pret = false;
+  }
+  trOcrEtat.enCours = false; trOcrMajEtat();
+  if (trOcrEtat.pret) trLancerLectures();
+  return trOcrEtat.pret;
+}
+// Préparée toute seule dès qu'il y a Internet (le carnet ouvert sur 🏭 Fournisseurs, le Stand ou la Pile).
+// Quelques secondes après l'ouverture : le carnet s'affiche d'abord, le téléchargement vient ensuite.
+let trOcrAutoMinuterie = null;
+function trOcrAuto() {
+  if (trOcrEtat.pret || trOcrEtat.enCours || trOcrEtat.tente || trOcrAutoMinuterie) return;
+  if (navigator.onLine === false || !/^https?:/.test(location.protocol)) return;
+  trOcrAutoMinuterie = setTimeout(() => { trOcrAutoMinuterie = null; if (!trOcrEtat.pret) trOcrVerifier().then(p => { if (!p) trOcrPreparer(); else trOcrMajEtat(); }); }, 2500);
+}
+window.addEventListener('online', () => { trOcrEtat.tente = false; if (['rencontres', 'stand', 'pile'].includes(ongletActif)) trOcrAuto(); });
+function trOcrEtatHtml() {
+  if (!('caches' in window)) return '';
+  if (trOcrEtat.pret) return '<div class="tr-ocr ok" id="tr_ocr">📖 Lecture des cartes sans Internet : prête ✓</div>';
+  if (trOcrEtat.enCours) return `<div class="tr-ocr" id="tr_ocr">⬇️ Préparation de la lecture des cartes (une seule fois, 9 Mo) : ${trOcrEtat.pct} %
+    <div class="tr-barre"><i style="width:${trOcrEtat.pct}%"></i></div></div>`;
+  if (trOcrEtat.erreur) return `<div class="tr-ocr att" id="tr_ocr">📖 La lecture des cartes n'a pas pu se préparer (${E(trOcrEtat.erreur)}).
+    Les QR codes se lisent quand même. <button class="mk-lien" onclick="trOcrEtat.tente=false;trOcrPreparer()">Réessayer</button></div>`;
+  if (trOcrEtat.pret === false && navigator.onLine === false) return '<div class="tr-ocr att" id="tr_ocr">📖 Lecture du texte des cartes : se prépare à la prochaine connexion (wifi de l\'hôtel). Les QR codes se lisent déjà.</div>';
+  return '<div class="tr-ocr" id="tr_ocr">📖 Lecture des cartes sans Internet : vérification…</div>';
+}
+function trOcrMajEtat() { const z = document.getElementById('tr_ocr'); if (z) z.outerHTML = trOcrEtatHtml(); }
+
+async function trOcrLireCache(f) {
+  const c = await caches.open(TR_OCR_CACHE);
+  const r = await c.match(f);
+  if (!r) throw new Error('lecture pas encore prête');
+  return r;
+}
+let trOcrScriptPret = null;
+function trOcrScript() {
+  if (window.Tesseract) return Promise.resolve();
+  if (trOcrScriptPret) return trOcrScriptPret;
+  trOcrScriptPret = (async () => {
+    const url = URL.createObjectURL(await (await trOcrLireCache('ocr/tesseract.min.js')).blob());
+    await new Promise((ok, ko) => { const s = document.createElement('script'); s.src = url; s.onload = ok; s.onerror = () => ko(new Error('moteur de lecture illisible')); document.head.appendChild(s); });
+  })();
+  trOcrScriptPret.catch(() => { trOcrScriptPret = null; });
+  return trOcrScriptPret;
+}
+// Un seul « lecteur » à la fois (il pèse dans la mémoire du téléphone) ; on le libère après une série.
+let trOcrW = null, trOcrLangs = '', trOcrFile = Promise.resolve();
+async function trOcrTravailleur(langs) {
+  if (trOcrW && trOcrLangs === langs) return trOcrW;
+  if (trOcrW) { const vieux = trOcrW; trOcrW = null; try { (await vieux).terminate(); } catch (e) {} }
+  trOcrLangs = langs;
+  trOcrW = (async () => {
+    await trOcrScript();
+    // Le lecteur va chercher ses langues sur Internet : on lui sert celles rangées dans le téléphone.
+    const cale = "const __f=self.fetch.bind(self);self.fetch=async(u,o)=>{const s=typeof u==='string'?u:((u&&u.url)||'');"
+      + "if(s.indexOf('/ocr/lang/')>=0){try{const c=await caches.open('" + TR_OCR_CACHE + "');const r=await c.match(s);if(r)return r;}catch(e){}}return __f(u,o);};\n";
+    const texteW = await (await trOcrLireCache('ocr/worker.min.js')).text();
+    const workerPath = URL.createObjectURL(new Blob([cale, texteW], { type: 'text/javascript' }));
+    const corePath = URL.createObjectURL(await (await trOcrLireCache(TR_OCR_SIMD ? 'ocr/tesseract-core-simd-lstm.wasm.js' : 'ocr/tesseract-core-lstm.wasm.js')).blob()) + '#core.wasm.js';
+    return Tesseract.createWorker(langs, 1, { workerPath, workerBlobURL: false, corePath, gzip: true, cacheMethod: 'none',
+      langPath: new URL('ocr/lang', location.href).href });
+  })();
+  trOcrW.catch(() => { trOcrW = null; });
+  return trOcrW;
+}
+// Le lecteur est libéré 5 secondes après la DERNIÈRE lecture demandée, jamais pendant qu'une lecture
+// attend son tour (sinon une lecture en cours resterait bloquée pour toujours).
+let trOcrEnAttente = 0, trOcrMinuterie = null;
+function trOcrLiberer() {
+  clearTimeout(trOcrMinuterie);
+  trOcrMinuterie = setTimeout(() => {
+    if (trOcrEnAttente > 0 || !trOcrW) return;
+    const w = trOcrW; trOcrW = null; trOcrLangs = '';
+    w.then(x => x.terminate()).catch(() => {});
+  }, 5000);
+}
+function trOcrJeter() {   // un lecteur qui ne répond plus : on le jette, le suivant repart à neuf
+  const w = trOcrW; trOcrW = null; trOcrLangs = '';
+  if (w) w.then(x => x.terminate()).catch(() => {});
+}
+// Lit une image (toile). Rend { texte, mots: [{ t, c, b }] }. Les lectures passent l'une après l'autre.
+function trOcrLire(toile, langs, psm) {
+  trOcrEnAttente++; clearTimeout(trOcrMinuterie);
+  const travail = trOcrFile.then(async () => {
+    const w = await trOcrTravailleur(langs || 'eng');
+    let minuterie;
+    const trop = new Promise((ok, ko) => { minuterie = setTimeout(() => ko(new Error('lecture trop longue')), 90000); });
+    try {
+      await Promise.race([w.setParameters({ tessedit_pageseg_mode: String(psm || '3') }), trop]);
+      const r = await Promise.race([w.recognize(toile, {}, { text: true, blocks: true }), trop]);
+      const mots = [];
+      (r.data.blocks || []).forEach(b => (b.paragraphs || []).forEach(p => (p.lines || []).forEach(l => (l.words || []).forEach(x =>
+        mots.push({ t: x.text, c: x.confidence, b: x.bbox })))));
+      return { texte: r.data.text || '', mots };
+    } catch (e) { trOcrJeter(); throw e; }
+    finally { clearTimeout(minuterie); }
+  });
+  trOcrFile = travail.catch(() => {});
+  return travail.finally(() => { trOcrEnAttente--; });
+}
+async function trOcrDispo() {
+  if (trOcrEtat.pret === null) await trOcrVerifier();
+  return trOcrEtat.pret === true;
+}
+function trTourner(toile, deg) {
+  const c = document.createElement('canvas');
+  const droit = deg === 90 || deg === 270;
+  c.width = droit ? toile.height : toile.width; c.height = droit ? toile.width : toile.height;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.translate(c.width / 2, c.height / 2); g.rotate(deg * Math.PI / 180);
+  g.drawImage(toile, -toile.width / 2, -toile.height / 2);
+  return c;
+}
+function trImage(src) {
+  return new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ko(new Error('photo illisible')); i.src = src; });
+}
+// Une lecture « lisible » : des mots sûrs, et surtout un e-mail ou un téléphone.
+const TR_RE_MAIL = /[A-Z0-9._%+-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)*\.[A-Z]{2,}/i;
+const TR_RE_TEL = /(?:\+?\s?86[\s-]*)?1[3-9]\d[\s-]?\d{4}[\s-]?\d{4}|\+\d[\d\s-]{8,}\d/;
+function trScore(r) {
+  const surs = r.mots.filter(m => m.c >= 70 && String(m.t).replace(/[^A-Za-z0-9一-鿿]/g, '').length >= 3).length;
+  return surs + (TR_RE_MAIL.test(r.texte) ? 8 : 0) + (TR_RE_TEL.test(r.texte) ? 8 : 0);
+}
+// Lit une carte (ou une couverture) dans le bon sens : on essaie de tourner si c'est illisible.
+async function trOcrCarte(img, rapide) {
+  if (!(await trOcrDispo())) return null;
+  const base = mkToile(img, rapide ? 1400 : 1700);
+  let meilleur = null;
+  for (const deg of [0, 90, 270, 180]) {
+    const toile = deg ? trTourner(base, deg) : base;
+    const r = await trOcrLire(toile, 'eng+chi_sim', '3');
+    const s = trScore(r);
+    if (!meilleur || s > meilleur.s) meilleur = { s, r, deg, toile };
+    if (s >= 14) break;
+    if (deg === 270 && meilleur.s < 4) break;    // rien de lisible : une photo sans texte
+  }
+  let texte = meilleur.r.texte;
+  if (!rapide && meilleur.s >= 4) {                // les morceaux éparpillés (logo, coins) : 2e lecture
+    try { texte += '\n' + (await trOcrLire(meilleur.toile, 'eng+chi_sim', '11')).texte; } catch (e) {}
+  }
+  return { texte, deg: meilleur.deg, score: meilleur.s, mots: meilleur.r.mots };
+}
+
+// ---------- 2. Tous les QR d'une carte : WeChat ET WhatsApp ----------
+function trMasquer(toile, points) {
+  if (!points || !points.length) return;
+  const xs = points.map(p => p.x), ys = points.map(p => p.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const cote = Math.max(x1 - x0, y1 - y0, 20), m = cote * 0.45;
+  const g = toile.getContext('2d'); g.fillStyle = '#fff';
+  g.fillRect(x0 - m, y0 - m, x1 - x0 + 2 * m, y1 - y0 + 2 * m);
+}
+async function trLireTousQR(source, fouiller) {
+  const trouves = [];
+  const garder = (texte, toile, points) => {
+    if (!texte || trouves.some(q => q.texte === texte)) return;
+    trouves.push({ texte, image: mkDecouperQR(toile, points) });
+  };
+  let natif = null, Z = null;
+  try { natif = await mkLecteurNatif(); } catch (e) {}
+  for (const t of [1600, 2400, 1100]) {
+    const toile = mkToile(source, t);
+    if (natif) {
+      try { (await natif.detect(toile) || []).forEach(x => garder(x.rawValue, toile, x.cornerPoints || [])); } catch (e) {}
+    }
+    if (!Z) { try { Z = await mkChargerZXing(); } catch (e) { if (!natif) return trouves; } }
+    if (Z) {
+      for (let k = 0; k < 5; k++) {
+        const r = mkZXingLire(Z, toile);
+        if (!r) break;
+        garder(r.texte, toile, r.points);
+        trMasquer(toile, r.points);              // on cache ce QR pour trouver le suivant
+      }
+    }
+    if (trouves.length >= 2) break;
+  }
+  // Un petit QR dans une grande photo (carte posée loin, de travers) : on cherche morceau par morceau, agrandi.
+  // (essayé sur la vraie carte de Lisa : seul un morceau d'un quart de la photo, agrandi, la lit)
+  if (!trouves.length && Z && fouiller !== false) {
+    const grand = mkToile(source, 2400), W = grand.width, H = grand.height;
+    for (const taille of [0.5, 0.25]) {
+      const pas = taille / 2;
+      for (let fy = 0; fy <= 1 - taille + 1e-6 && !trouves.length; fy += pas) {
+        for (let fx = 0; fx <= 1 - taille + 1e-6 && !trouves.length; fx += pas) {
+          const tw = W * taille, th = H * taille, e = 1400 / Math.max(tw, th);
+          const c = document.createElement('canvas'); c.width = Math.round(tw * e); c.height = Math.round(th * e);
+          c.getContext('2d', { willReadFrequently: true }).drawImage(grand, W * fx, H * fy, tw, th, 0, 0, c.width, c.height);
+          for (let k = 0; k < 3; k++) { const r = mkZXingLire(Z, c); if (!r) break; garder(r.texte, c, r.points); trMasquer(c, r.points); }
+        }
+      }
+      if (trouves.length) break;
+    }
+  }
+  return trouves;
+}
+function trAppliquerQR(f, qrs) {
+  const remplis = [];
+  (qrs || []).forEach(q => {
+    const a = mkAnalyserQR(q.texte), ch = a.champs || {};
+    if (a.type === 'wechat') {
+      if (!f.wechat_lien) { f.wechat_lien = ch.wechat_lien; remplis.push('wechat_lien'); }
+      if ((!f.qr_photo || f.qr_dessine) && f.wechat_lien === ch.wechat_lien) { f.qr_photo = q.image; delete f.qr_dessine; }
+    } else if (a.type === 'whatsapp') {
+      if (!f.whatsapp_lien) { f.whatsapp_lien = /^https?:/i.test(q.texte) ? q.texte : 'https://' + q.texte; remplis.push('whatsapp_lien'); }
+      if (!f.wa_qr) f.wa_qr = q.image;
+      if (ch.tel && !f.whatsapp) { f.whatsapp = ch.tel; remplis.push('whatsapp'); }
+    } else {
+      Object.keys(ch).forEach(k => {
+        if (k === 'note') return;
+        if (k === 'tel') { if (!f.mobile) { f.mobile = ch.tel; remplis.push('mobile'); } if (!f.tel) f.tel = ch.tel; return; }
+        if (k === 'allee') { if (!f.adresse) { f.adresse = ch.allee; remplis.push('adresse'); } return; }
+        if (k === 'nom') { if (!f.contact) { f.contact = ch.nom; remplis.push('contact'); } return; }
+        if (!String(f[k] || '').trim()) { f[k] = ch[k]; remplis.push(k); }
+      });
+      if (!f.qr_texte) f.qr_texte = String(q.texte).slice(0, 600);
+    }
+  });
+  if (remplis.length) { delete f.ct_neuf; trSynchroNomAuto(f); }
+  return remplis;
+}
+
+// ---------- 3. Le texte d'une carte → les cases de la fiche ----------
+// Le lecteur rend des lignes salies (« | 2-5 HEILONGJIANG… », « E m i ly », « © +86… ») : on nettoie d'abord.
+function trNettoyer(texte) {
+  return String(texte || '').replace(/\r/g, '').split('\n').map(l => {
+    let s = l.replace(/[|¦]/g, ' ').replace(/\s+/g, ' ').trim();
+    s = s.replace(/\b([A-Z])((?: [a-z]{1,2}){2,5})\b/g, (m, a, b) => a + b.replace(/ /g, ''));   // « E m i ly » → « Emily »
+    s = s.replace(/^(?:[^A-Za-z0-9一-鿿+]+|\d{1,2}[-–:.]\d{1,2}\s+(?=[A-Z]{3}))+/, '');
+    return s.trim();
+  }).filter(s => s.replace(/[^A-Za-z0-9一-鿿]/g, '').length >= 2).join('\n');
+}
+const TR_RE_SOC = /([A-Z][A-Za-z0-9&.,'’()\- ]{4,}?\b(?:CO\.?\s*,?\s*LTD\.?|COMPANY(?:\s+LIMITED)?|LIMITED|FACTORY|CORPORATION|CORP\.|INC\.|INDUSTRY))/i;
+const TR_RE_SOC_CN = /([一-鿿]{2,}(?:有限公司|公司|工厂|厂|商行))/;
+const TR_MOTS_PAS_NOM = /^(mobile|phone|tel|fax|e-?mail|email|web|website|add|address|wechat|whatsapp|skype|qq|sales|manager|co|ltd|china|the|and|our|www)$/i;
+function trLireTexteCarte(texteBrut) {
+  // Un numéro QQ coupé par le lecteur (« 131 0092080@qq.com ») est recollé.
+  const texte = trNettoyer(texteBrut).replace(/(\d)\s+(?=[\d.]*\d@)/g, '$1');
+  // Les chiffres d'un e-mail ne sont pas un téléphone : on lit les téléphones SANS les e-mails.
+  const RE_MAIL = /[A-Z0-9._%+-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)*\.[A-Z]{2,}/gi;
+  const mails = texte.match(RE_MAIL) || [];
+  const r = ctLireTexteCarte(texte.replace(RE_MAIL, ' '));   // la lecture de la 1.3.0 (téléphones, site, adresse, poste)
+  if (mails[0]) r.email = mails[0];
+  // L'e-mail : « E-mail1310092080@qq.com » collé → on retire le mot « mail ».
+  if (r.email) r.email = r.email.replace(/^(?:e-?mail|email|mail)[:：]?(?=[a-z0-9])/i, '');
+  // Un numéro QQ (l'e-mail 1310092080@qq.com) lu à part sur une autre ligne n'est pas un téléphone ;
+  // un « fixe » sans indicatif (+86, 0…) ni mot « Tel » non plus.
+  const locaux = mails.map(m => m.split('@')[0].replace(/\D/g, '')).filter(x => x.length >= 6);
+  ['tel_fixe', 'mobile', 'whatsapp'].forEach(k => {
+    if (!r[k]) return;
+    const d = String(r[k]).replace(/\D/g, '');
+    if (locaux.some(l => d.endsWith(l) || l.endsWith(d))) delete r[k];
+  });
+  if (r.tel_fixe && !/^(\+|00|0)/.test(String(r.tel_fixe).trim())) {
+    const d = String(r.tel_fixe).replace(/\D/g, '');
+    const ligne = texte.split('\n').find(l => l.replace(/\D/g, '').includes(d)) || '';
+    if (!/tel|phone|电话|座机|手机/i.test(ligne)) delete r.tel_fixe;
+  }
+  // La société : la plus longue formule légale trouvée (« … CO.,LTD. », « …有限公司 »).
+  const socs = [];
+  texte.split('\n').forEach(l => {
+    const m = l.match(TR_RE_SOC); if (m) socs.push(m[1].trim().replace(/^(?:[A-Za-z]{1,2}\s+)+(?=[A-Z]{4,})/, ''));   // « BV HEILONGJIANG… » → « HEILONGJIANG… »
+    const c = l.match(TR_RE_SOC_CN); if (c) socs.push(c[1]);
+  });
+  if (socs.length) r.societe = socs.sort((a, b) => b.length - a.length)[0].replace(/\s+/g, ' ');
+  else if (r.societe && r.societe.length > 70) delete r.societe;
+  // Le contact : un nom chinois suivi de son prénom anglais (« 王超群 Lucy »), sinon la ligne du poste.
+  const cn = texte.match(/([一-鿿](?:\s?[一-鿿]){1,3})\s+([A-Z][a-z]{2,15})\b/);
+  if (cn && !TR_MOTS_PAS_NOM.test(cn[2])) r.contact = cn[1].replace(/\s/g, '') + ' ' + cn[2];
+  if (r.contact) {
+    r.contact = r.contact.replace(/[^A-Za-z一-鿿 .'-]/g, ' ').replace(/\s+/g, ' ').trim();
+    const mots = r.contact.split(' ').filter(m => m.length >= 2 || /[一-鿿]/.test(m));
+    r.contact = mots.slice(0, 4).join(' ');
+    if (!r.contact || r.contact.length < 2) delete r.contact;
+  }
+  if (r.adresse) {
+    r.adresse = r.adresse.split(', ').filter(a => a !== r.societe && !TR_RE_SOC.test(a)).join(', ');
+    if (!r.adresse) delete r.adresse;
+  }
+  return r;
+}
+// « HEILONGJIANG EURASIA ELECTRICAL APPLIANCE » → « Eurasia » ; « 广州吉泰电器科技有限公司 » → « 吉泰 ».
+const TR_LIEUX = /^(?:guangdong|guangzhou|shenzhen|zhejiang|yiwu|ningbo|foshan|dongguan|jieyang|shantou|heilongjiang|jiangsu|fujian|shandong|hebei|henan|hunan|hubei|anhui|jiangxi|sichuan|shanghai|beijing|tianjin|chongqing|wenzhou|taizhou|jinhua|cixi|yuyao|zhongshan|shunde|jiangmen|chaozhou|huizhou|xiamen|quanzhou|hangzhou|suzhou|wuxi|changzhou|nanjing|qingdao|harbin|china|hong\s*kong)\s+/i;
+function trMarque(societe) {
+  let s = String(societe || '').trim();
+  if (/[一-鿿]/.test(s) && !/[A-Za-z]{3}/.test(s)) {
+    s = s.replace(/^(?:广东|广州|深圳|浙江|义乌|宁波|佛山|东莞|揭阳|汕头|黑龙江|江苏|福建|山东|中山|顺德|江门|潮州|惠州|厦门|泉州|杭州|苏州|温州|台州|金华|慈溪|余姚|上海|北京|天津|重庆)(?:省|市)?/, '');
+    return s.slice(0, 2);
+  }
+  let avant;
+  do { avant = s; s = s.replace(TR_LIEUX, ''); } while (s !== avant);
+  const mot = (s.match(/[A-Za-z][A-Za-z0-9&'-]+/) || [''])[0];
+  return mot ? mot[0].toUpperCase() + mot.slice(1).toLowerCase() : '';
+}
+function trPrenom(contact) {
+  const s = String(contact || '').trim();
+  const latin = s.match(/[A-Z][a-z]{1,15}(?:\s[A-Z][a-z]{1,15})?/);
+  return latin ? latin[0] : s;
+}
+const TR_CHAMPS_LUS = ['contact', 'poste', 'societe', 'mobile', 'tel_fixe', 'whatsapp', 'email', 'site', 'alibaba', 'wechat', 'adresse'];
+function trAppliquerCarte(f, r) {
+  const remplis = [];
+  TR_CHAMPS_LUS.forEach(k => { if (r[k] && !String(f[k] || '').trim()) { f[k] = r[k]; remplis.push(k); } });
+  if (!f.tel && (f.mobile || f.tel_fixe)) f.tel = f.mobile || f.tel_fixe;
+  if (remplis.length) {
+    f.lu_auto = [...new Set([...(Array.isArray(f.lu_auto) ? f.lu_auto : []), ...remplis])];
+    delete f.ct_neuf;
+  }
+  trSynchroNomAuto(f);
+  return remplis;
+}
+// Le nom affiché se fabrique tout seul (« Eurasia — Lucy ») tant que Riche ne l'a pas écrit lui-même.
+function trSynchroNomAuto(f) {
+  if (!f || !f.id) return;                       // une fiche provisoire (tri de la pile) n'a pas de nom à suivre
+  if (String(f.nom || '').trim() && !f.nom_auto) return;
+  const marque = trMarque(f.societe), qui = trPrenom(f.contact);
+  const nom = [marque, qui].filter(Boolean).join(' — ');
+  if (nom && nom !== f.nom) { f.nom = nom; f.nom_auto = true; ctSynchroNom(f); }
+}
+function trLuAutoHtml(f) {
+  const l = Array.isArray(f.lu_auto) ? f.lu_auto.filter(k => String(f[k] || '').trim()) : [];
+  if (!l.length) return '';
+  const noms = l.map(k => (CT_LIBELLES[k] || ({ wechat_lien: 'WeChat', whatsapp_lien: 'WhatsApp' })[k] || k).toLowerCase());
+  return `<div class="tr-lu">🔎 Lu par le téléphone sur la carte : ${E(noms.join(', '))}. Jetez un œil dans « Voir et corriger les coordonnées ».
+    <br><button type="button" onclick="trLuVerifie('${f.id}')">✓ C'est bon, j'ai vérifié</button></div>`;
+}
+function trLuVerifie(fid) { const f = mkFournisseur(fid); if (!f) return; delete f.lu_auto; sauverLocal(); dessiner(); }
+// WhatsApp : le numéro s'il est connu (le message s'ouvre directement), sinon le lien de son QR.
+function trOuvrirWhatsApp(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const d = ctTelPropre(f.whatsapp || '').replace(/\D/g, '');
+  ctNouvelOnglet(d.length >= 8 ? 'https://wa.me/' + d : f.whatsapp_lien);
+}
+
+// ---------- 4. Les photos rangées, et lues en arrière-plan ----------
+// Une photo de carte (ou du panneau du stand) est marquée « à lire » : le carnet la lit dès qu'il peut,
+// même plus tard (lecture pas encore prête, carnet refermé) — rien n'est perdu.
+const TR_TAILLES = { carte: [1800, 0.82], page: [2400, 0.8], produit: [1800, 0.82], stand: [1600, 0.8] };
+async function trRangerPhoto(f, type, source) {
+  const id = idUnique('d');
+  const [max, q] = TR_TAILLES[type] || TR_TAILLES.page;
+  await ctEcrire(id, mkReduire(source, max, q));
+  const mini = mkReduire(source, 280, 0.62);
+  await ctEcrire(id + '~m', mini);
+  ctMiniCache[id] = mini;
+  if (!Array.isArray(f.docs)) f.docs = [];
+  const d = { id, type, le: mkMaintenant() };
+  if (type === 'carte' || type === 'stand') d.a_lire = true;
+  f.docs.push(d);
+  delete f.ct_neuf;
+  f.vu_le = f.vu_le || mkMaintenant();
+  sauverLocal();
+  if (d.a_lire) setTimeout(trLancerLectures, 50);
+  return d;
+}
+let trLecturesEnCours = false, trLectureDe = '';
+function trProchaineLecture() {
+  for (const f of fournisseursListe()) for (const d of ctDocs(f)) {
+    if (!d.a_lire) continue;
+    if (!d.lu_qr || (!d.lu_ocr && trOcrEtat.pret === true)) return { f, d };
+  }
+  return null;
+}
+async function trLancerLectures() {
+  if (trLecturesEnCours) return;
+  trLecturesEnCours = true;
+  try {
+    await trOcrDispo();
+    for (let garde = 0; garde < 200; garde++) {
+      const t = trProchaineLecture(); if (!t) break;
+      trLectureDe = t.f.id; trApresLecture(t.f);
+      try { await trLireDoc(t.f, t.d); } catch (e) { t.d.lu_qr = true; t.d.lu_ocr = true; t.d.lu_erreur = String(e && e.message || e).slice(0, 120); }
+      if (t.d.lu_qr && t.d.lu_ocr) delete t.d.a_lire;
+      const f2 = trFusionnerSiConnu(t.f);
+      sauverLocal();
+      trLectureDe = ''; trApresLecture(f2);
+    }
+  } finally { trLecturesEnCours = false; trLectureDe = ''; trOcrLiberer(); }
+}
+async function trLireDoc(f, d) {
+  const src = await ctLire(d.id);
+  if (!src) { d.lu_qr = d.lu_ocr = true; return; }
+  const img = await trImage(src);
+  if (!d.lu_qr) {
+    const qrs = d.type === 'carte' ? await trLireTousQR(img) : [];
+    d.qr_n = qrs.length; trAppliquerQR(f, qrs); d.lu_qr = true;
+  }
+  if (!d.lu_ocr && await trOcrDispo()) {
+    const o = await trOcrCarte(img, d.type === 'stand');
+    d.lu_ocr = true;
+    if (!o) return;
+    d.score = o.score; if (o.deg) d.sens = o.deg;
+    if (d.type === 'stand') {
+      const m = trNettoyer(o.texte).match(/\b(\d{1,2}\.\d)\s?([A-Z])\s?-?(\d{1,3})\b/);
+      if (m && !f.allee) { f.allee = m[1] + ' ' + m[2] + m[3]; f.lu_auto = [...new Set([...(f.lu_auto || []), 'allee'])]; }
+      return;
+    }
+    const r = trLireTexteCarte(o.texte);
+    // Beaucoup de texte et aucune coordonnée : c'était une page de catalogue prise en mode « carte ».
+    if (o.mots.length > 70 && !r.email && !r.mobile && !r.tel_fixe) { d.type = 'page'; return; }
+    trAppliquerCarte(f, r);
+  }
+}
+// Un fournisseur ouvert au stand dont la carte révèle qu'il est DÉJÀ dans le carnet (même portable, e-mail,
+// WeChat ou WhatsApp) : ses photos rejoignent sa fiche, pas de doublon.
+const TR_CHAMPS_FUSION = ['contact', 'poste', 'societe', 'mobile', 'tel', 'tel_fixe', 'whatsapp', 'whatsapp_lien', 'email', 'site', 'alibaba', 'wechat',
+  'wechat_lien', 'adresse', 'allee', 'qr_photo', 'wa_qr'];
+function trFusionnerSiConnu(f) {
+  if (!f || !['stand', 'pile'].includes(f.source) || ctProduits(f).length || mkOffresDe(f).length) return f;
+  const tels = [f.mobile, f.tel_fixe, f.whatsapp].map(ctCleTel).filter(Boolean);
+  const em = String(f.email || '').trim().toLowerCase();
+  const g = fournisseursListe().find(x => x !== f && (
+    (em && String(x.email || '').trim().toLowerCase() === em)
+    || (tels.length && [x.mobile, x.tel, x.tel_fixe, x.whatsapp].map(ctCleTel).some(t => t && tels.includes(t)))
+    || (f.wechat_lien && x.wechat_lien === f.wechat_lien) || (f.whatsapp_lien && x.whatsapp_lien === f.whatsapp_lien)));
+  if (!g) return f;
+  g.docs = ctDocs(g).concat(ctDocs(f));
+  TR_CHAMPS_FUSION.forEach(k => { if (f[k] && !String(g[k] || '').trim()) { g[k] = f[k]; if ((f.lu_auto || []).includes(k)) g.lu_auto = [...new Set([...(g.lu_auto || []), k])]; } });
+  if (f.qr_photo && g.qr_dessine) { g.qr_photo = f.qr_photo; delete g.qr_dessine; }
+  g.vu_le = mkMaintenant();
+  C.fournisseurs = fournisseursListe().filter(x => x !== f);
+  if (trStand.fid === f.id) trStand.fid = g.id;
+  if (ctDossier === f.id) ctDossier = g.id;
+  avertir('🔁 ' + mkNomFournisseur(g) + ' était déjà dans le carnet : les photos sont rangées chez lui.', 5000);
+  return g;
+}
+// Après une lecture : on met à jour l'écran qui montre ce fournisseur, sans couper Riche s'il écrit.
+function trApresLecture(f) {
+  if (ongletActif === 'stand') { trMajEtatStand(); return; }
+  const concerne = (ongletActif === 'dossier' && ctDossier === f.id) || ongletActif === 'rencontres';
+  if (!concerne) return;
+  const a = document.activeElement;
+  if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && document.getElementById('ecran').contains(a)) {
+    a.addEventListener('blur', () => setTimeout(() => { if (ongletActif === 'dossier' || ongletActif === 'rencontres') dessiner(); }, 50), { once: true });
+    return;
+  }
+  dessiner();
+}
+function trEnLecture(f) { return !!f && (trLectureDe === f.id || ctDocs(f).some(d => d.a_lire && !d.lu_qr)); }
+
+// ---------- 5. ⚡ Le mode Stand : la caméra dans le carnet ----------
+const trStand = { fid: '', type: 'carte', flux: null, nCartes: 0, num: '', erreur: '' };
+const TR_TYPES = [['carte', '📇 Carte'], ['page', '📖 Catalogue'], ['produit', '📦 Produit'], ['stand', '🏷️ Panneau']];
+function trStandOuvrir(fid) {
+  trStand.fid = fid || ''; trStand.type = fid ? 'page' : 'carte'; trStand.nCartes = 0; trStand.num = ''; trStand.erreur = '';
+  allerA('stand');
+}
+function trStandF() { return trStand.fid ? mkFournisseur(trStand.fid) : null; }
+function trStandFournisseur() {
+  let f = trStandF();
+  if (f) return f;
+  f = { id: idUnique('f'), code: mkProchainCode(), nom: '', marche: 'Foire de Canton', batiment: '', allee: trStand.num || '', wechat: '', tel: '',
+    qualite: '', remarque: '', le: mkMaintenant().slice(0, 10), vu_le: mkMaintenant(), source: 'stand', decision: '', docs: [], produits: [] };
+  fournisseursListe().unshift(f);
+  trStand.fid = f.id;
+  return f;
+}
+function ecranStand() {
+  const f = trStandF();
+  const vise = trStand.type === 'carte' ? 'vise-carte' : '';   // (pas « carte » : c'est déjà la classe des cadres blancs du carnet)
+  const msg = { carte: 'Posez la carte à plat, bien éclairée', page: 'Une page entière dans le cadre', produit: 'Le produit, de face', stand: 'Le panneau avec le numéro du stand' }[trStand.type];
+  setTimeout(() => { trCameraDemarrer(); trMajBande(); trMajEtatStand(); trOcrAuto(); }, 0);
+  return `<div class="tr-stand">
+    <div class="tr-stand-tete">⚡ Stand ${f ? `<span class="mk-code">${E(f.code)}</span> <span id="tr_stand_nom">${E(f.nom || 'nouveau fournisseur')}</span>` : '<span id="tr_stand_nom">— commencez par sa carte</span>'}</div>
+    <div class="tr-cam"><video id="tr_video" muted autoplay playsinline webkit-playsinline></video>
+      <div class="vise ${vise}"></div><div class="eclair" id="tr_eclair"></div><div class="msg" id="tr_cam_msg">${trStand.erreur ? E(trStand.erreur) : E(msg)}</div></div>
+    <div class="tr-types">${TR_TYPES.map(([k, t]) => `<button type="button" class="${trStand.type === k ? 'on' : ''}" onclick="trStandType('${k}')">${t}</button>`).join('')}</div>
+    <button type="button" class="tr-declencheur" aria-label="Prendre la photo" onclick="trDeclencher()"></button>
+    <div class="tr-bande" id="tr_bande"></div>
+    <div class="tr-etat" id="tr_stand_etat" role="status"></div>
+    <div class="mk-deux">
+      <label class="b contour" for="tr_stand_appareil">📷 Appareil photo (plus net)</label>
+      <label class="b contour" for="tr_stand_photos">🖼️ Photos déjà prises</label>
+    </div>
+    <input type="file" id="tr_stand_appareil" accept="image/*" capture="environment" class="champ-cache" onchange="trStandFichiers(this)">
+    <input type="file" id="tr_stand_photos" accept="image/*" multiple class="champ-cache" onchange="trStandFichiers(this)">
+    <label for="tr_stand_num" style="font-size:15px">Numéro du stand (facultatif)</label>
+    <input id="tr_stand_num" value="${E(f ? f.allee : trStand.num)}" placeholder="ex : 11.2 C23" autocapitalize="characters" oninput="trStandNum(this.value)" style="font-size:17px">
+    <div class="ct-entree">
+      <button class="b vert" onclick="trStandSuivant()">✅ Stand suivant</button>
+      <button class="b gris" onclick="trStandTerminer()">🏁 Terminer${f ? ' → voir sa fiche' : ''}</button>
+    </div>
+    <p class="mk-aide" style="font-size:15px">Une photo = un appui sur le rond. La carte d'abord (recto, verso), puis le catalogue : tout se range chez
+    le même fournisseur, et le carnet lit sa carte tout seul. Sur « Stand suivant », un nouveau fournisseur commence.</p>
+  </div>`;
+}
+function trStandType(t) {
+  trStand.type = t;
+  document.querySelectorAll('.tr-types button').forEach((b, i) => b.classList.toggle('on', TR_TYPES[i][0] === t));
+  const v = document.querySelector('.tr-cam .vise'); if (v) v.classList.toggle('vise-carte', t === 'carte');
+  const m = document.getElementById('tr_cam_msg');
+  if (m) m.textContent = { carte: 'Posez la carte à plat, bien éclairée', page: 'Une page entière dans le cadre', produit: 'Le produit, de face', stand: 'Le panneau avec le numéro du stand' }[t];
+}
+function trStandNum(v) { trStand.num = v; const f = trStandF(); if (f) { f.allee = v; ctPlusTard(f); } }
+async function trCameraDemarrer() {
+  const v = document.getElementById('tr_video'); if (!v || ongletActif !== 'stand') return;
+  if (trStand.flux && trStand.flux.active) { if (v.srcObject !== trStand.flux) v.srcObject = trStand.flux; v.play().catch(() => {}); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { trCameraIndispo('La caméra ne s\'ouvre pas dans le carnet : utilisez « Appareil photo ».'); return; }
+  try {
+    const flux = await navigator.mediaDevices.getUserMedia({ audio: false,
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 3840 }, height: { ideal: 2160 } } });
+    if (ongletActif !== 'stand') { flux.getTracks().forEach(t => t.stop()); return; }
+    trStand.flux = flux; trStand.erreur = '';
+    const v2 = document.getElementById('tr_video'); if (!v2) return;
+    v2.srcObject = flux; await v2.play().catch(() => {});
+  } catch (e) {
+    trCameraIndispo('Caméra refusée ou occupée : utilisez « Appareil photo » ou « Photos déjà prises ».');
+  }
+}
+function trCameraIndispo(texte) { trStand.erreur = texte; const m = document.getElementById('tr_cam_msg'); if (m) m.textContent = texte; }
+function trCameraArreter() {
+  if (trStand.flux) { try { trStand.flux.getTracks().forEach(t => t.stop()); } catch (e) {} trStand.flux = null; }
+  const v = document.getElementById('tr_video'); if (v) { try { v.srcObject = null; } catch (e) {} }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') trCameraArreter();
+  else if (ongletActif === 'stand') trCameraDemarrer();
+});
+async function trDeclencher() {
+  const v = document.getElementById('tr_video');
+  if (!v || !v.videoWidth) { avertir('La caméra n\'est pas prête : touchez « 📷 Appareil photo ».'); return; }
+  const c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  const e = document.getElementById('tr_eclair'); if (e) { e.classList.add('on'); setTimeout(() => e.classList.remove('on'), 60); }
+  if (navigator.vibrate) navigator.vibrate(30);
+  await trStandGarder(c);
+}
+async function trStandFichiers(input) {
+  const fichiers = Array.from((input && input.files) || []); if (input) input.value = '';
+  for (const fi of fichiers) { try { await trStandGarder(await mkLireFichier(fi)); } catch (e) { avertir('Une photo n\'a pas pu être rangée (mémoire pleine ?).'); } }
+}
+async function trStandGarder(source) {
+  const f = trStandFournisseur(), type = trStand.type;
+  try { await trRangerPhoto(f, type, source); }
+  catch (e) { avertir('⚠ Photo non rangée : la mémoire du téléphone est peut-être pleine.'); return; }
+  if (type === 'carte') {
+    trStand.nCartes++;
+    if (trStand.nCartes >= 2) { trStandType('page'); avertir('📇 Carte recto-verso ✓ — maintenant le catalogue.', 3000); }
+  }
+  const t = document.querySelector('.tr-stand-tete');
+  if (t && !t.querySelector('.mk-code')) t.innerHTML = `⚡ Stand <span class="mk-code">${E(f.code)}</span> <span id="tr_stand_nom">${E(f.nom || 'nouveau fournisseur')}</span>`;
+  trMajBande(); trMajEtatStand();
+}
+function trMajBande() {
+  const z = document.getElementById('tr_bande'); if (!z) return;
+  const f = trStandF();
+  const docs = f ? ctDocs(f).slice().reverse() : [];
+  const ic = { carte: '📇', page: '📖', produit: '📦', stand: '🏷️' };
+  z.innerHTML = docs.map(d => `<div class="v"><img class="ct-mini" data-doc="${E(d.id)}" alt="" onclick="ctVoirDoc('${f.id}','${d.id}')"><span>${ic[d.type] || '📖'}</span></div>`).join('');
+  ctRemplirMinis();
+}
+function trMajEtatStand() {
+  const z = document.getElementById('tr_stand_etat'); if (!z) return;
+  const f = trStandF();
+  const n = document.getElementById('tr_stand_nom'); if (n && f) n.textContent = f.nom || 'nouveau fournisseur';
+  if (!f) { z.className = 'tr-etat'; z.textContent = '📇 Photographiez sa carte : le carnet lit son QR et ses coordonnées.'; return; }
+  const docs = ctDocs(f), nc = docs.filter(d => d.type === 'carte').length, np = docs.length - nc;
+  const lu = [f.contact && '👤 ' + f.contact, (f.mobile || f.tel_fixe) && '📞 ' + ctTelLisible(f.mobile || f.tel_fixe), f.email && '✉️ ' + f.email,
+    f.wechat_lien && '💬 WeChat ✓', f.whatsapp_lien && '🟢 WhatsApp ✓', f.allee && '📍 ' + f.allee].filter(Boolean);
+  const enCours = trEnLecture(f);
+  z.className = 'tr-etat' + (lu.length ? ' ok' : '');
+  z.innerHTML = `${nc} carte(s) · ${np} autre(s) photo(s)${enCours ? ' · ⏳ lecture de la carte…' : ''}<br>${lu.length ? E(lu.join(' · ')) : (enCours ? '' : 'Rien de lu pour l\'instant : la carte sera relue quand la lecture sera prête.')}`;
+}
+function trStandSuivant() {
+  const f = trStandF();
+  if (!f) { avertir('Ce stand n\'a encore aucune photo.'); return; }
+  trStand.fid = ''; trStand.nCartes = 0; trStand.num = '';
+  trStandType('carte');
+  dessiner();
+  avertir('✅ ' + mkNomFournisseur(f) + ' est rangé (' + ctDocs(f).length + ' photo(s)).\nStand suivant : commencez par sa carte.', 4000);
+}
+function trStandTerminer() {
+  const f = trStandF();
+  trCameraArreter();
+  if (f) ctOuvrirDossier(f.id); else allerA('rencontres');
+}
+
+// ---------- 6. 📚 Ranger une pile de photos (à l'hôtel) ----------
+// Toutes les photos de la journée d'un coup, dans l'ordre où elles ont été prises. Le carnet reconnaît
+// les cartes (QR, e-mail, téléphone), regroupe chaque catalogue derrière la carte qui le précède, et
+// reconnaît un fournisseur déjà dans le carnet. Riche voit le tri, corrige d'un geste, puis range.
+let trPile = null;
+function trPileOuvrir() { trPile = { etape: 'choix', photos: [], fait: 0, total: 0, groupes: [] }; allerA('pile'); }
+function ecranPile() {
+  setTimeout(trOcrAuto, 0);
+  const p = trPile || (trPile = { etape: 'choix', photos: [], fait: 0, total: 0, groupes: [] });
+  const retour = `<button class="b gris" style="margin-bottom:12px;min-height:50px;font-size:16px" onclick="trPileAnnuler()">← Fournisseurs</button>`;
+  if (p.etape === 'choix') return retour + `<div class="carte"><h2 style="font-size:19px">📚 Ranger une pile de photos</h2>
+    <p class="mk-aide" style="font-size:16px">Choisissez <b>toutes</b> les photos de la journée d'un coup : cartes de visite et pages de catalogue,
+    <b>dans l'ordre où vous les avez prises</b> (la carte, puis son catalogue). Le carnet :</p>
+    <ol class="mk-etapes"><li>reconnaît chaque carte (QR WeChat / WhatsApp, e-mail, téléphone) et la lit ;</li>
+    <li>range chaque catalogue derrière la carte qui le précède ;</li>
+    <li>reconnaît un fournisseur déjà dans le carnet (même téléphone, même e-mail, même WeChat) ;</li>
+    <li>vous montre le tri : vous corrigez d'un geste, puis « Tout ranger ».</li></ol>
+    ${trOcrEtatHtml()}
+    <div style="height:10px"></div>
+    <label class="b vert tr-gros" for="tr_pile_fichiers" style="display:flex;align-items:center;justify-content:center;text-align:center">🖼️ Choisir les photos<small>autant que vous voulez</small></label>
+    <input type="file" id="tr_pile_fichiers" accept="image/*" multiple class="champ-cache" onchange="trPileLire(this)"></div>`;
+  if (p.etape === 'lecture') return retour + `<div class="carte"><h2 style="font-size:19px">📚 Je trie vos photos…</h2>
+    <div class="tr-pile-prog" id="tr_pile_prog">Photo ${p.fait} sur ${p.total}</div>
+    <div class="tr-barre"><i id="tr_pile_barre" style="width:${p.total ? Math.round(p.fait * 100 / p.total) : 0}%"></i></div>
+    <p class="mk-aide" style="font-size:15px">Environ 3 secondes par carte. Laissez le carnet ouvert.</p></div>`;
+  return retour + trPileApercuHtml();
+}
+async function trPileLire(input) {
+  const fichiers = Array.from((input && input.files) || []); if (input) input.value = '';
+  if (!fichiers.length) return;
+  const p = trPile; p.etape = 'lecture'; p.total = fichiers.length; p.fait = 0; p.photos = [];
+  dessiner();
+  await trOcrDispo();
+  for (const fi of fichiers) {
+    try { p.photos.push(await trPileAnalyser(fi)); } catch (e) { /* photo illisible : ignorée */ }
+    p.fait++;
+    const z = document.getElementById('tr_pile_prog'), b = document.getElementById('tr_pile_barre');
+    if (z) z.textContent = 'Photo ' + p.fait + ' sur ' + p.total; if (b) b.style.width = Math.round(p.fait * 100 / p.total) + '%';
+  }
+  trOcrLiberer();
+  trPileGrouper();
+  p.etape = 'apercu';
+  if (ongletActif === 'pile') dessiner();
+}
+function trDomaine(u) { const m = String(u || '').toLowerCase().match(/^(?:https?:\/\/)?(?:www\.|en\.)?([^\/:?#]+)/); return m ? m[1].replace(/^(?:[a-z0-9-]+\.)?(alibaba\.com)$/, (x) => x) : ''; }
+function trCles(ch) {
+  const k = [];
+  if (ch.email) k.push('mail:' + String(ch.email).toLowerCase());
+  [ch.mobile, ch.tel_fixe, ch.whatsapp, ch.tel].forEach(t => { const c = ctCleTel(t); if (c) k.push('tel:' + c); });
+  if (ch.wechat_lien) k.push('wx:' + ch.wechat_lien);
+  if (ch.whatsapp_lien) k.push('wa:' + ch.whatsapp_lien);
+  [ch.site, ch.alibaba].forEach(s => { const d = trDomaine(s); if (d && !/^(alibaba\.com|1688\.com|qq\.com|gmail\.com|163\.com|126\.com)$/.test(d)) k.push('web:' + d); });
+  if (ch.societe && ch.societe.length >= 8) k.push('soc:' + normaliserNom(ch.societe).replace(/[^a-z0-9一-鿿]/g, ''));
+  return [...new Set(k)];
+}
+// Une carte posée sur une table : une grande partie de la photo est « lisse » (la table, le drap) ; une page
+// de catalogue est pleine. Mesuré sur les vraies photos de Riche : cartes 0,57 à 0,89 ; couverture 0,34 ; double page 0,18.
+function trPlat(source) {
+  const petit = mkToile(source, 512);
+  const W = petit.width >= petit.height ? 128 : 96, H = petit.width >= petit.height ? 96 : 128;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(petit, 0, 0, W, H);
+  const d = g.getImageData(0, 0, W, H).data, gris = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) gris[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+  let plat = 0, tot = 0;
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+    const gr = Math.abs(gris[y * W + x + 1] - gris[y * W + x - 1]) + Math.abs(gris[(y + 1) * W + x] - gris[(y - 1) * W + x]);
+    tot++; if (gr < 12) plat++;
+  }
+  return tot ? plat / tot : 0;
+}
+async function trPileAnalyser(fichier) {
+  const img = await mkLireFichier(fichier);
+  const id = idUnique('d');
+  await ctEcrire(id, mkReduire(img, 2400, 0.8));
+  const mini = mkReduire(img, 280, 0.62);
+  await ctEcrire(id + '~m', mini); ctMiniCache[id] = mini;
+  const ph = { id, nom: fichier.name || '', mini, type: 'page', qrs: [], champs: {}, cles: [], mots: 0, ocr: false, plat: trPlat(img) };
+  ph.qrs = await trLireTousQR(img, ph.plat >= 0.45);   // fouiller morceau par morceau : seulement une photo qui ressemble à une carte
+  const qrChamps = {};
+  trAppliquerQR(qrChamps, ph.qrs);
+  let lu = {};
+  if (trOcrEtat.pret) {
+    try {
+      const o = await trOcrCarte(img, true);
+      if (o) { ph.ocr = true; ph.mots = o.mots.length; ph.score = o.score; lu = trLireTexteCarte(o.texte); ph.refs = ctModelesDansTexte(o.texte).length; }
+    } catch (e) {}
+  }
+  const assembler = () => Object.assign({}, lu, ...['wechat_lien', 'whatsapp_lien', 'whatsapp', 'mobile', 'email', 'societe', 'contact', 'site'].filter(k => qrChamps[k]).map(k => ({ [k]: qrChamps[k] })));
+  ph.champs = assembler();
+  const aCoord = !!(ph.champs.email || ph.champs.mobile || ph.champs.tel_fixe || ph.champs.wechat_lien || ph.champs.whatsapp_lien);
+  // Une carte : des coordonnées, peu de texte, et une photo « lisse » autour. Une couverture de catalogue a
+  // souvent les coordonnées AUSSI, mais la photo est pleine (ou il y a des références) : c'est une page.
+  ph.type = aCoord && ph.plat >= 0.45 && ph.mots <= 60 && !(ph.refs >= 2) ? 'carte' : 'page';
+  // Une carte mérite la lecture complète (les morceaux éparpillés : e-mail, site, WeChat écrit).
+  if (ph.type === 'carte' && trOcrEtat.pret) {
+    try { const o = await trOcrCarte(img, false); if (o) { lu = Object.assign(trLireTexteCarte(o.texte), lu); ph.champs = assembler(); } } catch (e) {}
+  }
+  ph.cles = trCles(ph.champs);
+  return ph;
+}
+function trTrouverParCles(ch) {
+  const f = ctTrouverFournisseur({ email: ch.email, mobile: ch.mobile, tel_fixe: ch.tel_fixe, whatsapp: ch.whatsapp, wechat_lien: ch.wechat_lien, societe: ch.societe });
+  if (f) return f;
+  if (ch.whatsapp_lien) return fournisseursListe().find(x => x.whatsapp_lien === ch.whatsapp_lien) || null;
+  return null;
+}
+function trPileGrouper() {
+  const p = trPile; const groupes = [];
+  const ranger = { gid: 'ranger', fid: '', photos: [], cles: new Set() };
+  let courant = null, precedente = null;
+  const nouveau = (fid) => { const g = { gid: 'g' + groupes.length, fid: fid || '', photos: [], cles: new Set() }; groupes.push(g); return g; };
+  p.photos.forEach(ph => {
+    let g = null;
+    if (ph.cles.length) {
+      g = groupes.find(x => ph.cles.some(k => x.cles.has(k)));
+      if (!g) { const f = trTrouverParCles(ph.champs); if (f) g = groupes.find(x => x.fid === f.id) || nouveau(f.id); }
+      if (!g) g = nouveau('');
+    }
+    // Le verso d'une carte : juste après la carte, presque sans texte.
+    if (!g && precedente && precedente.type === 'carte' && ph.mots < 15 && ph.plat >= 0.65) ph.type = 'carte';
+    if (!g) g = courant || ranger;
+    ph.groupe = g.gid;
+    g.photos.push(ph); ph.cles.forEach(k => g.cles.add(k));
+    if (g !== ranger) courant = g;
+    precedente = ph;
+  });
+  p.groupes = groupes.concat([ranger]);
+}
+function trPileGroupe(gid) { return trPile.groupes.find(g => g.gid === gid); }
+function trPileChamps(g) {
+  const ch = {};
+  const ordre = g.photos.filter(x => x.type === 'carte').concat(g.photos.filter(x => x.type !== 'carte'));
+  ordre.forEach(ph => Object.keys(ph.champs).forEach(k => {
+    if (ph.type !== 'carte' && ['contact', 'poste', 'adresse'].includes(k)) return;
+    if (ph.champs[k] && !ch[k]) ch[k] = ph.champs[k];
+  }));
+  return ch;
+}
+function trPileApercuHtml() {
+  const p = trPile;
+  const pleins = p.groupes.filter(g => g.photos.length);
+  const nF = pleins.filter(g => g.gid !== 'ranger').length, nP = p.photos.length;
+  const options = (g0) => p.groupes.filter(g => g.gid !== 'ranger').map(g => `<option value="${g.gid}"${g.gid === g0 ? ' selected' : ''}>→ ${E(trPileNomGroupe(g))}</option>`).join('')
+    + `<option value="nouveau">→ un autre fournisseur (nouveau)</option><option value="ranger"${g0 === 'ranger' ? ' selected' : ''}>→ 📥 À ranger plus tard</option><option value="jeter">🗑 Ne pas garder</option>`;
+  return `<div class="carte"><h2 style="font-size:19px">📚 Voici le tri : ${nP} photo(s), ${nF} fournisseur(s)</h2>
+    <p class="mk-aide" style="font-size:15px">Touchez <b>📇/📖</b> sous une photo pour dire si c'est une carte ou une page. Le menu sous la photo la
+    déplace chez un autre fournisseur. Rien n'est rangé tant que vous n'avez pas touché « Tout ranger ».</p>
+    <button class="b vert" style="min-height:60px;font-size:18px" onclick="trPileRanger()">✅ Tout ranger</button></div>
+    ${pleins.map(g => {
+      const ch = trPileChamps(g), f = g.fid ? mkFournisseur(g.fid) : null;
+      const det = [ch.contact && '👤 ' + ch.contact, (ch.mobile || ch.tel_fixe) && '📞 ' + ctTelLisible(ch.mobile || ch.tel_fixe), ch.email && '✉️ ' + ch.email,
+        ch.wechat_lien && '💬 WeChat', ch.whatsapp_lien && '🟢 WhatsApp', ch.societe && '🏭 ' + ch.societe].filter(Boolean);
+      const nc = g.photos.filter(x => x.type === 'carte').length;
+      return `<div class="carte tr-groupe${g.gid === 'ranger' ? ' ranger' : ''}">
+        <div class="tete">${g.gid === 'ranger' ? '📥 À ranger plus tard' : f ? '🔁 Déjà dans le carnet : <span class="mk-code">' + E(f.code) + '</span> ' + E(f.nom || f.societe) : '🆕 ' + E(trPileNomGroupe(g))}</div>
+        <div class="det">${g.gid === 'ranger' ? 'Aucune carte avant ces photos : je ne sais pas à qui elles sont. Choisissez sous chaque photo.' : E(det.join(' · ') || 'Carte sans coordonnées lisibles : vous les compléterez sur sa fiche.')}</div>
+        <div class="det">${nc} carte(s) · ${g.photos.length - nc} page(s)</div>
+        <div class="tr-vignettes">${g.photos.map(ph => `<div class="tr-vignette"><img src="${ph.mini}" alt="">
+          <button type="button" onclick="trPileType('${ph.id}')">${ph.type === 'carte' ? '📇 Carte' : '📖 Page'}</button>
+          <select aria-label="Déplacer cette photo" onchange="trPileDeplacer('${ph.id}', this.value)">${options(g.gid)}</select></div>`).join('')}</div>
+      </div>`;
+    }).join('')}
+    <div class="carte"><button class="b vert" style="min-height:60px;font-size:18px" onclick="trPileRanger()">✅ Tout ranger</button>
+    <div style="height:8px"></div><button class="b gris" onclick="trPileAnnuler()">Annuler (rien n'est gardé)</button></div>`;
+}
+function trPileNomGroupe(g) {
+  if (g.fid) { const f = mkFournisseur(g.fid); if (f) return mkNomFournisseur(f); }
+  const ch = trPileChamps(g);
+  const nom = [trMarque(ch.societe), trPrenom(ch.contact)].filter(Boolean).join(' — ');
+  return nom || ch.email || ctTelLisible(ch.mobile || ch.tel_fixe) || 'Nouveau fournisseur ' + (Number(g.gid.slice(1)) + 1);
+}
+function trPilePhoto(pid) { for (const g of trPile.groupes) { const ph = g.photos.find(x => x.id === pid); if (ph) return { g, ph }; } return {}; }
+function trPileType(pid) { const { ph } = trPilePhoto(pid); if (!ph) return; ph.type = ph.type === 'carte' ? 'page' : 'carte'; dessiner(); }
+function trPileDeplacer(pid, vers) {
+  const { g, ph } = trPilePhoto(pid); if (!ph) return;
+  g.photos = g.photos.filter(x => x !== ph);
+  if (vers === 'jeter') { trPile.photos = trPile.photos.filter(x => x !== ph); ctEffacer(ph.id).catch(() => {}); ctEffacer(ph.id + '~m').catch(() => {}); dessiner(); return; }
+  let cible = trPileGroupe(vers);
+  if (vers === 'nouveau' || !cible) {
+    cible = { gid: 'g' + trPile.groupes.length, fid: '', photos: [], cles: new Set() };
+    trPile.groupes.splice(trPile.groupes.length - 1, 0, cible);
+  }
+  cible.photos.push(ph); ph.groupe = cible.gid;
+  dessiner();
+}
+function trPileRanger() {
+  const p = trPile; if (!p) return;
+  let nF = 0, nNeufs = 0, nP = 0;
+  let premier = null;
+  p.groupes.forEach(g => {
+    if (!g.photos.length) return;
+    if (g.gid === 'ranger') {
+      C.a_ranger = Array.isArray(C.a_ranger) ? C.a_ranger : [];
+      g.photos.forEach(ph => { C.a_ranger.push({ id: ph.id, type: ph.type, le: mkMaintenant() }); nP++; });
+      return;
+    }
+    let f = g.fid ? mkFournisseur(g.fid) : null;
+    if (!f) {
+      f = { id: idUnique('f'), code: mkProchainCode(), nom: '', marche: 'Foire de Canton', batiment: '', allee: '', wechat: '', tel: '', qualite: '', remarque: '',
+        le: mkMaintenant().slice(0, 10), vu_le: mkMaintenant(), source: 'pile', decision: '', docs: [], produits: [] };
+      fournisseursListe().unshift(f); nNeufs++;
+    }
+    if (!Array.isArray(f.docs)) f.docs = [];
+    g.photos.forEach(ph => {
+      const d = { id: ph.id, type: ph.type, le: mkMaintenant(), lu_qr: true, lu_ocr: !!ph.ocr };
+      if (ph.type === 'carte' && !ph.ocr) d.a_lire = true;
+      f.docs.push(d); nP++;
+    });
+    trAppliquerQR(f, g.photos.filter(x => x.type === 'carte').flatMap(x => x.qrs).concat(g.photos.filter(x => x.type !== 'carte').flatMap(x => x.qrs)));
+    trAppliquerCarte(f, trPileChamps(g));
+    delete f.ct_neuf;
+    nF++; if (!premier) premier = f;
+  });
+  trPile = null;
+  sauverLocal();
+  trLancerLectures();
+  allerA('rencontres');
+  avertir('✅ Rangé : ' + nP + ' photo(s) chez ' + nF + ' fournisseur(s)' + (nNeufs ? ', dont ' + nNeufs + ' nouveau(x)' : '') + '.', 6000);
+}
+function trPileAnnuler() {
+  if (trPile && trPile.photos.length && trPile.etape !== 'choix') {
+    if (!confirmerEnDeuxTemps('tr-pile-annuler', 'Annuler le tri ? Les ' + trPile.photos.length + ' photo(s) lues ne seront pas gardées.')) return;
+    trPile.photos.forEach(ph => { ctEffacer(ph.id).catch(() => {}); ctEffacer(ph.id + '~m').catch(() => {}); });
+  }
+  trPile = null; allerA('rencontres');
+}
+
+// ---------- 7. 📥 Les photos « à ranger » ----------
+function trARangerHtml() {
+  const l = Array.isArray(C.a_ranger) ? C.a_ranger : [];
+  if (!l.length) return '';
+  const fs = fournisseursListe();
+  return `<div class="carte tr-a-ranger"><h2 style="font-size:18px">📥 À ranger (${l.length} photo${l.length > 1 ? 's' : ''})</h2>
+    <p class="mk-aide" style="font-size:15px">Le carnet ne sait pas à qui sont ces photos. Choisissez le fournisseur sous chacune.</p>
+    <div class="tr-vignettes">${l.map(d => `<div class="tr-vignette"><img class="ct-mini" data-doc="${E(d.id)}" alt="" onclick="trVoirARanger('${d.id}')">
+      <select aria-label="Ranger chez" onchange="trRangerChez('${d.id}', this.value)"><option value="">Ranger chez…</option>
+      ${fs.map(f => `<option value="${f.id}">${E(mkNomFournisseur(f))}</option>`).join('')}<option value="jeter">🗑 Supprimer</option></select></div>`).join('')}</div></div>`;
+}
+async function trVoirARanger(did) { let src = ''; try { src = await ctLire(did); } catch (e) {} if (src) mkApercu(src, 'Photo à ranger'); }
+function trRangerChez(did, fid) {
+  const l = Array.isArray(C.a_ranger) ? C.a_ranger : [];
+  const d = l.find(x => x.id === did); if (!d || !fid) return;
+  C.a_ranger = l.filter(x => x !== d);
+  if (fid === 'jeter') { ctEffacer(did).catch(() => {}); ctEffacer(did + '~m').catch(() => {}); }
+  else {
+    const f = mkFournisseur(fid); if (!f) return;
+    if (!Array.isArray(f.docs)) f.docs = [];
+    f.docs.push({ id: did, type: d.type || 'page', le: d.le || mkMaintenant(), a_lire: d.type === 'carte' ? true : undefined });
+    if (d.type === 'carte') setTimeout(trLancerLectures, 50);
+  }
+  sauverLocal(); dessiner();
+}
+
+// ---------- 8. 💡 Astuces terrain ----------
+function trAstucesHtml() {
+  return `<details class="carte tr-astuces"><summary>💡 Astuces terrain (ce que font les acheteurs aguerris)</summary>
+    <ol>
+      <li><b>Au stand, 10 secondes :</b> ⚡ Scanner un stand → la carte (recto, verso), la couverture, les pages qui vous intéressent. Pas de tri à faire.</li>
+      <li><b>Demandez le catalogue en fichier sur WeChat</b> (PDF) : plus léger que le papier, et Claude le lit en entier.
+        <br><span class="tr-cn">请把电子版目录和价格表发到我的微信，谢谢！</span>
+        <br><button class="mk-lien" onclick="mkCopier('请把电子版目录和价格表发到我的微信，谢谢！', 'Copié : collez-le dans WeChat.')">📋 Copier cette phrase</button></li>
+      <li><b>Photographiez le panneau du stand</b> (🏷️ Panneau) : le carnet note le numéro (ex. 11.2 C23) pour y retourner.</li>
+      <li><b>À l'hôtel :</b> 📚 Ranger une pile, puis « ✉️ Demander les prix » avec les <b>images numérotées</b> : le vendeur répond « 1 = 45元 ».</li>
+      <li><b>Sa réponse arrive :</b> copiez-la dans WeChat, puis « 💬 Coller la réponse » sur sa fiche : chaque prix se place sur son produit.</li>
+      <li><b>Sur WeChat</b>, un appui long sur un message chinois → « Traduire ».</li>
+      <li><b>Catalogue compliqué ?</b> Envoyez les photos à Claude : il découpe chaque produit avec son nom et ses détails.</li>
+      <li><b>Jamais d'acompte</b> sans Trade Assurance (Alibaba) ou sans avoir vu un échantillon.</li>
+    </ol></details>`;
+}
+
+// ---------- 9. L'onglet 🏭 Fournisseurs, et le carnet qui se rouvre là où on l'a laissé ----------
+const TR_SOUS_FOURNISSEURS = ['rencontres', 'dossier', 'catalogues', 'stand', 'pile', 'vendeur'];
+const TR_ONGLETS_GARDES = ['voyage', 'radar', 'negocier', 'enquete', 'comparer', 'achats', 'frais', 'prix', 'objectif', 'strategie', 'envoi', 'rencontres', 'catalogues', 'dossier'];
+function trGarderOnglet(nom) {
+  try {
+    if (TR_ONGLETS_GARDES.includes(nom)) localStorage.setItem('kylo_onglet', nom);
+    if (nom === 'dossier' && ctDossier) localStorage.setItem('kylo_dossier', ctDossier);
+  } catch (e) {}
+}
+function trQuitterEcran(nom) {
+  if (nom !== 'stand') trCameraArreter();
+  document.body.classList.toggle('tr-plein', nom === 'stand');
+}
+(function trOngletAuDemarrage() {
+  let o = '';
+  try { o = localStorage.getItem('kylo_onglet') || ''; } catch (e) {}
+  if (!o) o = 'rencontres';                 // à la Foire : le carnet s'ouvre sur les fournisseurs
+  if (!TR_ONGLETS_GARDES.includes(o)) return;
+  if (o === 'dossier') { try { ctDossier = localStorage.getItem('kylo_dossier') || null; } catch (e) {} if (!ctDossier) o = 'rencontres'; }
+  ongletActif = o;
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('actif', b.dataset.onglet === o || (b.dataset.onglet === 'rencontres' && TR_SOUS_FOURNISSEURS.includes(o))));
+})();
+window.addEventListener('load', () => setTimeout(() => {
+  trOcrVerifier().then(() => { trOcrMajEtat(); trLancerLectures(); });
+}, 800));
+</script>
+<script>
+'use strict';
+// ===================== 1.4.0 — LES PRODUITS EN PHOTO, PRÊTS POUR WECHAT (20/10/2026) =====================
+// Riche : « chaque produit de la photo du catalogue affiché unitairement, avec son nom et ses détails,
+// prêt à envoyer sur WeChat : donne-moi le prix de chacun. Quand ils répondent, le prix se place
+// directement sur les produits. »
+//   - chaque modèle peut avoir SA photo (découpée par Claude, ou au doigt dans le carnet) ;
+//   - « ✉️ Demander les prix » fabrique des IMAGES NUMÉROTÉES (12 produits par image, photo + référence)
+//     et le message en chinois qui demande de répondre « 1 = 45元 » ;
+//   - « 💬 Coller la réponse » : chaque prix va tout seul sur son produit (par numéro ou par référence) ;
+//   - « ✂️ Découper » : poser 4 coins sur un bloc de produits, choisir lignes × colonnes → une photo par produit.
+
+window.KYLO_PRODUITS = '1.4.0';
+
+// ---------- 1. La photo d'un produit ----------
+function trPhotoProduitHtml(f, p) {
+  if (!p.photo_doc) return '';
+  return `<img class="ct-mini tr-prod-photo" data-doc="${E(p.photo_doc)}" alt="${E(p.ref)}" onclick="trVoirProduit('${f.id}','${p.id}')">`;
+}
+function trNumero(f, p) {
+  const l = Array.isArray(f.demande_liste) ? f.demande_liste : [];
+  const i = l.indexOf(p.id);
+  return i >= 0 ? i + 1 : 0;
+}
+function trNumHtml(f, p) { const n = trNumero(f, p); return n ? `<span class="tr-num" title="numéro sur les images envoyées">${n}</span>` : ''; }
+// La référence montrée au vendeur : sans les « (2) » ou « (tasse) » ajoutés pour les distinguer dans le carnet.
+function trRefVendeur(ref) { return String(ref || '').replace(/\s*\(.*\)\s*$/, '').trim(); }
+// La couleur et les chiffres utiles en une ligne : « noir mat · 1,0–2,8 L · 400–1000 W ».
+function trResume(p) {
+  const t = String(p.caracteristiques || '');
+  const premier = t.split('·')[0].trim();
+  const couleur = premier && !/\d/.test(premier) ? premier : '';
+  const r = [couleur, trCourt(p)].filter(Boolean).join(' · ');
+  return r || (t.length > 70 ? t.slice(0, 68) + '…' : t);
+}
+// ---------- La grille des produits (photos) ou la liste détaillée (1.3.0) ----------
+function trVueGrille(f) { return f.vue_produits ? f.vue_produits === 'grille' : ctProduits(f).some(p => p.photo_doc); }
+function trVue(fid, v) { const f = mkFournisseur(fid); if (!f) return; f.vue_produits = v; sauverLocal(); dessiner(); }
+function trBasculeVue(f) {
+  if (!ctProduits(f).some(p => p.photo_doc)) return '';
+  const g = trVueGrille(f);
+  return `<div class="mk-puces"><button type="button" class="mk-puce${g ? ' on' : ''}" onclick="trVue('${f.id}','grille')">🖼 Photos</button>
+    <button type="button" class="mk-puce${g ? '' : ' on'}" onclick="trVue('${f.id}','liste')">☰ Détails et prix</button></div>`;
+}
+function trGrilleProduits(f) {
+  const ps = ctProduits(f), groupes = {};
+  ps.forEach(p => { const k = ctNomFamille(p.categorie); (groupes[k] = groupes[k] || []).push(p); });
+  const nInt = ps.filter(p => p.interesse).length;
+  return `${trBasculeVue(f)}
+    <p class="mk-aide" style="font-size:15px">Touchez une photo pour la voir en grand (et l'envoyer), ☆ pour marquer ce qui vous intéresse,
+    « 💰 » pour noter un prix.${nInt ? ' <b>⭐ ' + nInt + ' modèle(s) m\'intéressent.</b>' : ''}</p>
+    ${Object.keys(groupes).map(k => `<div class="ct-famille">${ctEmoji(k)} ${E(k)} (${groupes[k].length})</div>
+      <div class="tr-grille">${groupes[k].map(p => trCarteProduit(f, p)).join('')}</div>`).join('')}`;
+}
+function trCarteProduit(f, p) {
+  const n = trNumero(f, p), g = ctPrixGnf(p);
+  return `<div class="tr-cp" id="trcp_${p.id}">
+    <div class="ph">${p.photo_doc ? `<img class="ct-mini" data-doc="${E(p.photo_doc)}" alt="${E(p.ref)}" onclick="trVoirProduit('${f.id}','${p.id}')">`
+      : `<div class="vide" onclick="ctBoiteProduit('${f.id}','${p.id}')">📦</div>`}
+      ${n ? `<span class="tr-num">${n}</span>` : ''}
+      <button type="button" class="ct-etoile${p.interesse ? ' on' : ''}" aria-label="M'intéresse" onclick="ctInteresse('${f.id}','${p.id}')">${p.interesse ? '★' : '☆'}</button></div>
+    <button type="button" class="ref" onclick="ctBoiteProduit('${f.id}','${p.id}')">${E(p.ref || '(sans référence)')}</button>
+    <div class="res">${E(trResume(p))}${p.incertain ? ' <span class="ct-tag att">à vérifier</span>' : ''}</div>
+    ${num(p.prix) > 0 ? `<button type="button" class="px ok" onclick="trBoitePrix('${f.id}','${p.id}')">${E(nf(p.prix, 2) + ' ' + mkSym(p.devise || 'USD'))}${num(p.moq) ? ' · min ' + nf(p.moq) : ''}<small>${g ? E(gnfStrict(g)) : 'taux à remplir'}</small></button>`
+      : `<button type="button" class="px" onclick="trBoitePrix('${f.id}','${p.id}')">💰 Noter son prix</button>`}
+  </div>`;
+}
+function trBoitePrix(fid, pid) {
+  const f = mkFournisseur(fid), p = f && ctProduit(f, pid); if (!p) return;
+  const d = p.devise || f.prix_devise || 'CNY';
+  mkBoite(`<div class="mk-dlg ct-champs">
+    <div class="mk-resume">${p.photo_doc ? `<img class="ct-mini" data-doc="${E(p.photo_doc)}" alt="" style="width:72px;height:72px;object-fit:contain">` : ''}
+      <div class="corps"><b style="font-size:18px">${E(p.ref)}</b><br>${E(trResume(p))}</div></div>
+    <div class="ct-prix">
+      <div><label for="ctpx_${p.id}">Prix / pièce</label><input id="ctpx_${p.id}" inputmode="decimal" value="${E(num(p.prix) ? p.prix : '')}" placeholder="—"
+        oninput="trPrixSaisi('${f.id}','${p.id}',this.value)"></div>
+      <div><label for="ctdv_${p.id}">Devise</label><select id="ctdv_${p.id}" onchange="ctMajPrix('${f.id}','${p.id}','devise',this.value)">
+        ${codesDevises().map(x => `<option value="${x}" ${x === d ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
+      <div><label for="ctmq_${p.id}">Minimum (MOQ)</label><input id="ctmq_${p.id}" inputmode="numeric" value="${E(num(p.moq) ? p.moq : '')}" placeholder="—"
+        oninput="ctMajPrix('${f.id}','${p.id}','moq',this.value)"></div>
+    </div>
+    <div class="ct-gnf" id="ctg_${p.id}">${ctPrixHtml(p)}</div>
+    ${p.prix_note ? `<p class="ct-sous">💬 ${E(p.prix_note)}</p>` : ''}
+    <div class="mk-boutons"><button class="b vert" onclick="ctToutDeSuite();fermerBoite();dessiner()">✅ OK</button></div></div>`);
+  ctRemplirMinis();
+  const ch = document.getElementById('ctpx_' + p.id); if (ch && !num(p.prix)) ch.focus();
+}
+// Le premier prix d'un modèle prend la devise affichée (le yuan, à la Foire) : ouvrir la case ne change rien.
+function trPrixSaisi(fid, pid, v) {
+  const f = mkFournisseur(fid), p = f && ctProduit(f, pid); if (!p) return;
+  if (!p.devise) { const sel = document.getElementById('ctdv_' + pid); if (sel) ctMajPrix(fid, pid, 'devise', sel.value); }
+  ctMajPrix(fid, pid, 'prix', v);
+}
+function trBandeProduits(f) {
+  const ps = ctProduits(f).filter(p => p.photo_doc);
+  if (!ps.length) return '';
+  return `<div class="tr-bande-prod">${ps.slice(0, 14).map(p => `<div class="p" onclick="ctOuvrirDossier('${f.id}')"><img class="ct-mini" data-doc="${E(p.photo_doc)}" alt="">${E(p.ref)}</div>`).join('')}
+    ${ps.length > 14 ? `<div class="p" onclick="ctOuvrirDossier('${f.id}')" style="align-self:center">+ ${ps.length - 14} autres ›</div>` : ''}</div>`;
+}
+function trMessageUnProduit(f, p) {
+  const qui = String(f.contact || '').trim();
+  const ref = trRefVendeur(p.ref);
+  return (qui ? qui + ' ' : '') + '您好！请问图片里这个产品（' + ref + '）多少钱一个？最小起订量是多少？一箱装多少个？谢谢！\n'
+    + 'Hello, what is the unit price of this model (' + ref + '), the MOQ and pcs per carton? Thank you!';
+}
+async function trVoirProduit(fid, pid) {
+  const f = mkFournisseur(fid), p = f && ctProduit(f, pid); if (!p) return;
+  let src = '';
+  try { src = await ctLire(p.photo_doc); } catch (e) {}
+  if (!src) { ctBoiteProduit(fid, pid); return; }
+  const dlg = document.createElement('dialog'); dlg.className = 'mk-apercu';
+  const prix = num(p.prix) > 0 ? nf(p.prix, 2) + ' ' + (p.devise || 'USD') + ' ' + ctPrixHtml(p).replace(/<[^>]+>/g, '') : 'prix pas encore reçu';
+  dlg.innerHTML = `<div class="leg"><b style="font-size:20px">${trNumero(f, p) ? 'n° ' + trNumero(f, p) + ' · ' : ''}${E(p.ref)}</b> — ${E(mkNomFournisseur(f))}<br>${E(p.caracteristiques || '')}<br>💰 ${E(prix)}</div>
+    <div class="ct-zoom-boite"><img src="${src}" alt=""></div>
+    <div class="ct-actions-apercu">
+      <button type="button" class="b" style="background:#1aad19;color:#fff" data-a="envoyer">💬 L'envoyer + demander son prix</button>
+      <button type="button" class="b contour" data-a="fiche">📦 Sa fiche</button>
+      <button type="button" class="b contour" data-a="etoile">${p.interesse ? '★ M\'intéresse' : '☆ M\'intéresse'}</button>
+      <button type="button" class="b gris" data-a="fermer">Fermer</button></div>`;
+  document.body.appendChild(dlg);
+  const fermer = () => { try { dlg.close(); } catch (e) {} dlg.remove(); };
+  dlg.addEventListener('close', () => dlg.remove());
+  dlg.querySelector('[data-a="fermer"]').onclick = fermer;
+  dlg.querySelector('[data-a="fiche"]').onclick = () => { fermer(); ctBoiteProduit(fid, pid); };
+  dlg.querySelector('[data-a="etoile"]').onclick = (ev) => { p.interesse = !p.interesse; sauverLocal(); ev.target.textContent = p.interesse ? '★ M\'intéresse' : '☆ M\'intéresse'; if (ongletActif === 'dossier' || ongletActif === 'catalogues') dessiner(); };
+  dlg.querySelector('[data-a="envoyer"]').onclick = () => {
+    mkCopier(trMessageUnProduit(f, p), 'Question copiée (chinois + anglais) : après la photo, collez-la dans WeChat.');
+    ctPartagerFichiers([{ nom: (f.code || 'F') + '-' + String(p.ref).replace(/[^\w-]+/g, '_') + '.jpg', src }], mkNomFournisseur(f));
+  };
+  if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
+}
+
+// ---------- 2. Les photos qui arrivent avec ce que Claude a lu ----------
+// Le fichier de Claude contient la photo de chaque produit : on la range dans la réserve des photos
+// (pas dans la mémoire du carnet), une seule fois, AVANT d'ajouter les produits.
+let trFichierImport = '';
+function trNbPhotosImport(imp) {
+  let n = 0;
+  (imp.fournisseurs || []).forEach(x => (x.produits || []).forEach(p => { if (typeof p.photo === 'string' && p.photo.startsWith('data:image')) n++; }));
+  return n;
+}
+async function trPhotosImport(imp, suivi) {
+  let n = 0, fait = 0;
+  const total = trNbPhotosImport(imp);
+  for (const x of imp.fournisseurs || []) {
+    const f = ctTrouverFournisseur(x);
+    for (const xp of x.produits || []) {
+      if (!(typeof xp.photo === 'string' && xp.photo.startsWith('data:image'))) { delete xp.photo; continue; }
+      const k = ctCleRef(xp.ref);
+      const deja = f && k ? ctProduits(f).find(p => ctCleRef(p.ref) === k) : null;
+      if (deja && deja.photo_doc) { delete xp.photo; fait++; continue; }
+      const id = idUnique('d');
+      await ctEcrire(id, xp.photo);
+      const mini = mkReduire(await trImage(xp.photo), 280, 0.7);
+      await ctEcrire(id + '~m', mini); ctMiniCache[id] = mini;
+      xp.photo_doc = id; delete xp.photo; n++; fait++;
+      if (suivi) suivi(fait, total);
+    }
+  }
+  return n;
+}
+
+// ---------- 3. Les images numérotées pour WeChat (12 produits par image) ----------
+// « capacités 1,0 / 1,5 / … / 2,8 L · puissance 400 / … / 1000 W » → « 1,0–2,8 L · 400–1000 W »
+function trCourt(p) {
+  const t = String(p.caracteristiques || '');
+  const L = (t.match(/capacit[^·]*/i) || [''])[0].match(/\d+(?:[.,]\d+)?/g) || t.match(/\d+(?:[.,]\d+)?(?=\s*L\b)/g);
+  const W = (t.match(/puissance[^·]*/i) || [''])[0].match(/\d{2,4}/g) || t.match(/\d{2,4}(?=\s*W\b)/g);
+  const mah = t.match(/(\d{3,5})\s*mAh/i);
+  const ml = t.match(/(\d{2,4})\s*mL/i);
+  const bouts = [];
+  if (L && L.length) bouts.push(L.length > 1 ? L[0] + '–' + L[L.length - 1] + ' L' : L[0] + ' L');
+  else if (ml) bouts.push(ml[1] + ' mL');
+  if (W && W.length) bouts.push(W.length > 1 ? W[0] + '–' + W[W.length - 1] + ' W' : W[0] + ' W');
+  if (mah) bouts.push(mah[1] + ' mAh');
+  return bouts.join(' · ').replace(/\./g, ',');
+}
+function trTexteAjuste(g, texte, x, y, largeurMax, taille, gras) {
+  let t = taille;
+  do { g.font = (gras ? '800 ' : '500 ') + t + 'px system-ui,-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif'; t -= 1; }
+  while (g.measureText(texte).width > largeurMax && t > 14);
+  g.fillText(texte, x, y);
+}
+async function trPlanches(f, produits) {
+  const PAR = 12, COL = 3, W = 1080, CW = 360, PH = 286, CH = 404, HAUT = 196, BAS = 150;
+  const res = [];
+  const pages = Math.ceil(produits.length / PAR) || 1;
+  const qui = [trMarque(f.societe) || f.nom || f.societe, f.contact].filter(Boolean).join(' — ');
+  const jour = new Date().toLocaleDateString('fr-CA');   // la date du téléphone (heure de Chine)
+  for (let pg = 0; pg < pages; pg++) {
+    const lot = produits.slice(pg * PAR, pg * PAR + PAR);
+    const rangs = Math.ceil(lot.length / COL);
+    const c = document.createElement('canvas'); c.width = W; c.height = HAUT + rangs * CH + BAS;
+    const g = c.getContext('2d');
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, c.width, c.height);
+    // En-tête
+    g.fillStyle = '#0d3f85'; g.fillRect(0, 0, W, HAUT - 16);
+    g.fillStyle = '#ffffff'; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+    trTexteAjuste(g, '报价请求 · Price request', 36, 66, W - 72, 48, true);
+    trTexteAjuste(g, qui, 36, 116, W - 72, 34, true);
+    trTexteAjuste(g, 'KYLO EURGUINE · 几内亚 Guinée · ' + jour + ' · 第 ' + (pg + 1) + '/' + pages + ' 张', 36, 160, W - 72, 26, false);
+    lot.forEach((x, i) => {
+      const n = pg * PAR + i + 1, col = i % COL, rang = Math.floor(i / COL);
+      const x0 = col * CW, y0 = HAUT + rang * CH;
+      g.strokeStyle = '#d7e1f0'; g.lineWidth = 2; g.strokeRect(x0 + 6, y0 + 6, CW - 12, CH - 12);
+      if (x.img) {
+        const e = Math.min((CW - 28) / x.img.width, (PH - 20) / x.img.height);
+        const l = x.img.width * e, h = x.img.height * e;
+        g.drawImage(x.img, x0 + (CW - l) / 2, y0 + 14 + (PH - 20 - h) / 2, l, h);
+      } else {
+        g.fillStyle = '#e8effb'; g.fillRect(x0 + 14, y0 + 14, CW - 28, PH - 20);
+        g.fillStyle = '#5a6b85'; g.textAlign = 'center'; trTexteAjuste(g, '(pas de photo)', x0 + CW / 2, y0 + PH / 2, CW - 40, 26, false); g.textAlign = 'left';
+      }
+      // Le numéro, gros et rouge : c'est lui que le vendeur écrit dans sa réponse.
+      g.fillStyle = '#d32f2f'; g.beginPath(); g.arc(x0 + 44, y0 + 44, 32, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#ffffff'; g.textAlign = 'center'; trTexteAjuste(g, String(n), x0 + 44, y0 + 56, 56, n > 99 ? 28 : 34, true);
+      g.fillStyle = '#16233a'; trTexteAjuste(g, trRefVendeur(x.p.ref) || '—', x0 + CW / 2, y0 + PH + 38, CW - 30, 32, true);
+      const court = trCourt(x.p);
+      if (court) { g.fillStyle = '#3d4a5f'; trTexteAjuste(g, court, x0 + CW / 2, y0 + PH + 72, CW - 30, 24, false); }
+      g.fillStyle = '#157347'; trTexteAjuste(g, '单价 Prix : ________', x0 + CW / 2, y0 + PH + 106, CW - 30, 24, true);
+      g.textAlign = 'left';
+    });
+    // Le pied : comment répondre.
+    const yb = HAUT + rangs * CH;
+    g.fillStyle = '#fbf1de'; g.fillRect(0, yb + 8, W, BAS - 8);
+    g.fillStyle = '#16233a'; g.textAlign = 'center';
+    trTexteAjuste(g, '请按编号报价：1 = ?元，2 = ?元 …', W / 2, yb + 58, W - 60, 34, true);
+    trTexteAjuste(g, '（单价 · 最小起订量 · 每箱数量）  谢谢！ Thank you!', W / 2, yb + 106, W - 60, 28, false);
+    res.push(c.toDataURL('image/jpeg', 0.86));
+  }
+  return res;
+}
+function trChoixProduits(f, portee) {
+  const ps = ctProduits(f);
+  if (portee === 'interesse') return ps.filter(p => p.interesse);
+  if (portee === 'sansprix') return ps.filter(p => !(num(p.prix) > 0));
+  return ps;
+}
+function trMessagePlanches(f, liste) {
+  const qui = String(f.contact || '').trim(), sig = ctSignature(), moi = sig.split('–')[0].trim(), n = liste.length;
+  const cn = [(qui ? qui + ' ' : '') + '您好！',
+    '我是几内亚（西非）KYLO EURGUINE 公司的 ' + moi + '。我们' + ctLieu(f.lieu_rencontre || 'foire', 'cn') + '见过面，谢谢您的产品目录。',
+    '图片里的 ' + n + ' 个产品都有编号（1–' + n + '），请按编号给我报价：',
+    '1）单价（人民币还是美元，请注明）', '2）最小起订量', '3）每箱数量和外箱尺寸',
+    '请这样回复：', '1 = ?元', '2 = ?元', '……',
+    '如果不同容量价格不一样，请写：1 = 1.0L ?元 / 1.5L ?元', '',
+    '编号和型号：', ...liste.map((p, i) => (i + 1) + '. ' + (trRefVendeur(p.ref) || '—')), '', '谢谢！', sig].join('\n');
+  const en = 'Hello' + (qui ? ' ' + qui : '') + ', this is ' + moi + ' from KYLO EURGUINE (Guinea, West Africa). Please quote each numbered product in the pictures (1–' + n
+    + '): unit price (RMB or USD), MOQ, pcs per carton. Reply like: 1 = ? RMB, 2 = ? RMB… Thank you!';
+  return cn + '\n\n' + en;
+}
+let trEnvoi = { fid: '', portee: 'tous', planches: [], liste: [], jeton: 0 };
+// « ✉️ Demander les prix » : avec les photos des produits s'il y en a, sinon le message texte (1.3.0).
+function trDemander(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  if (!ctProduits(f).some(p => p.photo_doc)) { ctBoiteDemande(fid); return; }
+  ctToutDeSuite();
+  const nInt = ctProduits(f).filter(p => p.interesse).length;
+  trEnvoi = { fid, portee: trEnvoi.fid === fid ? trEnvoi.portee : 'tous', planches: [], liste: [], jeton: 0 };
+  if (trEnvoi.portee === 'interesse' && !nInt) trEnvoi.portee = 'tous';
+  trDessinerEnvoi();
+}
+function trDessinerEnvoi() {
+  const f = mkFournisseur(trEnvoi.fid); if (!f) return;
+  const ps = ctProduits(f), nInt = ps.filter(p => p.interesse).length, nSans = ps.filter(p => !(num(p.prix) > 0)).length;
+  const liste = trChoixProduits(f, trEnvoi.portee);
+  trEnvoi.liste = liste.map(p => p.id);
+  ctDemande = { fid: f.id, portee: 'tous-liste', lieu: f.lieu_rencontre || 'foire', relance: false };
+  const nImages = Math.ceil(liste.length / 12);
+  const puce = (k, t) => `<button type="button" class="mk-puce${trEnvoi.portee === k ? ' on' : ''}" onclick="trEnvoi.portee='${k}';trDessinerEnvoi()">${t}</button>`;
+  mkBoite(`<div class="mk-dlg ct-champs">
+    <h3>✉️ Demander les prix à ${E(mkNomFournisseur(f))}</h3>
+    <p class="mk-aide" style="font-size:15px">Chaque produit a <b>sa photo et son numéro</b>. Le vendeur répond « 1 = 45元 » : vous collez sa réponse
+    et chaque prix se place sur son produit. Le message est <b>en chinois</b> (et une ligne en anglais).</p>
+    <label>Quels produits ?</label>
+    <div class="mk-puces">${puce('tous', 'Les ' + ps.length + ' produits')}${nInt ? puce('interesse', '⭐ Les ' + nInt + ' qui m\'intéressent') : ''}${nSans && nSans < ps.length ? puce('sansprix', 'Les ' + nSans + ' sans prix') : ''}</div>
+    <div id="tr_planches" class="tr-planches"><p class="ct-etat">⏳ Préparation de ${nImages} image(s)…</p></div>
+    <div class="tr-etape"><span class="n">1</span><div class="c">
+      <button class="b" style="background:#1aad19;color:#fff" onclick="trEnvoyerPlanches()">📤 Envoyer les ${nImages} image(s) (WeChat…)</button>
+      <p class="mk-aide">Choisissez WeChat, puis la discussion de ${E(f.contact || 'votre fournisseur')}. WeChat n'apparaît pas ? Choisissez
+      « Enregistrer les images », puis dans WeChat : + → Album.</p></div></div>
+    <div class="tr-etape"><span class="n">2</span><div class="c">
+      <button class="b" style="background:#1aad19;color:#fff" onclick="ctEnvoyer('wechat')">💬 Copier le message et ouvrir WeChat</button>
+      <details style="margin-top:6px"><summary style="font-size:15px;font-weight:700;min-height:40px;display:flex;align-items:center">Voir / modifier le message</summary>
+      <textarea id="ct_msg" class="ct-message" rows="12">${E(trMessagePlanches(f, liste))}</textarea></details></div></div>
+    <div class="tr-etape"><span class="n">3</span><div class="c">
+      <button class="b vert" onclick="trMarquerEnvoye()">✅ C'est envoyé — noter la date</button></div></div>
+    <div class="mk-boutons">
+      <button class="b contour" onclick="ctBoiteDemande('${f.id}')">Autre façon : message texte, e-mail, WhatsApp</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button></div>
+  </div>`);
+  trFabriquerPlanches(f, liste);
+}
+async function trFabriquerPlanches(f, liste) {
+  const jeton = ++trEnvoi.jeton;
+  const items = [];
+  for (const p of liste) {
+    let img = null;
+    if (p.photo_doc) { try { const src = await ctLire(p.photo_doc); if (src) img = await trImage(src); } catch (e) {} }
+    items.push({ p, img });
+  }
+  if (jeton !== trEnvoi.jeton) return;
+  const planches = await trPlanches(f, items);
+  if (jeton !== trEnvoi.jeton) return;
+  trEnvoi.planches = planches;
+  const z = document.getElementById('tr_planches');
+  if (z) z.innerHTML = planches.map((src, i) => `<img src="${src}" alt="Image ${i + 1}" onclick="mkApercu(trEnvoi.planches[${i}], 'Image ${i + 1} sur ${planches.length}')">`).join('');
+}
+function trEnvoyerPlanches() {
+  const f = mkFournisseur(trEnvoi.fid); if (!f) return;
+  if (!trEnvoi.planches.length) { avertir('Les images se préparent encore, une seconde…'); return; }
+  const base = (f.code || 'F') + '-' + (trMarque(f.societe) || 'prix').replace(/[^\w-]+/g, '');
+  ctPartagerFichiers(trEnvoi.planches.map((src, i) => ({ nom: base + '-' + (i + 1) + '.jpg', src })), mkNomFournisseur(f) + ' — demande de prix');
+}
+function trMarquerEnvoye() {
+  const f = mkFournisseur(trEnvoi.fid); if (!f) return;
+  f.demande_le = mkMaintenant();
+  f.demande_liste = trEnvoi.liste.slice();
+  f.demande_modeles = trEnvoi.liste.map(id => (ctProduit(f, id) || {}).ref).filter(Boolean);
+  f.demande_canal = 'wechat-images';
+  delete f.relance_le; delete f.ct_neuf;
+  sauverLocal(); fermerBoite(); dessiner();
+  avertir('✅ Noté : prix demandés le ' + mkJour(f.demande_le) + ' (' + f.demande_liste.length + ' produits numérotés). Sa réponse : « 💬 Coller la réponse ».', 6000);
+}
+
+// ---------- 4. La réponse du fournisseur → les prix ----------
+function trDemi(s) {   // les chiffres et signes « pleine largeur » du chinois → normaux
+  return String(s || '').replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/　/g, ' ').replace(/￥/g, '¥');
+}
+const TR_RE_UNITE = /\d+(?:[.,]\d+)?\s*(?:L|l|ml|mL|ML|升|毫升|W|w|瓦|mAh|MAH|mah|V|v|伏|cm|CM|mm|MM|kg|KG|g|克|寸|inch|%|度|天|days?)(?![A-Za-z一-鿿])/g;
+function trDeviseDe(s) {
+  if (/美元|美金|usd|us\$|\$|dollar/i.test(s)) return 'USD';
+  if (/元|块|rmb|cny|¥|人民币/i.test(s)) return 'CNY';
+  return '';
+}
+function trLireReponse(f, texteBrut, devDefaut) {
+  const texte = trDemi(texteBrut);
+  const ps = ctProduits(f);
+  const liste = (Array.isArray(f.demande_liste) && f.demande_liste.length ? f.demande_liste : ps.map(p => p.id)).map(id => ctProduit(f, id)).filter(Boolean);
+  const cles = ps.map(p => ({ p, k: ctCleRef(String(p.ref).replace(/\s*\(.*\)\s*$/, '')) })).filter(x => x.k.length >= 3).sort((a, b) => b.k.length - a.k.length);
+  const devGlobale = trDeviseDe(texte) || devDefaut || 'CNY';
+  // Un numéro en tête : « 1 = », « 1: », « 1、», « 1) », « 1. », « 1号 », « No.1 », « 第1 ».
+  const NUM = /^(?:no\.?\s*|#|第)?(\d{1,3})\s*(?:号\s*[=:：、)）\-]?|#|[=:：、)）\-]|\.(?!\d))\s*/i;
+  const segments = [];
+  texte.split('\n').forEach(l => {
+    l.split(/(?:[\s,，;；、])(?=(?:no\.?\s*|#|第)?\d{1,3}\s*(?:号|[=:：、)）]|\.(?!\d)))/i).forEach(s => { if (s.trim()) segments.push(s.trim()); });
+  });
+  const lignes = [], incompris = [], vus = new Set();
+  segments.forEach(seg => {
+    let p = null, reste = seg;
+    const m = seg.match(NUM);
+    if (m) reste = seg.slice(m[0].length);
+    const plat = reste.toUpperCase().replace(/[\s\-_.]/g, '');
+    const parRef = cles.find(x => plat.includes(x.k));
+    if (parRef) { p = parRef.p; reste = reste.replace(new RegExp(String(p.ref).replace(/\s*\(.*\)\s*$/, '').split('').map(c => /[A-Za-z0-9]/.test(c) ? c : '[\\s\\-_.]?').join('\\s*'), 'i'), ' '); }
+    else if (m) { const n = Number(m[1]); if (n >= 1 && n <= liste.length) p = liste[n - 1]; else reste = seg; }
+    let t = ' ' + reste + ' ';
+    let moq = 0, colisage = 0;
+    const mq = t.match(/(?:moq|起订量?|最少|最低)\D{0,6}(\d{1,6})/i) || t.match(/(\d{1,6})\s*(?:pcs|个|台|套|件|只)\s*(?:起订|起)/i);
+    if (mq) { moq = num(mq[1]); t = t.replace(mq[0], ' '); }
+    const cq = t.match(/(\d{1,4})\s*(?:pcs|个|台|只|套)?\s*\/\s*(?:ctn|carton|箱)/i) || t.match(/(?:每箱|一箱|装箱)\D{0,4}(\d{1,4})/);
+    if (cq) { colisage = num(cq[1]); t = t.replace(cq[0], ' '); }
+    t = t.replace(/\d+(?:\.\d+)?\s*[x×*]\s*\d+(?:\.\d+)?(?:\s*[x×*]\s*\d+(?:\.\d+)?)?/g, ' ').replace(TR_RE_UNITE, ' ');
+    const prix = [];
+    const re = /(¥|\$|rmb|cny|usd|us\$)?\s*(\d{1,3}(?:,\d{3})+|\d+(?:[.,]\d{1,2})?)\s*(元|块|rmb|cny|美元|美金|usd|\$|dollars?)?/gi;
+    let x;
+    while ((x = re.exec(t))) {
+      const v = /,\d{3}/.test(x[2]) ? num(x[2].replace(/,/g, '')) : num(x[2]); if (!(v > 0)) continue;
+      prix.push({ v, d: trDeviseDe((x[1] || '') + (x[3] || '')) });
+    }
+    if (!p) { if (prix.length) incompris.push(seg); return; }
+    if (!prix.length && !moq && !colisage) return;
+    const d = (prix[0] && prix[0].d) || trDeviseDe(seg) || devGlobale;
+    if (vus.has(p.id)) {   // le même produit cité deux fois : la 2e ligne complète la 1re
+      const l = lignes.find(y => y.p === p); if (l) { if (!l.moq && moq) l.moq = moq; if (!l.colisage && colisage) l.colisage = colisage; l.note += ' · ' + seg; }
+      return;
+    }
+    vus.add(p.id);
+    lignes.push({ p, n: liste.indexOf(p) + 1, prix: prix.length ? prix[0].v : 0, devise: d, moq, colisage,
+      plusieurs: prix.length > 1, note: seg });
+  });
+  return { lignes, incompris };
+}
+let trReponse = { fid: '', devise: 'CNY', res: null };
+function trBoiteReponse(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  ctToutDeSuite();
+  trReponse = { fid, devise: trReponse.fid === fid ? trReponse.devise : 'CNY', res: null };
+  mkBoite(`<div class="mk-dlg ct-champs">
+    <h3>💬 La réponse de ${E(f.contact || mkNomFournisseur(f))} → les prix</h3>
+    <ol class="mk-etapes"><li>Dans WeChat, <b>appui long</b> sur sa réponse → <b>Copier</b>. (Plusieurs messages : appui long → <b>Plusieurs</b>, puis copiez-les un par un.)</li>
+      <li>Revenez ici et touchez <b>Coller</b>. Chaque prix va sur son produit, par son numéro (1, 2, 3…) ou sa référence.</li></ol>
+    <button class="b vert" style="min-height:56px;font-size:17px" onclick="ctColler('tr_rep', trApercuReponse)">📋 Coller sa réponse</button>
+    <textarea id="tr_rep" rows="6" placeholder="ex : 1 = 45元&#10;2 = 50元&#10;YS-819B 52元 MOQ 500" oninput="trApercuReponse()"></textarea>
+    <label>Si la devise n'est pas écrite dans sa réponse</label>
+    <div class="mk-puces" id="tr_rep_dev">${[['CNY', '¥ Yuan (RMB)'], ['USD', '$ Dollar']].map(([k, t]) => `<button type="button" class="mk-puce${trReponse.devise === k ? ' on' : ''}" onclick="trReponse.devise='${k}';document.querySelectorAll('#tr_rep_dev .mk-puce').forEach(b=>b.classList.toggle('on', b.textContent==='${t}'));trApercuReponse()">${t}</button>`).join('')}</div>
+    <div id="tr_rep_apercu" class="ct-apercu-import"></div>
+    <div class="mk-boutons">
+      <button class="b vert" id="tr_rep_ok" onclick="trAppliquerReponse()" disabled>✅ Mettre ces prix</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button></div>
+    <p class="mk-aide" style="margin-top:10px">Sa réponse est une photo ou un fichier Excel ? Envoyez-la à Claude : il vous renvoie un code avec tous les prix.</p>
+  </div>`);
+}
+function trApercuReponse() {
+  const f = mkFournisseur(trReponse.fid), t = document.getElementById('tr_rep'), z = document.getElementById('tr_rep_apercu'), ok = document.getElementById('tr_rep_ok');
+  if (!f || !t || !z) return;
+  if (!t.value.trim()) { z.innerHTML = ''; if (ok) ok.disabled = true; trReponse.res = null; return; }
+  const res = trLireReponse(f, t.value, trReponse.devise);
+  trReponse.res = res;
+  if (ok) { ok.disabled = !res.lignes.length; ok.textContent = res.lignes.length ? '✅ Mettre ces ' + res.lignes.length + ' prix' : '✅ Mettre ces prix'; }
+  z.innerHTML = (res.lignes.length ? `<p style="margin:10px 0 4px"><b>${res.lignes.length} prix compris :</b></p>
+    ${res.lignes.map((l, i) => `<label class="tr-rep-ligne"><input type="checkbox" checked data-i="${i}">
+      ${l.p.photo_doc ? `<img class="ct-mini" data-doc="${E(l.p.photo_doc)}" alt="">` : ''}
+      <span class="corps">${l.n ? '<span class="tr-num">' + l.n + '</span>' : ''}<b>${E(l.p.ref)}</b>${num(l.p.prix) > 0 ? ` <span class="mk-att">(avant : ${nf(l.p.prix, 2)} ${E(l.p.devise || '')})</span>` : ''}
+        ${l.moq ? '<br>minimum ' + nf(l.moq) : ''}${l.colisage ? ' · ' + nf(l.colisage) + ' / carton' : ''}${l.plusieurs ? '<br><span class="mk-att">plusieurs prix : ' + E(l.note.slice(0, 90)) + '</span>' : ''}</span>
+      <span class="px">${l.prix ? nf(l.prix, 2) + ' ' + (l.devise === 'CNY' ? '¥' : '$') : '—'}${l.prix && tauxDe(l.devise) > 0 ? `<br><small style="font-size:14px">${gnfStrict(l.prix * tauxDe(l.devise))}</small>` : ''}</span></label>`).join('')}`
+    : '<div class="alerte a-ambre">Aucun prix reconnu. Le vendeur a-t-il écrit les numéros (1 = …) ou les références ?</div>')
+    + (res.incompris.length ? `<p style="margin:10px 0 4px"><b>Pas compris à quel produit c'est :</b></p><ul style="margin:0;padding-left:20px">${res.incompris.slice(0, 8).map(s => `<li>${E(s)}</li>`).join('')}</ul>` : '');
+  ctRemplirMinis();
+}
+function trAppliquerReponse() {
+  const f = mkFournisseur(trReponse.fid), res = trReponse.res; if (!f || !res) return;
+  const coches = new Set([...document.querySelectorAll('#tr_rep_apercu input[type=checkbox]')].filter(c => c.checked).map(c => Number(c.dataset.i)));
+  let n = 0;
+  res.lignes.forEach((l, i) => {
+    if (!coches.has(i)) return;
+    const p = l.p;
+    if (l.prix > 0) {
+      if (num(p.prix) > 0 && (num(p.prix) !== l.prix || (p.devise || '') !== l.devise)) {
+        p.historique = Array.isArray(p.historique) ? p.historique : [];
+        p.historique.push({ prix: p.prix, devise: p.devise, moq: p.moq, le: p.prix_le });
+      }
+      p.prix = l.prix; p.devise = l.devise; p.prix_le = mkMaintenant();
+    }
+    if (l.moq) p.moq = l.moq;
+    if (l.colisage && !num(p.colisage)) p.colisage = l.colisage;
+    p.prix_note = l.note.slice(0, 300);
+    ctMajOffreDuProduit(f, p);
+    n++;
+  });
+  f.reponse_le = mkMaintenant();
+  sauverLocal(); fermerBoite(); dessiner();
+  avertir('✅ ' + n + ' prix placé(s) sur leurs produits. Les francs s\'affichent sur chaque produit.', 5000);
+}
+
+// ---------- 5. ✂️ Découper les produits d'une page, au doigt ----------
+// 4 coins posés sur un bloc de produits rangés en grille, le nombre de lignes et de colonnes → une
+// photo par produit (la case entière, étiquette comprise). Si la lecture est prête, le carnet lit
+// l'étiquette de chaque case (capacité, puissance, référence) : à vérifier, la photo est à côté.
+let trDec = null;
+async function trDecoupeOuvrir(fid, did) {
+  const f = mkFournisseur(fid); if (!f) return;
+  if (!did) {
+    const pages = ctDocs(f).filter(d => d.type !== 'carte');
+    if (!pages.length) { avertir('Ajoutez d\'abord une photo de page du catalogue.'); return; }
+    if (pages.length > 1) { trDecoupeChoisir(f, pages); return; }
+    did = pages[0].id;
+  }
+  let src = '';
+  try { src = await ctLire(did); } catch (e) {}
+  if (!src) { avertir('Cette photo n\'est plus dans ce téléphone.'); return; }
+  const img = await trImage(src);
+  const m = 0.06;
+  trDec = { fid, did, img, lignes: 3, colonnes: 4, famille: ctDerniereFamille(f), cases: null,
+    coins: [[img.width * m, img.height * m], [img.width * (1 - m), img.height * m], [img.width * (1 - m), img.height * (1 - m)], [img.width * m, img.height * (1 - m)]] };
+  trDecoupeDessinerBoite();
+}
+function trDecoupeChoisir(f, pages) {
+  mkBoite(`<div class="mk-dlg"><h3>✂️ Quelle page découper ?</h3>
+    <div class="ct-mini-grille">${pages.map((d, i) => `<div class="ct-mini-l"><img class="ct-mini" data-doc="${E(d.id)}" alt="Page ${i + 1}" onclick="trDecoupeOuvrir('${f.id}','${d.id}')"><span>${i + 1}</span></div>`).join('')}</div>
+    <div class="mk-boutons"><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+  ctRemplirMinis();
+}
+function trDecoupeDessinerBoite() {
+  const d = trDec; if (!d) return;
+  mkBoite(`<div class="mk-dlg tr-dec-dlg">
+    <h3>✂️ Découper les produits</h3>
+    <p class="mk-aide" style="font-size:15px">Posez les <b>4 ronds verts</b> aux 4 coins d'un bloc de produits rangés en grille (étiquettes comprises),
+    puis réglez le nombre de lignes et de colonnes : chaque case verte = un produit.</p>
+    <div class="mk-deux"><button type="button" class="b contour" style="min-height:48px" onclick="trDecTourner(270)">↺ Tourner</button>
+      <button type="button" class="b contour" style="min-height:48px" onclick="trDecTourner(90)">↻ Tourner</button></div>
+    <div class="tr-decoupe" id="tr_dec"><canvas id="tr_dec_toile"></canvas>${[0, 1, 2, 3].map(i => `<div class="tr-poignee" data-i="${i}"></div>`).join('')}</div>
+    <div class="tr-pas"><span>Lignes (de haut en bas)</span><button type="button" onclick="trDecPas('lignes',-1)">−</button><b id="tr_dec_l">${d.lignes}</b><button type="button" onclick="trDecPas('lignes',1)">+</button></div>
+    <div class="tr-pas"><span>Colonnes (de gauche à droite)</span><button type="button" onclick="trDecPas('colonnes',-1)">−</button><b id="tr_dec_c">${d.colonnes}</b><button type="button" onclick="trDecPas('colonnes',1)">+</button></div>
+    <div class="mk-boutons">
+      <button class="b vert" id="tr_dec_go" onclick="trDecouper()">✂️ Découper ${d.lignes * d.colonnes} produits</button>
+      <button class="b gris" onclick="trDec=null;fermerBoite()">Fermer</button></div></div>`);
+  requestAnimationFrame(trDecPoser);
+}
+// Une page photographiée de travers (catalogue posé en long) : on la remet droite.
+function trDecTourner(deg) {
+  const d = trDec; if (!d) return;
+  const base = d.img instanceof HTMLCanvasElement ? d.img : mkToile(d.img, 4000);
+  d.img = trTourner(base, deg);
+  const m = 0.06, w = d.img.width, h = d.img.height;
+  d.coins = [[w * m, h * m], [w * (1 - m), h * m], [w * (1 - m), h * (1 - m)], [w * m, h * (1 - m)]];
+  trDecPoser();
+}
+function trDecEchelle() {
+  const t = document.getElementById('tr_dec_toile'); if (!t || !trDec) return 0;
+  return t.clientWidth / trDec.img.width;
+}
+function trDecPoser() {
+  const d = trDec, t = document.getElementById('tr_dec_toile'), zone = document.getElementById('tr_dec'); if (!d || !t || !zone) return;
+  const l = zone.clientWidth, e = l / d.img.width, h = d.img.height * e, r = window.devicePixelRatio || 1;
+  t.width = Math.round(l * r); t.height = Math.round(h * r); t.style.height = h + 'px';
+  const g = t.getContext('2d'); g.setTransform(r, 0, 0, r, 0, 0);
+  g.drawImage(d.img, 0, 0, l, h);
+  const P = (u, v) => trDecPoint(d.coins, u, v);
+  g.lineWidth = 2; g.strokeStyle = '#22c55e';
+  for (let i = 0; i <= d.lignes; i++) { g.beginPath(); for (let k = 0; k <= 20; k++) { const p = P(k / 20, i / d.lignes); k ? g.lineTo(p[0] * e, p[1] * e) : g.moveTo(p[0] * e, p[1] * e); } g.stroke(); }
+  for (let j = 0; j <= d.colonnes; j++) { g.beginPath(); for (let k = 0; k <= 20; k++) { const p = P(j / d.colonnes, k / 20); k ? g.lineTo(p[0] * e, p[1] * e) : g.moveTo(p[0] * e, p[1] * e); } g.stroke(); }
+  g.fillStyle = 'rgba(0,0,0,.65)'; g.font = '800 14px system-ui,sans-serif'; g.textAlign = 'center';
+  let n = 1;
+  for (let i = 0; i < d.lignes; i++) for (let j = 0; j < d.colonnes; j++) {
+    const c = P((j + 0.5) / d.colonnes, (i + 0.5) / d.lignes);
+    g.fillStyle = 'rgba(0,0,0,.65)'; g.beginPath(); g.arc(c[0] * e, c[1] * e, 13, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#fff'; g.fillText(String(n++), c[0] * e, c[1] * e + 5);
+  }
+  zone.querySelectorAll('.tr-poignee').forEach(el => {
+    const i = Number(el.dataset.i); el.style.left = (d.coins[i][0] * e) + 'px'; el.style.top = (d.coins[i][1] * e) + 'px';
+    if (!el._branche) { el._branche = true; trDecBrancher(el); }
+  });
+}
+// Le point (u, v) du bloc, entre ses 4 coins (haut-gauche, haut-droit, bas-droit, bas-gauche).
+function trDecPoint(c, u, v) {
+  const [hg, hd, bd, bg] = c;
+  return [hg[0] * (1 - u) * (1 - v) + hd[0] * u * (1 - v) + bd[0] * u * v + bg[0] * (1 - u) * v,
+    hg[1] * (1 - u) * (1 - v) + hd[1] * u * (1 - v) + bd[1] * u * v + bg[1] * (1 - u) * v];
+}
+function trDecBrancher(el) {
+  el.addEventListener('pointerdown', ev => {
+    ev.preventDefault(); el.setPointerCapture(ev.pointerId);
+    const zone = document.getElementById('tr_dec'), i = Number(el.dataset.i);
+    const bouger = (e2) => {
+      const r = zone.getBoundingClientRect(), s = trDecEchelle(); if (!s || !trDec) return;
+      trDec.coins[i] = [Math.max(0, Math.min(trDec.img.width, (e2.clientX - r.left) / s)), Math.max(0, Math.min(trDec.img.height, (e2.clientY - r.top) / s))];
+      trDecPoser();
+    };
+    const fin = () => { el.removeEventListener('pointermove', bouger); el.removeEventListener('pointerup', fin); el.removeEventListener('pointercancel', fin); };
+    el.addEventListener('pointermove', bouger); el.addEventListener('pointerup', fin); el.addEventListener('pointercancel', fin);
+  });
+}
+function trDecPas(k, s) {
+  if (!trDec) return;
+  trDec[k] = Math.max(1, Math.min(10, trDec[k] + s));
+  const l = document.getElementById('tr_dec_l'), c = document.getElementById('tr_dec_c'), b = document.getElementById('tr_dec_go');
+  if (l) l.textContent = trDec.lignes; if (c) c.textContent = trDec.colonnes;
+  if (b) b.textContent = '✂️ Découper ' + trDec.lignes * trDec.colonnes + ' produit' + (trDec.lignes * trDec.colonnes > 1 ? 's' : '');
+  trDecPoser();
+}
+async function trDecouper() {
+  const d = trDec; if (!d) return;
+  const cases = [];
+  for (let i = 0; i < d.lignes; i++) for (let j = 0; j < d.colonnes; j++) {
+    const q = [trDecPoint(d.coins, j / d.colonnes, i / d.lignes), trDecPoint(d.coins, (j + 1) / d.colonnes, i / d.lignes),
+      trDecPoint(d.coins, (j + 1) / d.colonnes, (i + 1) / d.lignes), trDecPoint(d.coins, j / d.colonnes, (i + 1) / d.lignes)];
+    const x0 = Math.max(0, Math.min(...q.map(p => p[0])) - 4), x1 = Math.min(d.img.width, Math.max(...q.map(p => p[0])) + 4);
+    const y0 = Math.max(0, Math.min(...q.map(p => p[1])) - 4), y1 = Math.min(d.img.height, Math.max(...q.map(p => p[1])) + 4);
+    const w = x1 - x0, h = y1 - y0; if (w < 20 || h < 20) continue;
+    const e = Math.min(1, 640 / Math.max(w, h));
+    const c = document.createElement('canvas'); c.width = Math.round(w * e); c.height = Math.round(h * e);
+    c.getContext('2d').drawImage(d.img, x0, y0, w, h, 0, 0, c.width, c.height);
+    // L'étiquette (le bas de la case), agrandie pour la lecture.
+    const eh = h * 0.30, et = document.createElement('canvas'); et.width = Math.round(w * 2.2); et.height = Math.round(eh * 2.2);
+    const g = et.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, et.width, et.height);
+    g.drawImage(d.img, x0, y1 - eh, w, eh, 0, 0, et.width, et.height);
+    cases.push({ photo: c.toDataURL('image/jpeg', 0.85), etiquette: et, ref: '', lu: '' });
+  }
+  d.cases = cases;
+  trDecRevoir(true);
+  if (await trOcrDispo()) {
+    for (let k = 0; k < cases.length; k++) {
+      if (!trDec || trDec.cases !== cases) return;
+      const etat = document.getElementById('tr_dec_etat'); if (etat) etat.textContent = '🔎 Lecture des étiquettes : ' + (k + 1) + ' / ' + cases.length + '…';
+      try {
+        const r = await trOcrLire(cases[k].etiquette, 'eng', '6');
+        const t = trDemi(r.texte);
+        // Une référence n'est proposée que si elle a la forme d'une vraie (« YS-858B ») ; sinon la case reste vide.
+        const refs = ctModelesDansTexte(t.replace(/[=~—–]/g, '-')).map(x => x.ref).filter(r => /^[A-Z]{2,4}-\d{3,5}[A-Z]?$/.test(r) && !/\d(W|L|V)$/.test(r));
+        if (refs[0] && !cases[k].ref) { cases[k].ref = refs[0]; cases[k].devine = true; }
+        // Capacités et puissances : gardées seulement si elles vont en croissant (sinon le lecteur s'est trompé).
+        const nombres = (re) => [...new Set((t.match(re) || []).map(x => parseFloat(x.replace(',', '.'))))];
+        const croissant = (a) => a.length >= 2 && a.every((v, i) => !i || v > a[i - 1]);
+        const L = nombres(/\d[.,]\d(?=\s*L\b)/gi), W = nombres(/\d{3,4}(?=\s*W\b)/gi);
+        const fr = (v) => String(v).replace('.', ',');
+        const mah = (t.match(/\d{3,5}\s*mAh/i) || [''])[0];
+        cases[k].lu = [croissant(L) && L.every(v => v >= 0.3 && v <= 20) ? fr(L[0].toFixed(1)) + '–' + fr(L[L.length - 1].toFixed(1)) + ' L' : '',
+          croissant(W) && W.every(v => v >= 100 && v <= 5000) ? W[0] + '–' + W[W.length - 1] + ' W' : '', mah].filter(Boolean).join(' · ');
+      } catch (e) {}
+      const ch = document.getElementById('tr_dec_ref_' + k); if (ch && !ch.value && cases[k].ref) ch.value = cases[k].ref;
+      const lu = document.getElementById('tr_dec_lu_' + k); if (lu) lu.textContent = cases[k].lu ? 'lu (à vérifier) : ' + cases[k].lu : '';
+    }
+    trOcrLiberer();
+    const etat = document.getElementById('tr_dec_etat'); if (etat) etat.textContent = '✅ Étiquettes lues : vérifiez chaque référence avec la photo.';
+  }
+}
+function trDecRevoir() {
+  const d = trDec; if (!d || !d.cases) return;
+  mkBoite(`<div class="mk-dlg ct-champs">
+    <h3>✂️ ${d.cases.length} produits découpés</h3>
+    <p class="ct-etat" id="tr_dec_etat">${trOcrEtat.pret ? '🔎 Lecture des étiquettes…' : 'Écrivez la référence de chaque produit (elle est sur la photo).'}</p>
+    <label for="tr_dec_fam">Famille de ces produits</label>
+    <input id="tr_dec_fam" list="ct_liste_familles" value="${E(d.famille)}" placeholder="ex : Cuiseur à riz">${ctListeFamillesHtml()}
+    <div class="tr-cases">${d.cases.map((c, k) => `<div class="tr-case"><img src="${c.photo}" alt="Produit ${k + 1}">
+      <input id="tr_dec_ref_${k}" value="${E(c.ref)}" placeholder="Référence n° ${k + 1}" autocapitalize="characters">
+      <div class="lu" id="tr_dec_lu_${k}">${c.lu ? 'lu (à vérifier) : ' + E(c.lu) : ''}</div></div>`).join('')}</div>
+    <p class="mk-aide" style="font-size:15px">Le téléphone lit mal les petites étiquettes : il ne propose une référence que s'il en est sûr. Pour les
+    détails exacts (capacités, puissance), envoyez la page à Claude.</p>
+    <div class="mk-boutons">
+      <button class="b vert" onclick="trDecAjouter()">✅ Ajouter ces ${d.cases.length} produits</button>
+      <button class="b contour" onclick="trDec.cases=null;trDecoupeDessinerBoite()">← Reprendre le cadrage</button>
+      <button class="b gris" onclick="trDec=null;fermerBoite()">Fermer sans rien ajouter</button></div></div>`);
+}
+async function trDecAjouter() {
+  const d = trDec; if (!d || !d.cases) return;
+  const f = mkFournisseur(d.fid); if (!f) return;
+  const fam = (document.getElementById('tr_dec_fam') || {}).value || '';
+  const pageNo = ctDocs(f).filter(x => x.type !== 'carte').findIndex(x => x.id === d.did) + 1;
+  let n = 0;
+  for (let k = 0; k < d.cases.length; k++) {
+    const c = d.cases[k];
+    const saisi = ((document.getElementById('tr_dec_ref_' + k) || {}).value || '').trim();
+    const ref = saisi || ('P' + (pageNo || '') + '-' + (k + 1));
+    if (ctProduits(f).some(p => ctCleRef(p.ref) === ctCleRef(ref))) continue;
+    const id = idUnique('d');
+    try {
+      await ctEcrire(id, c.photo);
+      const mini = mkReduire(await trImage(c.photo), 280, 0.7); await ctEcrire(id + '~m', mini); ctMiniCache[id] = mini;
+    } catch (e) { avertir('⚠ Mémoire pleine : ' + n + ' produit(s) ajouté(s) seulement.'); break; }
+    const incertain = !saisi ? 'référence et détails pas encore écrits : ils sont sur la photo (ou envoyez la page à Claude)'
+      : (c.devine && saisi === c.ref ? 'référence lue par le téléphone : à vérifier sur la photo' : '');
+    // Ce que le téléphone a cru lire sur l'étiquette n'est PAS recopié dans la fiche : une capacité fausse
+    // dans une commande coûte cher. Les détails sont sur la photo (ou Claude les lit).
+    ctAjouterProduit(f, Object.assign({ ref, categorie: fam, caracteristiques: '', page: pageNo ? 'photo ' + pageNo : '',
+      photo_doc: id, source: 'decoupe' }, incertain ? { incertain } : {}));
+    n++;
+  }
+  delete f.ct_neuf;
+  trDec = null;
+  sauverLocal(); fermerBoite(); dessiner();
+  avertir('✅ ' + n + ' produit(s) ajouté(s) avec leur photo chez ' + mkNomFournisseur(f) + '.', 5000);
+}
+</script>
+<script>
+'use strict';
+// ===================== 1.4.0 — LES QUESTIONS AU VENDEUR, EN CHINOIS (20/10/2026) =====================
+// Riche : « les fournisseurs parlent mal l'anglais, ça parle tellement vite… il faut des questions qu'on peut
+// poser à n'importe quel vendeur — beauté, bricolage, électrique… — en chinois. »
+// Les questions sont rangées par FAMILLE de produits. Riche tend le téléphone : le vendeur lit en chinois,
+// touche sa réponse (gros boutons) ou tape un chiffre. Riche relit tout en français sur la fiche, et les prix
+// donnés au stand vont directement sur les produits. Les mêmes questions se copient pour WeChat.
+
+window.KYLO_VENDEUR = '1.4.0';
+const TR_Q = {
+  base: { nom: '📋 Pour tous les vendeurs', q: [
+    ['usine', '你们是工厂还是贸易公司？', 'Usine ou commerce ?', 'choix', [['工厂', 'Usine'], ['贸易公司', 'Commerce (revendeur)'], ['都是', 'Les deux']], 1],
+    ['delai', '下单后多少天可以交货？', 'Combien de jours pour livrer après la commande ?', 'nombre', ['天', 'jours'], 1],
+    ['stock', '有现货吗？', 'Du stock tout de suite ?', 'choix', [['有', 'Oui'], ['没有', 'Non'], ['部分有', 'Une partie']]],
+    ['echantillon', '可以给样品吗？', 'Un échantillon ?', 'choix', [['可以，免费', 'Oui, gratuit'], ['可以，要付钱', 'Oui, payant'], ['不可以', 'Non']], 1],
+    ['logo', '可以印我的商标（OEM）吗？', 'Mon logo sur le produit (OEM) ?', 'choix', [['可以', 'Oui'], ['不可以', 'Non']], 1],
+    ['logo_moq', '印商标最少要订多少个？', 'Minimum de pièces avec mon logo ?', 'nombre', ['个', 'pièces']],
+    ['francais', '包装和说明书可以印法语吗？', 'Emballage et notice en français ?', 'choix', [['可以', 'Oui'], ['可以，要加钱', 'Oui, avec supplément'], ['不可以', 'Non']], 1],
+    ['devise', '报价用人民币还是美元？', 'Prix en yuans ou en dollars ?', 'choix', [['人民币', 'Yuans (RMB)'], ['美元', 'Dollars']]],
+    ['paiement', '怎么付款？', 'Comment payer ?', 'choix', [['30%定金，70%发货前付清', '30 % avant, 70 % avant l\'expédition'], ['全款', 'Tout avant'], ['阿里巴巴信用保障', 'Trade Assurance (Alibaba)'], ['其他', 'Autre']]],
+    ['ta', '接受阿里巴巴信用保障付款吗？', 'Accepte la Trade Assurance (Alibaba) ?', 'choix', [['接受', 'Oui'], ['不接受', 'Non']], 1],
+    ['transitaire', '可以送到广州的货代仓库吗？', 'Livre à l\'entrepôt du transitaire à Guangzhou ?', 'choix', [['可以，免费', 'Oui, gratuit'], ['可以，要运费', 'Oui, payant'], ['不可以', 'Non']]],
+    ['catalogue', '可以把电子版目录和价格表发到我的微信吗？', 'Envoie le catalogue (PDF) et les prix sur WeChat ?', 'choix', [['可以', 'Oui'], ['不可以', 'Non']], 1],
+    ['wechat', '请写下您的微信号或手机号：', 'Son WeChat ou son téléphone', 'texte', null, 1]] },
+  electro: { nom: '⚡ Électroménager', q: [
+    ['e_220', '电压是220伏、50赫兹吗？', 'Tension 220 V – 50 Hz ?', 'choix', [['是', 'Oui'], ['不是', 'Non'], ['都可以做', 'Les deux possibles']], 1],
+    ['e_prise', '可以配欧式圆插头吗？（几内亚用的）', 'Prise européenne ronde (celle de la Guinée) ?', 'choix', [['可以', 'Oui'], ['可以，要加钱', 'Oui, avec supplément'], ['不可以', 'Non']], 1],
+    ['e_cuivre', '电线是纯铜的吗？', 'Fils électriques en cuivre pur ?', 'choix', [['是纯铜', 'Oui, cuivre pur'], ['不是', 'Non']], 1],
+    ['e_garantie', '保修多久？', 'Garantie ?', 'choix', [['半年', '6 mois'], ['一年', '1 an'], ['两年', '2 ans'], ['没有保修', 'Aucune']]],
+    ['e_ce', '有CE认证吗？', 'Certificat CE ?', 'choix', [['有', 'Oui'], ['没有', 'Non']]],
+    ['e_pieces', '可以给备用零件吗？（内胆、电源线）', 'Pièces de rechange (cuve, cordon) ?', 'choix', [['可以，免费', 'Oui, gratuites'], ['可以，要付钱', 'Oui, payantes'], ['不可以', 'Non']]],
+    ['e_matiere', '外壳是什么材料？', 'Matière du boîtier ?', 'choix', [['不锈钢', 'Inox'], ['塑料', 'Plastique'], ['铁喷漆', 'Métal peint'], ['其他', 'Autre']]]] },
+  riz: { nom: '🍚 Cuiseur à riz', q: [
+    ['r_cuve', '内胆是不粘的吗？', 'Cuve anti-adhésive ?', 'choix', [['是', 'Oui'], ['不是', 'Non']], 1],
+    ['r_epaisseur', '内胆有多厚？', 'Épaisseur de la cuve ?', 'nombre', ['毫米', 'mm']],
+    ['r_chaud', '有自动保温功能吗？', 'Maintien au chaud automatique ?', 'choix', [['有', 'Oui'], ['没有', 'Non']]],
+    ['r_vapeur', '配蒸笼吗？', 'Panier vapeur inclus ?', 'choix', [['配', 'Oui'], ['不配', 'Non'], ['可以加', 'En option']]],
+    ['r_cuillere', '配饭勺和量杯吗？', 'Cuillère et verre doseur inclus ?', 'choix', [['配', 'Oui'], ['不配', 'Non']]]] },
+  eclairage: { nom: '💡 Éclairage, solaire, batteries', q: [
+    ['l_mah', '电池真实容量是多少毫安？', 'Capacité RÉELLE de la batterie ?', 'nombre', ['毫安', 'mAh'], 1],
+    ['l_batterie', '是什么电池？', 'Type de batterie ?', 'choix', [['锂电池', 'Lithium'], ['磷酸铁锂', 'LiFePO4'], ['铅酸电池', 'Plomb'], ['干电池', 'Piles']], 1],
+    ['l_charge', '充满电要几个小时？', 'Heures pour charger ?', 'nombre', ['小时', 'heures']],
+    ['l_duree', '充满电能亮几个小时？', 'Heures d\'éclairage, charge pleine ?', 'nombre', ['小时', 'heures'], 1],
+    ['l_panneau', '太阳能板多少瓦？', 'Puissance du panneau solaire ?', 'nombre', ['瓦', 'W']],
+    ['l_ip', '防水等级是多少？', 'Étanchéité ?', 'choix', [['IP65', 'IP65'], ['IP67', 'IP67'], ['IP44', 'IP44'], ['不防水', 'Pas étanche']]],
+    ['l_lumen', '实际亮度是多少流明？', 'Luminosité réelle ?', 'nombre', ['流明', 'lumens']],
+    ['l_garantie', '保修多久？', 'Garantie ?', 'choix', [['半年', '6 mois'], ['一年', '1 an'], ['两年', '2 ans'], ['没有保修', 'Aucune']]]] },
+  telephone: { nom: '📱 Téléphones et accessoires', q: [
+    ['t_original', '是原装的还是仿的？', 'Original ou copie ?', 'choix', [['原装', 'Original'], ['高仿', 'Copie'], ['自己的品牌', 'Sa propre marque']], 1],
+    ['t_mah', '电池真实容量是多少毫安？', 'Capacité RÉELLE de la batterie ?', 'nombre', ['毫安', 'mAh'], 1],
+    ['t_rapide', '快充是多少瓦？', 'Charge rapide : combien de W ?', 'nombre', ['瓦', 'W']],
+    ['t_cable', '数据线多长？', 'Longueur du câble ?', 'nombre', ['米', 'm']],
+    ['t_compat', '适合哪些手机？', 'Pour quels téléphones ?', 'choix', [['苹果', 'iPhone'], ['安卓', 'Android'], ['都可以', 'Les deux']]],
+    ['t_boite', '有独立包装盒吗？', 'Boîte individuelle ?', 'choix', [['有', 'Oui'], ['没有', 'Non']]],
+    ['t_garantie', '保修多久？', 'Garantie ?', 'choix', [['半年', '6 mois'], ['一年', '1 an'], ['没有保修', 'Aucune']]]] },
+  beaute: { nom: '💄 Beauté', q: [
+    ['be_validite', '保质期多久？', 'Se conserve combien de temps ?', 'nombre', ['个月', 'mois'], 1],
+    ['be_afrique', '适合非洲人的皮肤和头发吗？', 'Adapté aux peaux et cheveux africains ?', 'choix', [['适合', 'Oui'], ['不适合', 'Non'], ['不知道', 'Ne sait pas']], 1],
+    ['be_chaleur', '怕热吗？（几内亚很热，35度）', 'Craint la chaleur (35 °C en Guinée) ?', 'choix', [['怕热', 'Oui'], ['不怕', 'Non']], 1],
+    ['be_composition', '有成分表吗？', 'Liste des ingrédients ?', 'choix', [['有', 'Oui'], ['没有', 'Non']]],
+    ['be_rapport', '有检测报告吗（MSDS）？', 'Rapport de test (MSDS) ?', 'choix', [['有', 'Oui'], ['没有', 'Non']]],
+    ['be_contenu', '净含量是多少（毫升或克）？', 'Contenance ?', 'nombre', ['毫升/克', 'mL / g']]] },
+  bricolage: { nom: '🔧 Bricolage', q: [
+    ['o_matiere', '是什么钢？', 'Quel acier ?', 'choix', [['碳钢', 'Acier carbone'], ['铬钒钢', 'Chrome-vanadium'], ['不锈钢', 'Inox'], ['其他', 'Autre']], 1],
+    ['o_usage', '是专业用的还是家用的？', 'Usage pro ou maison ?', 'choix', [['专业', 'Pro'], ['家用', 'Maison']], 1],
+    ['o_volt', '电压多少伏？', 'Tension ?', 'nombre', ['伏', 'V']],
+    ['o_batterie', '有电池和充电器吗？', 'Batterie et chargeur inclus ?', 'choix', [['都有', 'Les deux'], ['只有电池', 'Batterie seule'], ['都没有', 'Aucun']]],
+    ['o_pieces', '一套有几件？', 'Combien de pièces par set ?', 'nombre', ['件', 'pièces']],
+    ['o_garantie', '保修多久？', 'Garantie ?', 'choix', [['半年', '6 mois'], ['一年', '1 an'], ['没有保修', 'Aucune']]]] },
+  cuisine: { nom: '🍳 Cuisine et maison', q: [
+    ['c_matiere', '是什么材料？', 'Matière ?', 'choix', [['不锈钢', 'Inox'], ['铝', 'Aluminium'], ['玻璃', 'Verre'], ['陶瓷', 'Céramique'], ['塑料', 'Plastique']], 1],
+    ['c_alimentaire', '是食品级的吗？', 'Qualité alimentaire ?', 'choix', [['是', 'Oui'], ['不是', 'Non']], 1],
+    ['c_induction', '可以用电磁炉吗？', 'Compatible induction ?', 'choix', [['可以', 'Oui'], ['不可以', 'Non']]],
+    ['c_pieces', '一套有几件？', 'Combien de pièces par set ?', 'nombre', ['件', 'pièces']],
+    ['c_couleurs', '有几种颜色？', 'Combien de couleurs ?', 'nombre', ['种', 'couleurs']]] },
+  textile: { nom: '👕 Textile', q: [
+    ['x_tissu', '是什么面料？', 'Quel tissu ?', 'choix', [['纯棉', 'Coton'], ['涤纶', 'Polyester'], ['混纺', 'Mélange'], ['其他', 'Autre']], 1],
+    ['x_tailles', '有哪些尺码？', 'Quelles tailles ?', 'choix', [['S–XL', 'S à XL'], ['M–XXXL', 'M à XXXL'], ['均码', 'Taille unique'], ['儿童码', 'Enfants']]],
+    ['x_moq_couleur', '每个颜色最少要多少件？', 'Minimum par couleur ?', 'nombre', ['件', 'pièces'], 1],
+    ['x_melange', '可以混色混码吗？', 'Mélanger couleurs et tailles ?', 'choix', [['可以', 'Oui'], ['不可以', 'Non']], 1],
+    ['x_deteint', '洗了会褪色吗？', 'Déteint au lavage ?', 'choix', [['不会', 'Non'], ['会一点', 'Un peu'], ['会', 'Oui']]]] },
+  chaussures: { nom: '👟 Chaussures et sacs', q: [
+    ['s_matiere', '是什么材料？', 'Matière ?', 'choix', [['真皮', 'Cuir véritable'], ['PU皮', 'Simili cuir (PU)'], ['帆布', 'Toile'], ['橡胶', 'Caoutchouc']], 1],
+    ['s_semelle', '鞋底是什么材料？', 'Semelle ?', 'choix', [['橡胶', 'Caoutchouc'], ['PVC', 'PVC'], ['EVA', 'EVA'], ['TPR', 'TPR']]],
+    ['s_tailles', '有哪些尺码？', 'Pointures ?', 'choix', [['36–41', '36 à 41'], ['39–45', '39 à 45'], ['儿童', 'Enfants'], ['都有', 'Toutes']]],
+    ['s_melange', '可以混码吗？', 'Mélanger les pointures ?', 'choix', [['可以', 'Oui'], ['不可以', 'Non']], 1]] },
+  jouets: { nom: '🧸 Jouets', q: [
+    ['j_age', '适合几岁的孩子？', 'Pour quel âge ?', 'choix', [['0–3岁', '0–3 ans'], ['3–6岁', '3–6 ans'], ['6岁以上', '6 ans et +']], 1],
+    ['j_norme', '有EN71或CE认证吗？', 'Norme EN71 ou CE ?', 'choix', [['有', 'Oui'], ['没有', 'Non']], 1],
+    ['j_piles', '需要电池吗？包含吗？', 'Piles ? Incluses ?', 'choix', [['不需要', 'Pas de piles'], ['需要，包含', 'Oui, incluses'], ['需要，不包含', 'Oui, non incluses']]],
+    ['j_securite', '材料无毒安全吗？', 'Matériaux non toxiques ?', 'choix', [['是', 'Oui'], ['不确定', 'Pas sûr']]]] },
+  alimentaire: { nom: '🥫 Alimentaire', q: [
+    ['a_validite', '保质期多久？', 'Se conserve combien de temps ?', 'nombre', ['个月', 'mois'], 1],
+    ['a_halal', '有清真认证吗？', 'Certifié halal ?', 'choix', [['有', 'Oui'], ['没有', 'Non']], 1],
+    ['a_froid', '需要冷藏吗？', 'À garder au froid ?', 'choix', [['需要', 'Oui'], ['不需要', 'Non']]],
+    ['a_sanitaire', '有出口卫生证书吗？', 'Certificat sanitaire d\'export ?', 'choix', [['有', 'Oui'], ['没有', 'Non']]]] },
+  meubles: { nom: '🛋️ Meubles', q: [
+    ['m_demontable', '可以拆装吗？', 'Démontable ?', 'choix', [['可以', 'Oui'], ['不可以', 'Non']], 1],
+    ['m_matiere', '是什么材料？', 'Matière ?', 'choix', [['实木', 'Bois massif'], ['板材', 'Panneau (MDF)'], ['金属', 'Métal'], ['塑料', 'Plastique']], 1],
+    ['m_carton', '包装尺寸是多少（厘米）？', 'Taille du carton (cm) ?', 'texte', null],
+    ['m_40hc', '一个40尺高柜能装多少套？', 'Combien par conteneur 40 HC ?', 'nombre', ['套', 'sets']]] }
+};
+const TR_Q_PAR_FAMILLE = { 'Tasse cuiseuse électrique': ['electro', 'riz'], 'Cuiseur à riz': ['electro', 'riz'], 'Électroménager de cuisine': ['electro'],
+  'Ventilateur': ['electro'], 'Chauffage': ['electro'], 'Tapette à moustiques électrique': ['eclairage'], 'Lampe anti-moustiques': ['eclairage'],
+  'Lampe de bureau': ['eclairage'], 'Lampe de secours': ['eclairage'], 'Lanterne': ['eclairage'], 'Torche et projecteur': ['eclairage'],
+  'Lampe frontale': ['eclairage'], 'Solaire': ['eclairage'], 'Téléphones': ['telephone'], 'Chargeurs et câbles': ['telephone'],
+  'Écouteurs et casques': ['telephone'], 'Batteries externes': ['telephone'], 'Enceintes': ['telephone'], 'Beauté et cosmétiques': ['beaute'],
+  'Outils et bricolage': ['bricolage'], 'Cuisine et maison': ['cuisine'], 'Vêtements et tissus': ['textile'], 'Chaussures et sacs': ['chaussures'],
+  'Jouets': ['jouets'], 'Alimentaire': ['alimentaire'], 'Meubles': ['meubles'] };
+function trQuestion(id) { for (const k of Object.keys(TR_Q)) { const q = TR_Q[k].q.find(x => x[0] === id); if (q) return q; } return null; }
+function trFamillesDe(f) {
+  const res = new Set();
+  ctProduits(f).forEach(p => { const fa = ctFamille(p.categorie); (fa && TR_Q_PAR_FAMILLE[fa[1]] || []).forEach(k => res.add(k)); });
+  return [...res];
+}
+let trVd = { fid: '', familles: [], toutes: false, prix: 'interesse', etapes: [], i: 0 };
+function trVendeurPreparer(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  ctToutDeSuite();
+  const fams = trVd.fid === fid ? trVd.familles : trFamillesDe(f);
+  trVd = { fid, familles: fams, toutes: trVd.fid === fid ? trVd.toutes : false, prix: ctProduits(f).some(p => p.interesse) ? 'interesse' : 'aucun', etapes: [], i: 0 };
+  trVendeurDessinerReglage();
+}
+function trVdQuestions() {
+  const ids = ['base', ...trVd.familles];
+  const qs = [];
+  ids.forEach(k => (TR_Q[k] ? TR_Q[k].q : []).forEach(q => { if (trVd.toutes || q[5]) qs.push(q); }));
+  // La question du WeChat toujours à la fin.
+  const w = qs.findIndex(q => q[0] === 'wechat'); if (w >= 0) qs.push(qs.splice(w, 1)[0]);
+  return qs;
+}
+function trVdProduits(f) { return trVd.prix === 'interesse' ? ctProduits(f).filter(p => p.interesse) : []; }
+function trVendeurDessinerReglage() {
+  const f = mkFournisseur(trVd.fid); if (!f) return;
+  const qs = trVdQuestions(), nInt = ctProduits(f).filter(p => p.interesse).length;
+  const puce = (on, js, t) => `<button type="button" class="mk-puce${on ? ' on' : ''}" onclick="${js};trVendeurDessinerReglage()">${t}</button>`;
+  mkBoite(`<div class="mk-dlg ct-champs">
+    <h3>🀄 Questions au vendeur — en chinois</h3>
+    <p class="mk-aide" style="font-size:15px">Vous tendez le téléphone : le vendeur lit en chinois et touche sa réponse. Vous relisez tout en français sur la fiche
+    de ${E(mkNomFournisseur(f))}.</p>
+    <label>Familles de produits</label>
+    <div class="mk-puces">${Object.keys(TR_Q).filter(k => k !== 'base').map(k => puce(trVd.familles.includes(k),
+      `trVd.familles=trVd.familles.includes('${k}')?trVd.familles.filter(x=>x!=='${k}'):trVd.familles.concat('${k}')`, TR_Q[k].nom)).join('')}</div>
+    <label>Combien de questions ?</label>
+    <div class="mk-puces">${puce(!trVd.toutes, 'trVd.toutes=false', '⚡ Les essentielles')}${puce(trVd.toutes, 'trVd.toutes=true', 'Toutes')}</div>
+    ${ctProduits(f).length ? `<label>Ses prix, au stand ?</label>
+    <div class="mk-puces">${nInt ? puce(trVd.prix === 'interesse', "trVd.prix='interesse'", '⭐ Prix des ' + nInt + ' qui m\'intéressent') : ''}${puce(trVd.prix === 'aucun', "trVd.prix='aucun'", 'Pas de prix')}</div>` : ''}
+    <p class="ct-sous"><b>${qs.length} question(s)${trVdProduits(f).length ? ' + ' + trVdProduits(f).length + ' prix' : ''}</b> — environ ${Math.max(1, Math.round((qs.length * 8 + trVdProduits(f).length * 15) / 60))} minute(s).</p>
+    <details><summary style="font-size:15px;font-weight:700;min-height:44px;display:flex;align-items:center">Voir les questions (chinois → français)</summary>
+      <ol class="tr-qliste">${qs.map(q => `<li><span class="tr-cn">${E(q[1])}</span><br>${E(q[2])}</li>`).join('')}</ol></details>
+    <div class="mk-boutons">
+      <button class="b vert" onclick="trVendeurCommencer()">📱 Donner le téléphone au vendeur</button>
+      <button class="b" style="background:#1aad19;color:#fff" onclick="trVendeurCopier()">💬 Copier les questions en chinois (WeChat)</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+}
+function trVendeurTexte(f) {
+  const qs = trVdQuestions().filter(q => q[0] !== 'wechat');
+  const ps = trVdProduits(f);
+  return [(f.contact ? f.contact + ' ' : '') + '您好！我是几内亚 KYLO EURGUINE 的采购商。麻烦您回答几个问题，谢谢！', '',
+    ...qs.map((q, i) => (i + 1) + '. ' + q[1] + (q[3] === 'choix' ? '（' + q[4].map(c => c[0]).join(' / ') + '）' : '')),
+    ...(ps.length ? ['', '这些产品的单价、起订量和每箱数量：', ...ps.map(p => '• ' + trRefVendeur(p.ref))] : []), '', '谢谢！', ctSignature()].join('\n');
+}
+function trVendeurCopier() {
+  const f = mkFournisseur(trVd.fid); if (!f) return;
+  mkCopier(trVendeurTexte(f), 'Questions copiées en chinois. Dans WeChat : appui long → Coller → Envoyer.');
+  setTimeout(() => ctAller('weixin://'), 600);
+}
+function trVendeurCommencer() {
+  const f = mkFournisseur(trVd.fid); if (!f) return;
+  trVd.etapes = [{ k: 'bonjour' }, ...trVdQuestions().map(q => ({ k: 'q', q })), ...trVdProduits(f).map(p => ({ k: 'prix', pid: p.id })), { k: 'fin' }];
+  trVd.i = 0;
+  fermerBoite();
+  let z = document.getElementById('tr_vd');
+  if (!z) { z = document.createElement('div'); z.id = 'tr_vd'; z.className = 'tr-vd'; z.setAttribute('role', 'dialog'); document.body.appendChild(z); }
+  trVdDessiner();
+}
+function trVdReponses(f) { if (!f.reponses || typeof f.reponses !== 'object') f.reponses = {}; return f.reponses; }
+function trVdDessiner() {
+  const z = document.getElementById('tr_vd'), f = mkFournisseur(trVd.fid); if (!z || !f) return;
+  const e = trVd.etapes[trVd.i], n = trVd.etapes.length - 2;
+  const haut = `<div class="haut"><span class="prog">${e.k === 'bonjour' || e.k === 'fin' ? '' : trVd.i + ' / ' + n}</span>
+    <button type="button" onclick="trVdQuitter()">✕ Quitter (Riche)</button></div>`;
+  const nav = (dernier) => `<div class="nav"><button type="button" onclick="trVdAller(-1)">← 上一题</button>
+    <button type="button" onclick="trVdAller(1)">跳过</button><button type="button" class="go" onclick="trVdValider()">${dernier ? '确定 ✓' : '下一题 →'}</button></div>`;
+  if (e.k === 'bonjour') {
+    z.innerHTML = haut + `<div class="bonjour" style="font-size:28px">供应商您好！🙏</div>
+      <div class="q" style="font-size:24px">我是几内亚（西非）的采购商，不会说中文。<br>请帮忙回答几个问题，点一下就可以。<br>谢谢！</div>
+      <div class="fr">« Bonjour ! Je suis acheteur de Guinée, je ne parle pas chinois. Merci de répondre à quelques questions, il suffit de toucher. »</div>
+      <div class="nav" style="grid-template-columns:1fr"><button type="button" class="go" onclick="trVdAller(1)">开始 →</button></div>`;
+    return;
+  }
+  if (e.k === 'fin') {
+    const nr = Object.keys(trVdReponses(f)).length;
+    z.innerHTML = haut + `<div class="bonjour" style="font-size:30px;margin-top:30px">谢谢您的帮助！🙏</div>
+      <div class="q" style="font-size:26px">请把手机还给我。</div>
+      <div class="fr">« Merci de votre aide ! Rendez-moi le téléphone, s'il vous plaît. »</div>
+      <div class="nav" style="grid-template-columns:1fr"><button type="button" class="go" onclick="trVdQuitter()">Voir les réponses en français (${nr})</button></div>`;
+    return;
+  }
+  const rep = trVdReponses(f);
+  if (e.k === 'prix') {
+    const p = ctProduit(f, e.pid);
+    if (!p) { trVdAller(1); return; }
+    const d = trVd.devise || 'CNY';
+    z.innerHTML = haut + `<div class="produit">${p.photo_doc ? `<img class="ct-mini" data-doc="${E(p.photo_doc)}" alt="">` : ''}<div><b>${E(trRefVendeur(p.ref))}</b><div class="fr">${E(trCourt(p))}</div></div></div>
+      <div class="q" style="font-size:24px">这个产品多少钱一个？</div><div class="fr">Prix d'une pièce</div>
+      <input id="tr_vd_prix" inputmode="decimal" value="${E(trVdSaisi(p.id, 'prix'))}" placeholder="0">
+      <div class="devises"><button type="button" class="${d === 'CNY' ? 'on' : ''}" onclick="trVd.devise='CNY';trVdGarderPrix(false);trVdDessiner()">人民币 ¥</button>
+        <button type="button" class="${d === 'USD' ? 'on' : ''}" onclick="trVd.devise='USD';trVdGarderPrix(false);trVdDessiner()">美元 $</button></div>
+      <div class="q" style="font-size:22px">最少要订多少个？</div><div class="fr">Minimum de commande</div>
+      <input id="tr_vd_moq" inputmode="numeric" value="${E(trVdSaisi(p.id, 'moq'))}" placeholder="0">
+      <div class="q" style="font-size:22px">一箱装多少个？</div><div class="fr">Pièces par carton</div>
+      <input id="tr_vd_col" inputmode="numeric" value="${E(trVdSaisi(p.id, 'col'))}" placeholder="0">
+      ${nav(trVd.i === trVd.etapes.length - 2)}`;
+    ctRemplirMinis();
+    return;
+  }
+  const q = e.q, r = rep[q[0]];
+  let corps = '';
+  if (q[3] === 'choix') corps = `<div class="choix">${q[4].map((c, i) => `<button type="button" class="${r && r.v === c[0] ? 'on' : ''}" onclick="trVdChoisir(${i})">${E(c[0])}</button>`).join('')}</div>`;
+  else if (q[3] === 'nombre') corps = `<input id="tr_vd_val" inputmode="decimal" value="${r ? E(r.v) : ''}" placeholder="0"><div class="unite">${E(q[4][0])}</div>`;
+  else corps = `<input id="tr_vd_val" value="${r ? E(r.v) : ''}" autocapitalize="off" autocorrect="off" style="font-size:24px;text-align:left">`;
+  z.innerHTML = haut + `<div class="q">${E(q[1])}</div><div class="fr">${E(q[2])}</div>${corps}${nav(trVd.i === trVd.etapes.length - 2)}`;
+  const ch = document.getElementById('tr_vd_val'); if (ch) ch.focus();
+}
+function trVdNoter(id, v) {
+  const f = mkFournisseur(trVd.fid); if (!f) return;
+  const q = trQuestion(id); const rep = trVdReponses(f);
+  if (v === '' || v === null || v === undefined) { delete rep[id]; return; }
+  let fr = String(v);
+  if (q && q[3] === 'choix') { const c = q[4].find(x => x[0] === v); if (c) fr = c[1]; }
+  else if (q && q[3] === 'nombre') fr = v + ' ' + q[4][1];
+  rep[id] = { v, fr, le: mkMaintenant() };
+  f.reponses_le = mkMaintenant();
+  if (id === 'wechat') {
+    const s = String(v).trim(), chiffres = s.replace(/\D/g, '');
+    if (/^1[3-9]\d{9}$/.test(chiffres.replace(/^86/, '')) && !f.mobile) { f.mobile = '+86' + chiffres.replace(/^86/, ''); if (!f.tel) f.tel = f.mobile; }
+    else if (/^[A-Za-z][\w-]{4,}$/.test(s) && !f.wechat) f.wechat = s;
+  }
+  delete f.ct_neuf;
+  sauverLocal();
+}
+function trVdChoisir(i) {
+  const e = trVd.etapes[trVd.i]; if (!e || e.k !== 'q') return;
+  trVdNoter(e.q[0], e.q[4][i][0]);
+  document.querySelectorAll('#tr_vd .choix button').forEach((b, k) => b.classList.toggle('on', k === i));
+  setTimeout(() => trVdAller(1), 260);
+}
+function trVdSaisi(pid, k) { const s = trVd.saisis && trVd.saisis[pid]; return s && s[k] ? s[k] : ''; }
+function trVdGarderPrix(avancer) {
+  const f = mkFournisseur(trVd.fid), e = trVd.etapes[trVd.i]; if (!f || !e || e.k !== 'prix') return;
+  const p = ctProduit(f, e.pid); if (!p) return;
+  const prix = num((document.getElementById('tr_vd_prix') || {}).value), moq = num((document.getElementById('tr_vd_moq') || {}).value),
+    col = num((document.getElementById('tr_vd_col') || {}).value), d = trVd.devise || 'CNY';
+  if (prix > 0 && (prix !== num(p.prix) || d !== p.devise)) {
+    if (num(p.prix) > 0) { p.historique = Array.isArray(p.historique) ? p.historique : []; p.historique.push({ prix: p.prix, devise: p.devise, moq: p.moq, le: p.prix_le }); }
+    p.prix = prix; p.devise = d; p.prix_le = mkMaintenant(); p.prix_note = 'donné par le vendeur au stand';
+  }
+  trVd.saisis = trVd.saisis || {};
+  trVd.saisis[p.id] = { prix: prix || '', moq: moq || '', col: col || '' };   // ce que le vendeur a tapé (s'il revient en arrière)
+  if (moq) p.moq = moq;
+  if (col) p.colisage = col;
+  ctMajOffreDuProduit(f, p);
+  sauverLocal();
+  if (avancer) trVdAller(1);
+}
+function trVdValider() {
+  const e = trVd.etapes[trVd.i]; if (!e) return;
+  if (e.k === 'prix') { trVdGarderPrix(true); return; }
+  if (e.k === 'q' && e.q[3] !== 'choix') { const ch = document.getElementById('tr_vd_val'); trVdNoter(e.q[0], ch ? ch.value.trim() : ''); }
+  trVdAller(1);
+}
+function trVdAller(s) {
+  trVd.i = Math.max(0, Math.min(trVd.etapes.length - 1, trVd.i + s));
+  trVdDessiner();
+}
+function trVdQuitter() {
+  const z = document.getElementById('tr_vd'); if (z) z.remove();
+  const f = mkFournisseur(trVd.fid);
+  if (f) { ctDossier = f.id; allerA('dossier'); setTimeout(() => { const s = document.getElementById('tr_reponses'); if (s) { s.open = true; s.scrollIntoView({ block: 'start' }); } }, 80); }
+}
+// Sur la fiche : les réponses, en français.
+function trReponsesHtml(f) {
+  const rep = f.reponses && typeof f.reponses === 'object' ? f.reponses : {};
+  const ids = Object.keys(rep);
+  const prixStand = ctProduits(f).filter(p => p.prix_note === 'donné par le vendeur au stand');
+  return `<details class="ct-section" id="tr_reponses" open><summary>🀄 Questions au vendeur (${ids.length} réponse${ids.length > 1 ? 's' : ''})</summary>
+    <p class="mk-aide" style="font-size:15px">Des questions en chinois, par famille de produits (électroménager, éclairage, beauté, bricolage, textile…).
+    Le vendeur lit et touche sa réponse ; vous la relisez ici en français.</p>
+    ${ids.length ? `<ul class="tr-rep">${ids.map(id => { const q = trQuestion(id); return `<li><b>${E(q ? q[2] : id)}</b> → ${E(rep[id].fr || rep[id].v)}</li>`; }).join('')}</ul>
+      <p class="ct-sous">Répondu le ${mkJour(f.reponses_le)} à ${mkHeure(f.reponses_le)}.</p>` : ''}
+    ${prixStand.length ? `<p class="ct-sous">💰 ${prixStand.length} prix donné(s) au stand, déjà sur ses produits.</p>` : ''}
+    <div class="ct-entree"><button class="b vert" onclick="trVendeurPreparer('${f.id}')">📱 Poser les questions (en chinois)</button></div>
+  </details>`;
+}
+// Depuis l'onglet Questions : n'importe quel vendeur.
+function trCarteQuestionsChinois() {
+  const fs = fournisseursListe();
+  return `<div class="carte" style="border:2px solid var(--vert)"><h2 style="font-size:18px">🀄 Questions en chinois — n'importe quel vendeur</h2>
+    <p class="mk-aide" style="font-size:15px">Par famille : électroménager, cuiseurs à riz, éclairage et solaire, téléphones, beauté, bricolage, cuisine, textile,
+    chaussures, jouets, alimentaire, meubles. Le vendeur lit en chinois et touche sa réponse ; vous la relisez en français sur sa fiche.</p>
+    <label for="tr_q_four" style="font-size:15px">Pour quel fournisseur ?</label>
+    <select id="tr_q_four" style="font-size:17px">${fs.map(f => `<option value="${f.id}">${E(mkNomFournisseur(f))}</option>`).join('')}<option value="nouveau">➕ Un nouveau fournisseur</option></select>
+    <div style="height:10px"></div>
+    <button class="b vert" style="min-height:56px;font-size:17px" onclick="trQuestionsDepuisOnglet()">🀄 Préparer les questions</button></div>`;
+}
+function trQuestionsDepuisOnglet() {
+  const v = (document.getElementById('tr_q_four') || {}).value;
+  if (v && v !== 'nouveau') { trVendeurPreparer(v); return; }
+  const f = { id: idUnique('f'), code: mkProchainCode(), nom: '', marche: 'Foire de Canton', batiment: '', allee: '', wechat: '', tel: '', qualite: '', remarque: '',
+    le: mkMaintenant().slice(0, 10), vu_le: mkMaintenant(), source: 'questions', decision: '', docs: [], produits: [], ct_neuf: true };
+  fournisseursListe().unshift(f); sauverLocal();
+  trVendeurPreparer(f.id);
 }
 </script>
 <script>

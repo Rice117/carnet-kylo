@@ -8299,24 +8299,19 @@ async function trDecouper() {
       const etat = document.getElementById('tr_dec_etat'); if (etat) etat.textContent = '🔎 Lecture des étiquettes : ' + (k + 1) + ' / ' + cases.length + '…';
       try {
         const r = await trOcrLire(cases[k].etiquette, 'eng', '6');
-        const t = trDemi(r.texte);
-        // Une référence n'est proposée que si elle a la forme d'une vraie (« YS-858B ») ; sinon la case reste vide.
-        const refs = ctModelesDansTexte(t.replace(/[=~—–]/g, '-')).map(x => x.ref).filter(r => /^[A-Z]{2,4}-\d{3,5}[A-Z]?$/.test(r) && !/\d(W|L|V)$/.test(r));
+        // Une référence n'est proposée que si le lecteur en est SÛR (confiance ≥ 85 %) et qu'elle a la forme
+        // d'une vraie (« WD-959 », « YS-858B ») ; sinon la case reste vide. Les capacités et puissances lues sur
+        // ces petites étiquettes sont trop souvent fausses : elles ne sont pas proposées (la photo les montre).
+        const surs = r.mots.filter(m => m.c >= 85).map(m => m.t).join(' ');
+        const refs = ctModelesDansTexte(trDemi(surs).replace(/[=~—–]/g, '-')).map(x => x.ref).filter(x => /^[A-Z]{2,4}-\d{3,5}[A-Z]?$/.test(x) && !/\d(W|L|V)$/.test(x));
         if (refs[0] && !cases[k].ref) { cases[k].ref = refs[0]; cases[k].devine = true; }
-        // Capacités et puissances : gardées seulement si elles vont en croissant (sinon le lecteur s'est trompé).
-        const nombres = (re) => [...new Set((t.match(re) || []).map(x => parseFloat(x.replace(',', '.'))))];
-        const croissant = (a) => a.length >= 2 && a.every((v, i) => !i || v > a[i - 1]);
-        const L = nombres(/\d[.,]\d(?=\s*L\b)/gi), W = nombres(/\d{3,4}(?=\s*W\b)/gi);
-        const fr = (v) => String(v).replace('.', ',');
-        const mah = (t.match(/\d{3,5}\s*mAh/i) || [''])[0];
-        cases[k].lu = [croissant(L) && L.every(v => v >= 0.3 && v <= 20) ? fr(L[0].toFixed(1)) + '–' + fr(L[L.length - 1].toFixed(1)) + ' L' : '',
-          croissant(W) && W.every(v => v >= 100 && v <= 5000) ? W[0] + '–' + W[W.length - 1] + ' W' : '', mah].filter(Boolean).join(' · ');
       } catch (e) {}
       const ch = document.getElementById('tr_dec_ref_' + k); if (ch && !ch.value && cases[k].ref) ch.value = cases[k].ref;
-      const lu = document.getElementById('tr_dec_lu_' + k); if (lu) lu.textContent = cases[k].lu ? 'lu (à vérifier) : ' + cases[k].lu : '';
+      const lu = document.getElementById('tr_dec_lu_' + k); if (lu) lu.textContent = cases[k].devine ? 'lu par le téléphone : à vérifier' : '';
     }
     trOcrLiberer();
-    const etat = document.getElementById('tr_dec_etat'); if (etat) etat.textContent = '✅ Étiquettes lues : vérifiez chaque référence avec la photo.';
+    const etat = document.getElementById('tr_dec_etat');
+    if (etat) etat.textContent = cases.some(c => c.devine) ? '✅ Les références sûres sont écrites : vérifiez-les avec la photo.' : 'Écrivez la référence de chaque produit (elle est sur la photo), ou envoyez la page à Claude.';
   }
 }
 function trDecRevoir() {
@@ -8328,7 +8323,7 @@ function trDecRevoir() {
     <input id="tr_dec_fam" list="ct_liste_familles" value="${E(d.famille)}" placeholder="ex : Cuiseur à riz">${ctListeFamillesHtml()}
     <div class="tr-cases">${d.cases.map((c, k) => `<div class="tr-case"><img src="${c.photo}" alt="Produit ${k + 1}">
       <input id="tr_dec_ref_${k}" value="${E(c.ref)}" placeholder="Référence n° ${k + 1}" autocapitalize="characters">
-      <div class="lu" id="tr_dec_lu_${k}">${c.lu ? 'lu (à vérifier) : ' + E(c.lu) : ''}</div></div>`).join('')}</div>
+      <div class="lu" id="tr_dec_lu_${k}">${c.devine ? 'lu par le téléphone : à vérifier' : ''}</div></div>`).join('')}</div>
     <p class="mk-aide" style="font-size:15px">Le téléphone lit mal les petites étiquettes : il ne propose une référence que s'il en est sûr. Pour les
     détails exacts (capacités, puissance), envoyez la page à Claude.</p>
     <div class="mk-boutons">

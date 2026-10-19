@@ -10,3 +10,15 @@ Lecture du texte sans Internet (carnet 1.4.0) — logiciels libres utilisés, sa
 
 Le carnet télécharge ces fichiers UNE fois (environ 9 Mo) dans son propre rangement du téléphone
 (« kylo-ocr-1 »), puis lit les cartes de visite sans Internet. Aucune photo ne quitte le téléphone.
+
+Lecture des fichiers reçus sur WeChat (carnet 1.5.0) — logiciels libres utilisés, sans modification :
+
+- pdf.min.js, pdf.worker.min.js : PDF.js 3.11.174 (version « legacy », pour les iPhone plus anciens),
+  paquet pdfjs-dist — https://github.com/mozilla/pdf.js — Licence Apache 2.0.
+- cmaps/*.bcmap : 20 tables de caractères chinois (GB) livrées avec PDF.js, d'Adobe Systems
+  (Copyright 1990-2009 Adobe Systems Incorporated) — licence BSD, texte complet dans cmaps/LICENSE.
+- xlsx.full.min.js : SheetJS Community Edition 0.18.5 (lecture des fichiers Excel)
+  — https://sheetjs.com — Licence Apache 2.0.
+
+Ces fichiers (environ 3 Mo de plus) sont rangés avec la lecture des cartes, une seule fois.
+Le fichier du fournisseur est lu DANS le téléphone : il ne part sur aucun site.

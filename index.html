@@ -892,7 +892,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.1.0';
+window.KYLO_APPLICATION = '1.2.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -1532,6 +1532,7 @@ function dessiner() {
   else if (ongletActif === 'courses') z.innerHTML = ecranCourses();
   else if (ongletActif === 'achats') z.innerHTML = ecranAchats();
   else if (ongletActif === 'frais') z.innerHTML = ecranFrais();
+  else if (ongletActif === 'rencontres') z.innerHTML = ecranRencontres();
   else if (ongletActif === 'comparer') z.innerHTML = ecranComparer();
   else if (ongletActif === 'prix') z.innerHTML = ecranPrix();
   else if (ongletActif === 'objectif') z.innerHTML = ecranObjectif();
@@ -1730,7 +1731,7 @@ function transformerEnAchat(idc) {
   if (!o) { avertir('Choisissez d\'abord une offre.'); return; }
   C.achats.push({ id: idUnique('a'), nom: c.article, fournisseur: o.fournisseur,
     quantite: num(c.quantite) || 1, prix_unitaire: num(o.prix), devise: o.devise,
-    categorie: '', famille: '', code_barres: '', photo: '', marge: 0.75,
+    categorie: '', famille: '', code_barres: '', photo: o.photo || '', marge: 0.75,
     prix_detail_gnf: num(c.prix_vente_vise_gnf) || 0, prix_grossiste_gnf: 0,
     note: [c.motif ? 'Choisi : ' + c.motif : '', o.note].filter(Boolean).join(' · '),
     conformite: { requise: false, verifie: false, note: '' } });
@@ -3096,7 +3097,7 @@ function ecranNegocier() {
 
 function ecranComparer() {
   const liste = C.comparaisons || [];
-  const entete = `<div class="carte"><h2>Comparer avant d'acheter</h2>
+  const entete = mkEnteteComparer() + `<div class="carte"><h2>Comparer avant d'acheter</h2>
     <p class="muet">Devant l'usine, on a trois prix pour le même article et cinq minutes pour décider.
     Cet écran fait le <b>seul calcul qui compte</b> : combien l'article revient <b>rendu magasin</b>,
     en francs, frais d'import compris. Le prix affiché sur l'étiquette ne se compare pas d'une devise à l'autre.</p>
@@ -3106,7 +3107,7 @@ function ecranComparer() {
   if (!liste.length) return entete + `<div class="carte"><h2>Aucune comparaison</h2>
     <p class="muet">Touchez « Comparer un article », entrez ce que vous cherchez et la quantité,
     puis ajoutez le prix de chaque fournisseur au fur et à mesure de la journée.</p></div>`;
-  return entete + liste.map(c => {
+  return entete + mkComparaisonsRecentes().map(c => {
     const classees = offresClassees(c);
     const moinsCher = classees[0];
     const retenue = classees.find(o => o.id === c.choisi);
@@ -3131,9 +3132,9 @@ function ecranComparer() {
           const marge = vise > 0 ? Math.round((vise - u) / vise * 100) : null;
           const sousMoq = num(o.moq) > 0 && num(c.quantite) < num(o.moq);
           return `<tr${o.id === c.choisi ? ' style="font-weight:700"' : ''}>
-            <td>${E(o.fournisseur || '(sans nom)')}
+            <td>${mkCelluleFournisseur(c, o)}
               <div class="muet">${num(o.delai) ? num(o.delai) + ' j' : 'délai ?'}${num(o.qualite) ? ' · ' + num(o.qualite) + '/5' : ''}${sousMoq ? ' · <b>minimum ' + num(o.moq) + '</b>' : ''}</div></td>
-            <td>${nf(o.prix, 2)} ${E(o.devise)}</td>
+            <td>${nf(o.prix, 2)} ${E(o.devise)}${mkCelluleGnf(o)}</td>
             <td><b>${gnf(u)}</b></td>
             <td>${ecart > 0 ? '+' + gnf(ecart) : '<span class="pastille p-ok">le moins cher</span>'}</td>
             <td>${marge === null ? '<span class="muet">—</span>'
@@ -3145,6 +3146,7 @@ function ecranComparer() {
       ${blocVerdict(c)}
       ${c.motif ? `<div class="alerte a-info">Choix : ${E(c.motif)}</div>` : ''}
       ${(c.offres || []).map(o => `<div class="carte" style="margin:8px 0;background:#f7f9fb">
+        ${mkOffrePhotos(c, o)}
         <div class="duo">
           <div><label>Fournisseur</label><input value="${E(o.fournisseur)}" placeholder="Nom de l'usine"
             onchange="majOffre('${c.id}','${o.id}','fournisseur',this.value)"></div>
@@ -3983,10 +3985,11 @@ function modifierAchat(idA) {
   </div>
   <div class="duo">
     <div><label>Prix d'achat unitaire</label>
-      <input id="a_pu" inputmode="decimal" value="${E(a.prix_unitaire || '')}"></div>
+      <input id="a_pu" inputmode="decimal" value="${E(a.prix_unitaire || '')}" oninput="majConvAchat()"></div>
     <div><label>Devise de cet achat</label>
-      <select id="a_dev">${codesDevises().map(d => `<option value="${d}" ${deviseDe(a) === d ? 'selected' : ''}>${d}</option>`).join('')}</select></div>
+      <select id="a_dev" onchange="majConvAchat()">${codesDevises().map(d => `<option value="${d}" ${deviseDe(a) === d ? 'selected' : ''}>${d}</option>`).join('')}</select></div>
   </div>
+  <div id="a_conv" class="mk-conv mk-conv-achat">${mkConversionHtml(a.prix_unitaire, deviseDe(a), true)}</div>
   <label>Code-barres</label>
   <div class="ligne" style="gap:8px">
     <input id="a_cb" value="${E(a.code_barres)}" placeholder="vide = le carnet en fabrique un" style="flex:1">
@@ -4309,6 +4312,1025 @@ function majPrix(idA, quoi, valeur) {
   if (quoi === 'detail') a.prix_detail_gnf = num(valeur); else a.prix_grossiste_gnf = num(valeur);
   sauverLocal(); dessiner();
 }
+</script>
+<style>
+/* ===================== 1.2.0 — AU MARCHÉ (19/10/2026) =====================
+   Textes jamais sous 14 px (règle de Riche : les écritures ne rétrécissent jamais). */
+main{padding-bottom:170px}
+.mk-fab{position:fixed;right:14px;bottom:calc(80px + env(safe-area-inset-bottom));z-index:36;border:0;border-radius:999px;
+  background:var(--vert);color:#fff;font:inherit;font-weight:900;font-size:18px;padding:12px 20px;min-height:58px;
+  box-shadow:0 8px 22px rgba(0,0,0,.30);display:flex;align-items:center;gap:8px}
+html[data-theme="sombre"] .mk-fab{background:#1a7f4e}
+.mk-fab .ic{font-size:24px;line-height:1}
+.mk-dlg h3{font-size:20px;margin:0 0 4px}
+.mk-dlg label{font-size:15px;font-weight:700}
+.mk-dlg input,.mk-dlg select,.mk-dlg textarea{font-size:17px}
+.mk-aide{font-size:14px;color:var(--gris);margin:2px 0 6px;line-height:1.4}
+.mk-sec{border:1px solid var(--lisiere);border-radius:14px;padding:12px;margin:12px 0;background:var(--carte)}
+.mk-sec-t{font-size:16px;font-weight:900;margin:0 0 6px;color:var(--bleu)}
+.mk-photos{display:grid;grid-template-columns:1.4fr 1fr;gap:10px}
+.mk-tuile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:150px;
+  border:2px dashed var(--bleu);border-radius:14px;background:var(--bleu-pale);color:var(--bleu);font-weight:800;
+  font-size:15px;text-align:center;cursor:pointer;overflow:hidden;position:relative;padding:8px;margin:0}
+.mk-tuile .ic{font-size:38px;line-height:1}
+.mk-tuile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.mk-tuile .mk-refaire{position:absolute;bottom:6px;left:6px;right:6px;background:rgba(0,0,0,.62);color:#fff;
+  border-radius:8px;font-size:14px;padding:5px;font-weight:700}
+.mk-puces{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 2px}
+.mk-puce{border:2px solid var(--lisiere);background:var(--carte);color:var(--noir);border-radius:999px;padding:8px 14px;
+  font:inherit;font-size:15px;font-weight:700;min-height:44px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mk-puce.on{border-color:var(--vert);background:var(--vert-pale);color:var(--vert)}
+.mk-puce.nouveau{border-style:dashed;color:var(--bleu);border-color:var(--bleu)}
+.mk-prix{display:grid;grid-template-columns:1fr 112px;gap:10px;align-items:end}
+.mk-prix input{font-size:26px;font-weight:900;padding:10px 12px}
+.mk-prix select{font-size:19px;font-weight:800;padding:12px 8px}
+.mk-conv{margin-top:10px;padding:12px 14px;border-radius:12px;background:var(--vert-pale);color:var(--vert)}
+.mk-conv:empty{display:none}
+.mkc-gnf{font-size:30px;font-weight:900;line-height:1.15;font-variant-numeric:tabular-nums}
+.mkc-autres{font-size:18px;font-weight:800;margin-top:2px}
+.mkc-rendu{font-size:15px;color:var(--texte-note);margin-top:6px;line-height:1.35}
+.mkc-alerte{font-size:16px;font-weight:800;color:var(--ambre)}
+.mk-taux{font-size:15px;color:var(--gris);margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mk-taux input{width:130px;padding:8px 10px;font-size:17px}
+.mk-taux button{font:inherit;font-size:15px;font-weight:700;background:none;border:0;color:var(--bleu);text-decoration:underline;padding:8px 4px;min-height:40px}
+.mk-qrzone{display:flex;gap:12px;align-items:center;margin:10px 0 4px}
+.mk-qrzone img{width:92px;height:92px;object-fit:contain;background:#fff;border-radius:10px;border:1px solid var(--lisiere);flex:none}
+.mk-etat{font-size:15px;font-weight:700;line-height:1.35}
+.mk-ok{color:var(--vert)} .mk-att{color:var(--ambre)} .mk-ko{color:var(--rouge)}
+.mk-deux{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mk-deux label.b.vert{background:var(--vert);color:#fff;border:0;border-radius:12px;font-weight:800;cursor:pointer}
+html[data-theme="sombre"] .mk-deux label.b.vert{background:#1a7f4e}
+.mk-deux .b, .mk-deux label.b{min-height:56px;font-size:15px;padding:8px 10px;margin:0;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.25}
+.mk-resume{display:flex;gap:10px;align-items:center;padding:10px;border-radius:12px;background:var(--bleu-pale);margin-top:6px}
+.mk-resume .corps{flex:1;min-width:0;font-size:15px;line-height:1.35}
+.mk-resume img{width:56px;height:56px;object-fit:contain;background:#fff;border-radius:8px;flex:none}
+.mk-code{display:inline-block;font-weight:900;background:var(--bleu);color:#fff;border-radius:8px;padding:1px 8px;font-size:15px;letter-spacing:.02em}
+html[data-theme="sombre"] .mk-code{color:#0c1526}
+.mk-boutons .b{min-height:56px;font-size:17px;margin-top:10px}
+.mk-lien{font:inherit;font-size:15px;font-weight:700;background:none;border:0;color:var(--bleu);text-decoration:underline;padding:8px 0;min-height:40px}
+/* Comparer : la photo et le WeChat à côté de chaque prix */
+table.recap td:not(:last-child){padding-right:12px}
+.mk-cellule{display:flex;gap:8px;align-items:center}
+.mk-cellule img{width:48px;height:48px;border-radius:8px;object-fit:cover;flex:none;cursor:zoom-in}
+.mk-gnf{font-size:14px;color:var(--vert);font-weight:800;white-space:nowrap}
+.mk-wx{font:inherit;font-size:14px;font-weight:800;border:0;border-radius:999px;background:#1aad19;color:#fff;padding:6px 12px;margin-top:4px;min-height:36px}
+.mk-entree{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:12px}
+.mk-entree .b{min-height:60px;font-size:18px}
+.mk-compte{font-size:15px;color:var(--texte-note);margin:2px 0 0}
+.mk-photos-offre{display:flex;gap:8px;margin:6px 0 4px}
+.mk-photos-offre img{width:96px;height:96px;object-fit:cover;border-radius:10px;cursor:zoom-in}
+/* Fournisseurs rencontrés */
+.mk-filtres{display:flex;gap:8px;overflow-x:auto;padding:4px 0 8px}
+.mk-filtres .mk-puce{flex:none}
+.mk-fiche{background:var(--carte);border:1px solid var(--lisiere);border-radius:16px;box-shadow:var(--ombre);padding:14px;margin-bottom:12px}
+.mk-fiche-tete{display:flex;gap:12px;align-items:center}
+.mk-fiche-tete .qr{width:72px;height:72px;object-fit:contain;background:#fff;border-radius:10px;border:1px solid var(--lisiere);flex:none;cursor:zoom-in}
+.mk-fiche-tete .sans{width:72px;height:72px;border-radius:10px;background:var(--bleu-pale);display:flex;align-items:center;justify-content:center;font-size:30px;flex:none}
+.mk-fiche-tete .nom{font-size:18px;font-weight:900;line-height:1.25}
+.mk-fiche-tete .det{font-size:15px;color:var(--texte-note);line-height:1.35}
+.mk-decision{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0 8px}
+.mk-decision button{font:inherit;font-weight:800;font-size:15px;min-height:52px;border-radius:12px;border:2px solid var(--lisiere);background:var(--carte);color:var(--noir);padding:6px}
+.mk-decision .on-contacter{background:var(--vert);border-color:var(--vert);color:#fff}
+.mk-decision .on-voir{background:var(--ambre);border-color:var(--ambre);color:#fff}
+.mk-decision .on-non{background:var(--rouge);border-color:var(--rouge);color:#fff}
+html[data-theme="sombre"] .mk-decision .on-contacter,html[data-theme="sombre"] .mk-decision .on-voir,html[data-theme="sombre"] .mk-decision .on-non{color:#0c1526}
+.mk-produits{display:flex;gap:10px;overflow-x:auto;padding:4px 0}
+.mk-prod{flex:none;width:140px;border:1px solid var(--lisiere);border-radius:12px;overflow:hidden;background:var(--carte)}
+.mk-prod img,.mk-prod .vide{width:140px;height:105px;object-fit:cover;display:flex;align-items:center;justify-content:center;background:var(--bleu-pale);font-size:30px;cursor:zoom-in}
+.mk-prod .t{padding:6px 8px;font-size:14px;line-height:1.3}
+.mk-prod .t b{display:block;font-size:15px}
+.mk-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.mk-actions .b{min-height:52px;font-size:15px;padding:8px 10px}
+.mk-actions .b.wechat{background:#1aad19;color:#fff}
+.mk-etapes{margin:8px 0 0;padding-left:22px;font-size:15px;line-height:1.5}
+.mk-grand-qr{display:block;width:100%;max-width:360px;margin:8px auto;background:#fff;border-radius:12px;border:1px solid var(--lisiere)}
+.mk-conv-achat{margin-top:8px}
+.mk-conv-achat:empty{display:none}
+/* L'image en grand, par-dessus la fiche ouverte */
+dialog.mk-apercu{position:fixed;inset:0;z-index:10000;width:100vw;height:100vh;height:100dvh;max-width:none;max-height:none;margin:0;
+  border:0;border-radius:0;background:#000;color:#fff;padding:14px;box-sizing:border-box}
+dialog.mk-apercu[open]{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+dialog.mk-apercu::backdrop{background:#000}
+dialog.mk-apercu img{max-width:100%;max-height:72vh;object-fit:contain;border-radius:10px;background:#fff}
+dialog.mk-apercu .leg{font-size:16px;text-align:center;line-height:1.4;max-width:520px}
+dialog.mk-apercu .b{max-width:420px;min-height:52px;font-size:17px}
+/* Le cadre de visée carré pour un QR code */
+.mk-scan-qr .scan-cadre{left:50%;right:auto;width:min(66%,46vh);height:auto;aspect-ratio:1/1;top:16%;transform:translateX(-50%)}
+.mk-scan-qr .scan-ligne{display:none}
+</style>
+<script>
+'use strict';
+// ===================== 1.2.0 — AU MARCHÉ (19/10/2026) =====================
+// Riche, au marché en Chine, 19/10/2026 : « il peut pas scanner pour prendre l'information du
+// fournisseur directement sur le carnet, et en plus il affiche le prix seulement en francs
+// guinéens ». Il rencontre plusieurs fournisseurs, prend leur WeChat, puis ne le retrouve plus
+// « du côté de la comparaison ». Il veut : choisir un produit, le prendre en photo, noter le prix
+// que dit le vendeur et le voir tout de suite en francs, prendre des notes, ranger après, puis
+// décider à qui il doit écrire.
+//
+// Ce module AJOUTE, il ne retire rien :
+//   - la fiche « Vu au marché » (bouton vert 📷 Marché, en bas à droite de tous les écrans) ;
+//   - chaque fiche devient une OFFRE dans Comparer (le produit) + une FICHE FOURNISSEUR (le stand),
+//     avec la photo, le prix dans sa devise, son équivalent en francs et en euros ;
+//   - le QR code WeChat (ou la carte de visite) est lu par le carnet ET gardé en image : WeChat
+//     sait relire une image (Scanner → icône image) ;
+//   - l'écran « Fournisseurs rencontrés » : produits vus, prix, et ✅ à contacter / 🤔 peut-être / ❌ non.
+// Les cases ajoutées (photo, photo2, fournisseur_id, vu_le, code, decision, wechat_lien, qr_photo,
+// carte_photo...) sont facultatives : un carnet plus ancien s'ouvre sans rien perdre.
+
+window.KYLO_MARCHE = '1.2.0';
+let MB = null;          // la fiche « Vu au marché » en cours
+let MF = null;          // la fiche fournisseur en cours (dans la fiche marché ou en modification)
+const MK_BROUILLON = 'kylo_marche_brouillon';
+const MK_SYMBOLES = { CNY: '¥', EUR: '€', USD: '$', GNF: 'GNF', XOF: 'FCFA', XAF: 'FCFA' };
+const mkSym = (d) => MK_SYMBOLES[d] || d;
+const mkMaintenant = () => new Date().toISOString();
+const mkHeure = (iso) => { const d = iso ? new Date(iso) : new Date(); return isNaN(d) ? '' : d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); };
+const mkJour = (iso) => { const d = iso ? new Date(iso) : null; return d && !isNaN(d) ? d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : ''; };
+
+function mkDevise() {
+  const d = (C.voyage && C.voyage.marche_devise) || 'CNY';
+  return codesDevises().includes(d) ? d : (codesDevises().includes('CNY') ? 'CNY' : (C.voyage.devise || 'GNF'));
+}
+function mkFournisseurs() { return fournisseursListe(); }
+function mkFournisseur(fid) { return fid ? mkFournisseurs().find(f => f.id === fid) : null; }
+function mkNomFournisseur(f) {
+  if (!f) return '';
+  const nom = String(f.nom || f.societe || '').trim() || (f.wechat ? 'WeChat ' + f.wechat : '(sans nom)');
+  return (f.code ? f.code + ' · ' : '') + nom;
+}
+function mkProchainCode() {
+  let max = 0;
+  mkFournisseurs().forEach(f => { const m = /^F(\d+)$/.exec(String(f.code || '')); if (m) max = Math.max(max, Number(m[1])); });
+  return 'F' + String(max + 1).padStart(2, '0');
+}
+// Toutes les offres du carnet qui viennent de ce fournisseur (par lien, ou par le même nom écrit).
+function mkOffresDe(f) {
+  const res = [];
+  const nomF = normaliserNom(f.nom);
+  (C.comparaisons || []).forEach(c => (c.offres || []).forEach(o => {
+    if (o.fournisseur_id === f.id || (!o.fournisseur_id && nomF && normaliserNom(o.fournisseur) === nomF)) res.push({ c, o });
+  }));
+  return res.sort((a, b) => String(b.o.vu_le || '').localeCompare(String(a.o.vu_le || '')));
+}
+
+// ---------- Les prix : la devise du vendeur, et tout de suite les francs ----------
+function mkConversionHtml(prix, devise, compact) {
+  const p = num(prix), d = devise || 'GNF';
+  if (!(p > 0)) return '';
+  const t = tauxDe(d);
+  if (!(t > 0)) return `<div class="mkc-alerte">Le taux du ${E(d)} n'est pas rempli : tapez-le ${compact ? 'dans Voyage → Taux de change' : 'juste en dessous'}.</div>`;
+  const g = p * t;
+  const eur = tauxDe('EUR'), cny = tauxDe('CNY');
+  const autres = [];
+  if (d !== 'EUR' && eur > 0) autres.push('≈ ' + nf(g / eur, 2) + ' €');
+  if (d !== 'CNY' && cny > 0) autres.push('≈ ' + nf(g / cny, 2) + ' ¥');
+  const rendu = g * (1 + fraisPourcent() / 100);
+  if (d === 'GNF') return autres.length ? `<div class="mkc-autres">${autres.join(' · ')}</div>` : '';
+  return `<div class="mkc-gnf">= ${gnfStrict(g)}</div>`
+    + (autres.length ? `<div class="mkc-autres">${autres.join(' · ')}</div>` : '')
+    + (compact ? '' : `<div class="mkc-rendu">Arrivé au magasin, avec ${nf(fraisPourcent(), 1)} % de frais de voyage : environ <b>${gnfStrict(rendu)}</b> la pièce.</div>`);
+}
+function mkPrixCourt(o) {
+  const p = num(o.prix); if (!(p > 0)) return 'prix ?';
+  const d = o.devise || C.voyage.devise || 'GNF';
+  const g = enGnf(p, d);
+  return nf(p, 2) + ' ' + mkSym(d) + (d !== 'GNF' && g > 0 ? ' = ' + gnfStrict(g) : '');
+}
+
+// ---------- Les photos : allégées, mais nettes ----------
+function mkLireFichier(fichier) {
+  return new Promise((ok, ko) => {
+    const lecteur = new FileReader();
+    lecteur.onerror = () => ko(new Error('photo illisible'));
+    lecteur.onload = () => {
+      const img = new Image();
+      img.onload = () => ok(img);
+      img.onerror = () => ko(new Error('photo illisible'));
+      img.src = lecteur.result;
+    };
+    lecteur.readAsDataURL(fichier);
+  });
+}
+function mkToile(source, max) {
+  const l = source.videoWidth || source.naturalWidth || source.width;
+  const h = source.videoHeight || source.naturalHeight || source.height;
+  const e = Math.min(1, max / Math.max(l, h));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(l * e)); c.height = Math.max(1, Math.round(h * e));
+  c.getContext('2d', { willReadFrequently: true }).drawImage(source, 0, 0, c.width, c.height);
+  return c;
+}
+function mkReduire(source, max, qualite) { return mkToile(source, max).toDataURL('image/jpeg', qualite); }
+
+// ---------- Le brouillon : rien ne se perd si le téléphone recharge la page ----------
+function mkBrouillonGarder() {
+  if (!MB) return;
+  try { sessionStorage.setItem(MK_BROUILLON, JSON.stringify({ MB, MF })); } catch (e) { /* tant pis : la fiche reste à l'écran */ }
+}
+function mkBrouillonLire() {
+  try { const t = sessionStorage.getItem(MK_BROUILLON); if (t) { const o = JSON.parse(t); if (o && o.MB) return o; } } catch (e) {}
+  return null;
+}
+function mkBrouillonEffacer() { try { sessionStorage.removeItem(MK_BROUILLON); } catch (e) {} }
+function mkBrouillonVide(b) {
+  if (!b) return true;
+  const f = MF || {};
+  return !b.photo && !b.photo2 && !String(b.article || '').trim() && !(num(b.prix) > 0) && !String(b.note || '').trim()
+    && !['nom', 'societe', 'allee', 'wechat', 'wechat_lien', 'tel', 'qr_photo', 'carte_photo'].some(k => String(f[k] || '').trim());
+}
+function mkFicheNeuve(fid) {
+  MB = { photo: '', photo2: '', article: '', prix: '', devise: mkDevise(), moq: '', note: '', fid: fid || '', fourOuvert: !fid };
+  MF = mkCopieFournisseur(mkFournisseur(fid));
+}
+const MK_CHAMPS_F = ['nom', 'societe', 'marche', 'allee', 'wechat', 'wechat_lien', 'tel', 'email', 'site', 'qr_photo', 'carte_photo', 'qr_texte'];
+function mkCopieFournisseur(f) {
+  const o = {}; MK_CHAMPS_F.forEach(k => { o[k] = f ? (f[k] || '') : ''; });
+  return o;
+}
+
+// ---------- La fiche « Vu au marché » ----------
+function marcheOuvrir(opts) {
+  opts = opts || {};
+  if (opts.neuf || opts.fid) { mkFicheNeuve(opts.fid || ''); }
+  else if (!MB) {
+    const b = mkBrouillonLire();
+    if (b && !mkBrouillonVide(b.MB)) { MB = b.MB; MF = b.MF || mkCopieFournisseur(mkFournisseur(b.MB.fid)); MB.repris = true; }
+    else mkFicheNeuve('');
+  }
+  mkAssurerCodes();
+  if (opts.article) MB.article = opts.article;
+  if (!MF) MF = mkCopieFournisseur(mkFournisseur(MB.fid));
+  mkBoite(mkFicheHtml());
+  const d = document.getElementById('boite');
+  if (d) d.classList.add('mk-boite');
+  mkMajConversion();
+}
+function mkFicheHtml() {
+  const b = MB;
+  const reprise = b.repris ? `<div class="alerte a-info" style="font-size:15px">Fiche reprise là où vous l'aviez laissée.
+    <button class="mk-lien" onclick="mkRecommencer()">Effacer et recommencer</button></div>` : '';
+  return `<div class="mk-dlg">
+    <h3>📷 Vu au marché</h3>
+    <p class="mk-aide">Photo, prix, fournisseur, notes : tout se range tout seul dans <b>Comparer</b>.</p>
+    ${reprise}
+    <div class="mk-sec">
+      <div class="mk-sec-t">1. Le produit</div>
+      <div class="mk-photos">
+        <label class="mk-tuile" for="mk_photo1" id="mk_tuile1">${mkTuile(b.photo, '📷', 'Photo du produit')}</label>
+        <label class="mk-tuile" for="mk_photo2" id="mk_tuile2">${mkTuile(b.photo2, '🏷️', 'Photo du prix ou de l\'étiquette')}</label>
+      </div>
+      <input type="file" id="mk_photo1" accept="image/*" class="champ-cache" onchange="mkPrendrePhoto('photo', this)">
+      <input type="file" id="mk_photo2" accept="image/*" class="champ-cache" onchange="mkPrendrePhoto('photo2', this)">
+      <label for="mk_article">Quel produit ? <span class="mk-aide">(facultatif : vous pourrez le nommer après)</span></label>
+      <input id="mk_article" list="mk_liste" value="${E(b.article)}" placeholder="ex : Thermos 1 L, écouteurs…" autocomplete="off"
+        oninput="MB.article=this.value;mkMajPuces();mkBrouillonGarder()">
+      <datalist id="mk_liste">${mkNomsProduits().map(n => `<option value="${E(n)}">`).join('')}</datalist>
+      <div class="mk-puces" id="mk_puces">${mkPucesProduits()}</div>
+    </div>
+    <div class="mk-sec">
+      <div class="mk-sec-t">2. Le prix que dit le vendeur</div>
+      <div class="mk-prix">
+        <div><label for="mk_prix">Prix d'une pièce</label>
+          <input id="mk_prix" inputmode="decimal" value="${E(b.prix)}" placeholder="0" autocomplete="off"
+            oninput="MB.prix=this.value;mkMajConversion();mkBrouillonGarder()"></div>
+        <div><label for="mk_devise">Devise</label>
+          <select id="mk_devise" onchange="MB.devise=this.value;mkMajConversion();mkBrouillonGarder()">
+            ${codesDevises().map(d => `<option value="${d}" ${b.devise === d ? 'selected' : ''}>${mkSym(d) === d ? d : mkSym(d) + ' ' + d}</option>`).join('')}
+          </select></div>
+      </div>
+      <div class="mk-conv" id="mk_conv"></div>
+      <div class="mk-taux" id="mk_taux"></div>
+      <label for="mk_moq">Quantité minimum de commande</label>
+      <input id="mk_moq" inputmode="numeric" value="${E(b.moq)}" placeholder="ex : 500 pièces" autocomplete="off"
+        oninput="MB.moq=this.value;mkBrouillonGarder()">
+    </div>
+    <div class="mk-sec">
+      <div class="mk-sec-t">3. Chez qui ?</div>
+      <div class="mk-puces" id="mk_pucesF">${mkPucesFournisseurs()}</div>
+      <div id="mk_four">${mkFourDetail()}</div>
+    </div>
+    <div class="mk-sec">
+      <div class="mk-sec-t">4. Notes</div>
+      <label for="mk_note">Ce qu'il faut retenir — dictez avec le micro du clavier 🎙️</label>
+      <textarea id="mk_note" rows="3" placeholder="ex : bonne qualité, échantillon gratuit, couleurs rouge et noir…"
+        oninput="MB.note=this.value;mkBrouillonGarder()">${E(b.note)}</textarea>
+    </div>
+    <div class="mk-boutons">
+      <button class="b vert" onclick="mkGarder(false)">✅ Garder</button>
+      <button class="b contour" onclick="mkGarder(true)">➕ Garder et noter un autre produit${b.fid || mkFourARempli() ? ' chez ce fournisseur' : ''}</button>
+      <button class="b gris" onclick="mkFermer()">Fermer</button>
+    </div>
+  </div>`;
+}
+function mkTuile(src, ic, texte) {
+  return src ? `<img src="${src}" alt=""><span class="mk-refaire">Changer la photo</span>`
+    : `<span class="ic" aria-hidden="true">${ic}</span><span>${texte}</span>`;
+}
+function mkNomsProduits() {
+  const vus = new Set(), noms = [];
+  const ajouter = (n) => { n = String(n || '').trim(); const k = normaliserNom(n); if (n && !vus.has(k)) { vus.add(k); noms.push(n); } };
+  mkComparaisonsRecentes().forEach(c => ajouter(c.article));
+  (C.achats || []).forEach(a => ajouter(a.nom));
+  if (C.liste_courses && Array.isArray(C.liste_courses.articles)) C.liste_courses.articles.forEach(a => ajouter(a.nom || a.libelle));
+  if (C.radar && Array.isArray(C.radar.produits)) C.radar.produits.filter(p => !p.abandonne).forEach(p => ajouter(p.nom));
+  return noms.slice(0, 300);
+}
+function mkComparaisonsRecentes() {
+  return (C.comparaisons || []).map((c, i) => ({ c, i }))
+    .sort((x, y) => String(y.c.maj || '').localeCompare(String(x.c.maj || '')) || x.i - y.i).map(x => x.c);
+}
+// Les produits déjà vus : un appui pour noter le prix d'un AUTRE fournisseur pour le même produit.
+function mkPucesProduits() {
+  const cherche = normaliserNom(MB && MB.article);
+  const liste = mkComparaisonsRecentes().filter(c => String(c.article || '').trim()).slice(0, 8);
+  if (!liste.length) return '';
+  return liste.map(c => `<button type="button" class="mk-puce${cherche && normaliserNom(c.article) === cherche ? ' on' : ''}"
+    onclick="mkChoisirProduit('${c.id}')">${E(c.article)} · ${(c.offres || []).length}</button>`).join('');
+}
+function mkMajPuces() { const z = document.getElementById('mk_puces'); if (z) z.innerHTML = mkPucesProduits(); }
+function mkChoisirProduit(cid) {
+  const c = trouverComparaison(cid); if (!c) return;
+  MB.article = c.article;
+  const ch = document.getElementById('mk_article'); if (ch) ch.value = c.article;
+  mkMajPuces(); mkBrouillonGarder();
+}
+function mkMajConversion() {
+  const z = document.getElementById('mk_conv'); if (!z || !MB) return;
+  z.innerHTML = mkConversionHtml(MB.prix, MB.devise, false);
+  const t = document.getElementById('mk_taux');
+  if (t) {
+    const d = MB.devise || 'GNF';
+    t.innerHTML = d === 'GNF' ? '' : (tauxDe(d) > 0 && !MB.tauxOuvert
+      ? `Taux du carnet : 1 ${E(mkSym(d))} = ${nf(tauxDe(d), 2)} GNF <button type="button" onclick="MB.tauxOuvert=true;mkMajConversion()">changer</button>`
+      : `<label for="mk_tx" style="margin:0">1 ${E(mkSym(d))} =</label>
+         <input id="mk_tx" inputmode="decimal" value="${tauxDe(d) || ''}" placeholder="ex : 1230"> GNF
+         <button type="button" onclick="mkFixerTaux()">valider</button>`);
+  }
+}
+function mkFixerTaux() {
+  const ch = document.getElementById('mk_tx'); const v = num(ch && ch.value);
+  if (!(v > 0)) { avertir('Tapez combien de francs guinéens vaut 1 ' + MB.devise + '.'); return; }
+  C.voyage.taux = C.voyage.taux || {};
+  C.voyage.taux[MB.devise] = v;
+  MB.tauxOuvert = false;
+  sauverLocal(); majBandeau(); mkMajConversion();
+  avertir('Taux du carnet changé : 1 ' + MB.devise + ' = ' + nf(v, 2) + ' GNF. Il sert pour tout le voyage.');
+}
+function mkPrendrePhoto(champ, input) {
+  const f = input.files && input.files[0]; if (!f) return;
+  mkLireFichier(f).then(img => {
+    MB[champ] = mkReduire(img, 900, 0.68);
+    const t = document.getElementById(champ === 'photo' ? 'mk_tuile1' : 'mk_tuile2');
+    if (t) t.innerHTML = mkTuile(MB[champ], '', '');
+    mkBrouillonGarder();
+  }).catch(e => avertir('Cette photo ne s\'ouvre pas : ' + e.message));
+  input.value = '';
+}
+
+// ---------- Le fournisseur dans la fiche ----------
+function mkFournisseursRecents() {
+  return mkFournisseurs().map((f, i) => ({ f, i }))
+    .sort((x, y) => String(y.f.vu_le || y.f.le || '').localeCompare(String(x.f.vu_le || x.f.le || '')) || x.i - y.i)
+    .map(x => x.f);
+}
+function mkFourARempli() { return MF && ['nom', 'societe', 'allee', 'wechat', 'wechat_lien', 'tel', 'qr_photo', 'carte_photo'].some(k => String(MF[k] || '').trim()); }
+function mkPucesFournisseurs() {
+  const liste = mkFournisseursRecents().slice(0, 8);
+  return liste.map(f => `<button type="button" class="mk-puce${MB.fid === f.id ? ' on' : ''}" onclick="mkChoisirFournisseur('${f.id}')">${E(mkNomFournisseur(f))}${f.wechat || f.wechat_lien || f.qr_photo ? ' 💬' : ''}</button>`).join('')
+    + `<button type="button" class="mk-puce nouveau${!MB.fid ? ' on' : ''}" onclick="mkChoisirFournisseur('')">+ Nouveau fournisseur</button>`;
+}
+function mkChoisirFournisseur(fid) {
+  mkLireChampsFournisseur();
+  MB.fid = fid;
+  MF = mkCopieFournisseur(mkFournisseur(fid));
+  MB.fourOuvert = !fid;
+  const p = document.getElementById('mk_pucesF'); if (p) p.innerHTML = mkPucesFournisseurs();
+  const z = document.getElementById('mk_four'); if (z) z.innerHTML = mkFourDetail();
+  mkBrouillonGarder();
+}
+function mkFourDetail() {
+  if (MB.fid && !MB.fourOuvert) {
+    const f = mkFournisseur(MB.fid);
+    if (f) return `<div class="mk-resume">
+      ${f.qr_photo ? `<img src="${f.qr_photo}" alt="QR WeChat">` : ''}
+      <div class="corps"><span class="mk-code">${E(f.code || '—')}</span> <b>${E(f.nom || f.societe || '(sans nom)')}</b>
+        ${f.allee || f.marche ? `<div>${E([f.marche, f.allee].filter(Boolean).join(' · '))}</div>` : ''}
+        <div class="${f.wechat || f.wechat_lien || f.qr_photo ? 'mk-ok' : 'mk-att'}" style="font-weight:700">${f.wechat || f.wechat_lien || f.qr_photo ? '💬 WeChat gardé' : 'Pas encore de WeChat'}</div></div></div>
+      <button type="button" class="mk-lien" onclick="MB.fourOuvert=true;document.getElementById('mk_four').innerHTML=mkFourDetail()">Compléter : QR, WeChat, téléphone, stand…</button>`;
+  }
+  return mkChampsFournisseurHtml('mk');
+}
+// Les champs d'une fiche fournisseur, partagés par la fiche marché et la modification.
+function mkChampsFournisseurHtml(p) {
+  const f = MF || {};
+  return `<div class="mk-deux">
+      <label class="b vert" for="${p}_qrfile">📷 Photo de son QR WeChat ou de sa carte</label>
+      <button type="button" class="b contour" onclick="mkScannerEnDirect('${p}')">🔲 Scanner son QR en direct</button>
+    </div>
+    <input type="file" id="${p}_qrfile" accept="image/*" class="champ-cache" onchange="mkLireQrPhoto('${p}', this)">
+    <div id="${p}_qrzone">${mkQrZoneHtml()}</div>
+    <label for="${p}_f_nom">Nom du vendeur ou de la boutique</label>
+    <input id="${p}_f_nom" value="${E(f.nom)}" placeholder="ex : M. Chen — Yiwu Trading" oninput="MF.nom=this.value;mkBrouillonGarder()">
+    <label for="${p}_f_allee">Où est le stand ?</label>
+    <input id="${p}_f_allee" value="${E(f.allee)}" placeholder="ex : Bât. H, allée 23, n° 4512" oninput="MF.allee=this.value;mkBrouillonGarder()">
+    <div class="duo">
+      <div><label for="${p}_f_wechat">WeChat (identifiant)</label>
+        <input id="${p}_f_wechat" value="${E(/^https?:/i.test(f.wechat) ? '' : f.wechat)}" placeholder="ex : chen_yiwu88" autocapitalize="off" oninput="MF.wechat=this.value;mkBrouillonGarder()"></div>
+      <div><label for="${p}_f_tel">Téléphone</label>
+        <input id="${p}_f_tel" inputmode="tel" value="${E(f.tel)}" placeholder="+86…" oninput="MF.tel=this.value;mkBrouillonGarder()"></div>
+    </div>`;
+}
+function mkQrZoneHtml() {
+  const f = MF || {};
+  const img = f.qr_photo || f.carte_photo;
+  if (!img && !f.wechat_lien && !f.qr_texte) return '';
+  let etat;
+  if (f.wechat_lien) etat = '<span class="mk-ok">✅ QR WeChat lu et gardé.</span> Il servira pour l\'ajouter dans WeChat.';
+  else if (f.qr_texte) etat = '<span class="mk-ok">✅ QR code lu.</span> ' + E(String(f.qr_texte).slice(0, 80));
+  else if (f.qr_photo) etat = '<span class="mk-ok">✅ QR gardé en image.</span>';
+  else etat = '<span class="mk-att">Photo de la carte gardée.</span> Aucun QR n\'a été lu dessus : tapez son WeChat ci-dessous si vous l\'avez.';
+  return `<div class="mk-qrzone">${img ? `<img src="${img}" alt="">` : ''}<div class="mk-etat">${etat}</div></div>`;
+}
+function mkMajQrZone(p) {
+  const z = document.getElementById(p + '_qrzone'); if (z) z.innerHTML = mkQrZoneHtml();
+  [['nom', 'nom'], ['allee', 'allee'], ['tel', 'tel']].forEach(([k, id]) => {
+    const ch = document.getElementById(p + '_f_' + id); if (ch && !ch.value && MF[k]) ch.value = MF[k];
+  });
+  const w = document.getElementById(p + '_f_wechat');
+  if (w && !w.value && MF.wechat && !/^https?:/i.test(MF.wechat)) w.value = MF.wechat;
+}
+function mkLireChampsFournisseur(p) {
+  p = p || 'mk';
+  if (!MF) return;
+  [['nom', 'nom'], ['allee', 'allee'], ['wechat', 'wechat'], ['tel', 'tel']].forEach(([k, id]) => {
+    const ch = document.getElementById(p + '_f_' + id); if (ch) MF[k] = ch.value;
+  });
+}
+
+// ---------- Lire un QR code : WeChat, carte de visite (vCard), lien, téléphone ----------
+function mkAnalyserQR(brut) {
+  const texte = String(brut || '').trim();
+  const r = { type: 'texte', champs: {}, brut: texte };
+  if (!texte) return r;
+  const ch = r.champs;
+  const tel = (s) => String(s || '').replace(/[^\d+]/g, '');
+  const ajouter = (k, v) => { v = String(v || '').trim(); if (v) ch[k] = ch[k] ? ch[k] + ' · ' + v : v; };
+  if (/^begin:vcard/i.test(texte)) {
+    r.type = 'carte';
+    const lignes = texte.replace(/\r\n/g, '\n').replace(/\n[ \t]/g, '').split('\n');
+    lignes.forEach(l => {
+      const i = l.indexOf(':'); if (i < 0) return;
+      const gauche = l.slice(0, i).toUpperCase(), v = l.slice(i + 1).replace(/\\n/gi, ' ').replace(/\\([,;:\\])/g, '$1');
+      const nom = gauche.split(';')[0].replace(/^ITEM\d+\./, '');
+      if (nom === 'FN') ch.nom = v.trim();
+      else if (nom === 'N' && !ch.nom) ch.nom = v.split(';').filter(Boolean).reverse().join(' ').trim();
+      else if (nom === 'ORG') ajouter('societe', v.split(';').filter(Boolean).join(' '));
+      else if (nom === 'TEL') { if (!ch.tel) ch.tel = tel(v); }
+      else if (nom === 'EMAIL') { if (!ch.email) ch.email = v.trim(); }
+      else if (nom === 'URL') ajouter('site', v);
+      else if (nom === 'ADR') ajouter('allee', v.split(';').map(s => s.trim()).filter(Boolean).join(', '));
+      else if (nom === 'X-WECHAT' || nom === 'X-WEIXIN') ch.wechat = v.trim();
+      else if ((nom === 'IMPP' || nom === 'X-SOCIALPROFILE') && /WECHAT|WEIXIN/i.test(gauche + v)) ch.wechat = v.replace(/^(x-apple:)?(weixin|wechat):/i, '').trim();
+      else if (nom === 'NOTE') ajouter('note', v);
+    });
+  } else if (/^mecard:/i.test(texte)) {
+    r.type = 'carte';
+    texte.replace(/^mecard:/i, '').split(';').forEach(seg => {
+      const i = seg.indexOf(':'); if (i <= 0) return;
+      const k = seg.slice(0, i).toUpperCase(), v = seg.slice(i + 1);
+      if (k === 'N') ch.nom = v.split(',').reverse().join(' ').trim();
+      else if (k === 'TEL' && !ch.tel) ch.tel = tel(v);
+      else if (k === 'EMAIL' && !ch.email) ch.email = v.trim();
+      else if (k === 'ORG') ajouter('societe', v);
+      else if (k === 'URL') ajouter('site', v);
+      else if (k === 'ADR') ajouter('allee', v);
+      else if (k === 'NOTE') ajouter('note', v);
+    });
+  } else if (/^(https?:\/\/)?([a-z0-9-]+\.)*(wechat\.com|weixin\.qq\.com|wx\.qq\.com|w\.url\.cn)\//i.test(texte)) {
+    r.type = 'wechat'; ch.wechat_lien = /^https?:/i.test(texte) ? texte : 'https://' + texte;
+  } else if (/^(https?:\/\/)?(wa\.me\/|api\.whatsapp\.com\/send)/i.test(texte)) {
+    r.type = 'whatsapp';
+    const m = texte.match(/wa\.me\/(\+?\d+)/i) || texte.match(/[?&]phone=(\+?\d+)/i);
+    if (m) ch.tel = (m[1][0] === '+' ? '' : '+') + m[1];
+  } else if (/^tel:/i.test(texte)) { r.type = 'tel'; ch.tel = tel(texte.slice(4)); }
+  else if (/^https?:\/\//i.test(texte)) { r.type = 'lien'; ch.site = texte; }
+  else {
+    const wx = texte.match(/(?:wechat|weixin|微信|wx)\s*(?:id|号)?\s*[:：]\s*([A-Za-z][A-Za-z0-9_-]{4,29})/i);
+    if (wx) ch.wechat = wx[1];
+    const t = texte.match(/(?:\+|00)?\d[\d\s().-]{7,}\d/);
+    if (t) ch.tel = tel(t[0]);
+  }
+  return r;
+}
+function mkAppliquerQR(res) {
+  const ch = res.champs || {};
+  Object.keys(ch).forEach(k => {
+    if (k === 'note') return;
+    if (k === 'wechat_lien' || !String(MF[k] || '').trim()) MF[k] = ch[k];
+  });
+  if (res.type !== 'wechat' && res.brut) MF.qr_texte = res.brut.slice(0, 600);
+}
+// Le lecteur : celui du téléphone s'il lit les QR (Android), sinon ZXing (iPhone), déjà rangé
+// hors ligne avec le carnet (lecteur-codes.js).
+let mkZX = null;
+function mkLecteurNatif() {
+  try {
+    const BD = window.BarcodeDetector;
+    if (!BD || (typeof KyloLecteurCodes === 'function' && BD === KyloLecteurCodes)) return Promise.resolve(null);
+    const p = BD.getSupportedFormats ? BD.getSupportedFormats() : Promise.resolve(['qr_code']);
+    return Promise.resolve(p).then(f => (f || []).includes('qr_code') ? new BD({ formats: ['qr_code'] }) : null).catch(() => null);
+  } catch (e) { return Promise.resolve(null); }
+}
+function mkChargerZXing() {
+  if (window.ZXing) return Promise.resolve(window.ZXing);
+  if (mkZX) return mkZX;
+  if (!('BarcodeDetector' in window) && typeof kyloChargerLecteurCodes === 'function') {
+    mkZX = kyloChargerLecteurCodes().then(() => { if (!window.ZXing) throw new Error('lecteur absent'); return window.ZXing; });
+  } else {
+    mkZX = new Promise((ok, ko) => {
+      const s = document.createElement('script'); s.src = 'lecteur-codes.js';
+      s.onload = () => (window.ZXing ? ok(window.ZXing) : ko(new Error('lecteur absent')));
+      s.onerror = () => ko(new Error('le lecteur de QR ne s\'est pas chargé'));
+      document.head.appendChild(s);
+    });
+  }
+  mkZX = mkZX.catch(e => { mkZX = null; throw e; });
+  return mkZX;
+}
+function mkZXingLire(Z, toile) {
+  const indices = new Map();
+  indices.set(Z.DecodeHintType.POSSIBLE_FORMATS, [Z.BarcodeFormat.QR_CODE]);
+  indices.set(Z.DecodeHintType.TRY_HARDER, true);
+  indices.set(Z.DecodeHintType.CHARACTER_SET, 'UTF-8');
+  const lecteur = new Z.MultiFormatReader(); lecteur.setHints(indices);
+  const lum = new Z.HTMLCanvasElementLuminanceSource(toile);
+  for (const Bin of [Z.HybridBinarizer, Z.GlobalHistogramBinarizer]) {
+    try {
+      const r = lecteur.decode(new Z.BinaryBitmap(new Bin(lum)));
+      return { texte: r.getText(), points: (r.getResultPoints() || []).map(p => ({ x: p.getX(), y: p.getY() })) };
+    } catch (e) { /* on essaie l'autre façon de lire */ }
+  }
+  return null;
+}
+// Lit un QR dans une image (photo ou image de la caméra). Rend { texte, toile, points } ou null.
+async function mkLireQR(source, tailles) {
+  const natif = await mkLecteurNatif();
+  for (const t of tailles) {
+    const toile = mkToile(source, t);
+    if (natif) {
+      try {
+        const r = await natif.detect(toile);
+        if (r && r.length && r[0].rawValue) return { texte: r[0].rawValue, toile, points: r[0].cornerPoints || [] };
+      } catch (e) { /* ZXing prend le relais */ }
+    }
+    let Z = null;
+    try { Z = await mkChargerZXing(); } catch (e) { if (!natif) throw e; }
+    if (Z) { const r = mkZXingLire(Z, toile); if (r) return { texte: r.texte, toile, points: r.points }; }
+  }
+  return null;
+}
+// Le QR découpé (avec sa marge blanche) : c'est cette image que WeChat relira.
+function mkDecouperQR(toile, points) {
+  if (!points || points.length < 3) return mkReduire(toile, 700, 0.85);
+  const xs = points.map(p => p.x), ys = points.map(p => p.y);
+  let x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const cote = Math.max(x1 - x0, y1 - y0), marge = cote * 0.42;
+  x0 = Math.max(0, x0 - marge); y0 = Math.max(0, y0 - marge);
+  x1 = Math.min(toile.width, x1 + marge); y1 = Math.min(toile.height, y1 + marge);
+  const l = x1 - x0, h = y1 - y0;
+  if (l < 40 || h < 40) return mkReduire(toile, 700, 0.85);
+  const e = Math.min(1, 640 / Math.max(l, h));
+  const c = document.createElement('canvas');
+  c.width = Math.round(l * e); c.height = Math.round(h * e);
+  c.getContext('2d').drawImage(toile, x0, y0, l, h, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.88);
+}
+function mkEtatQr(p, html) { const z = document.getElementById(p + '_qrzone'); if (z) z.innerHTML = `<div class="mk-qrzone"><div class="mk-etat">${html}</div></div>`; }
+function mkLireQrPhoto(p, input) {
+  const fichier = input.files && input.files[0]; input.value = ''; if (!fichier) return;
+  mkLireChampsFournisseur(p);
+  mkEtatQr(p, 'Lecture de la photo…');
+  mkLireFichier(fichier).then(img => mkLireQR(img, [1200, 800, 1700, 2400]).then(res => {
+    if (res) {
+      const a = mkAnalyserQR(res.texte);
+      MF.qr_photo = mkDecouperQR(res.toile, res.points);
+      mkAppliquerQR(a);
+    } else {
+      MF.carte_photo = mkReduire(img, 1100, 0.72);
+    }
+    mkMajQrZone(p); mkBrouillonGarder();
+    if (navigator.vibrate) navigator.vibrate(40);
+  })).catch(e => {
+    mkEtatQr(p, '<span class="mk-ko">Le lecteur de QR ne répond pas (' + E(e.message) + ').</span> Tapez son WeChat à la main.');
+  });
+}
+// Le scan en direct : même écran que le code-barres, avec un cadre carré.
+async function mkScannerEnDirect(p) {
+  if (mkScannerEnDirect.occupe) return;
+  mkScannerEnDirect.occupe = true;
+  mkLireChampsFournisseur(p);
+  let flux = null, voile = null, fini = false;
+  const fermer = () => {
+    fini = true; mkScannerEnDirect.occupe = false;
+    if (voile) { const vv = voile.querySelector('video'); if (vv) { try { vv.srcObject = null; } catch (e) {} }
+      try { if (voile.open && voile.close) voile.close(); } catch (e) {} voile.remove(); voile = null; }
+    if (flux) flux.getTracks().forEach(t => t.stop());
+  };
+  try {
+    voile = document.createElement('dialog');
+    voile.className = 'voile-scan mk-scan-qr';
+    voile.innerHTML = '<div class="scan-titre">Visez le QR code WeChat dans le carré</div>'
+      + '<div class="scan-zone"><video muted autoplay playsinline webkit-playsinline></video>'
+      + '<div class="scan-cadre"><span class="scan-ligne"></span></div></div>'
+      + '<div class="scan-etat" role="status">Ouverture de l\'appareil photo…</div>'
+      + '<button type="button" class="b gris scan-annuler">Annuler</button>';
+    document.body.appendChild(voile);
+    if (typeof voile.showModal === 'function') voile.showModal(); else voile.setAttribute('open', '');
+    voile.addEventListener('close', () => { if (!fini) fermer(); });
+    voile.querySelector('.scan-annuler').onclick = fermer;
+    const etat = voile.querySelector('.scan-etat');
+    const v = voile.querySelector('video'); v.muted = true;
+    // Le lecteur se prépare pendant que la caméra s'ouvre.
+    const pret = mkLecteurNatif().then(n => n || mkChargerZXing());
+    flux = await navigator.mediaDevices.getUserMedia({ audio: false,
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } });
+    if (fini) { flux.getTracks().forEach(t => t.stop()); return; }
+    v.srcObject = flux;
+    await new Promise(ok => { if (v.readyState >= 1) ok(); else v.addEventListener('loadedmetadata', ok, { once: true }); });
+    if (fini) return;
+    try { await v.play(); } catch (e) {}
+    try { await pret; } catch (e) { fermer(); mkEtatQr(p, '<span class="mk-ko">Le lecteur de QR ne s\'est pas chargé.</span> Prenez plutôt le QR en photo (bouton vert).'); return; }
+    if (fini) return;
+    etat.textContent = 'Approchez le téléphone, bien droit, avec de la lumière.';
+    const chercher = async () => {
+      if (fini) return;
+      try {
+        if (v.videoWidth) {
+          const res = await mkLireQR(v, [960]);
+          if (res && !fini) {
+            voile.classList.add('scan-lu'); etat.textContent = 'QR lu ✓';
+            if (navigator.vibrate) navigator.vibrate(40);
+            MF.qr_photo = mkDecouperQR(res.toile, res.points);
+            mkAppliquerQR(mkAnalyserQR(res.texte));
+            fini = true;
+            setTimeout(() => { fermer(); mkMajQrZone(p); mkBrouillonGarder(); }, 450);
+            return;
+          }
+        }
+      } catch (e) { /* on continue de regarder */ }
+      setTimeout(chercher, 160);
+    };
+    chercher();
+  } catch (e) {
+    if (fini) return;
+    fermer();
+    avertir('La caméra ne s\'ouvre pas ici (' + (e && e.message ? e.message : e) + ').\nPrenez plutôt le QR en photo : bouton vert « Photo de son QR ».', 7000);
+  }
+}
+
+// ---------- Garder la fiche : une offre dans Comparer + la fiche du fournisseur ----------
+function mkLireChamps() {
+  const val = (id) => { const ch = document.getElementById(id); return ch ? ch.value : undefined; };
+  ['article', 'prix', 'moq', 'note'].forEach(k => { const v = val('mk_' + k); if (v !== undefined) MB[k] = v; });
+  const d = val('mk_devise'); if (d) MB.devise = d;
+  mkLireChampsFournisseur('mk');
+}
+function mkGarder(suite) {
+  mkLireChamps();
+  const b = MB;
+  if (!b.photo && !b.photo2 && !String(b.article || '').trim() && !(num(b.prix) > 0)) {
+    avertir('Prenez au moins une photo, ou tapez le produit ou le prix.'); return;
+  }
+  const maintenant = mkMaintenant();
+  // 1. Le fournisseur
+  let f = mkFournisseur(b.fid);
+  if (!f && mkFourARempli()) {
+    f = { id: idUnique('f'), nom: '', marche: '', batiment: '', allee: '', wechat: '', tel: '', qualite: '', remarque: '',
+      le: maintenant.slice(0, 10), source: 'marche', decision: '' };
+    mkFournisseurs().unshift(f);
+  }
+  if (f) {
+    if (MB.fourOuvert || !b.fid) MK_CHAMPS_F.forEach(k => { if (MF[k] !== undefined && (String(MF[k]).trim() || f[k] === undefined)) f[k] = String(MF[k]).trim(); });
+    if (!f.code) f.code = mkProchainCode();
+    f.vu_le = maintenant;
+  }
+  // 2. Le produit : la comparaison du même nom, sinon une nouvelle
+  const nom = String(b.article || '').trim() || ('Produit vu à ' + mkHeure(maintenant) + (f ? ' chez ' + (f.code || '') : ''));
+  C.comparaisons = C.comparaisons || [];
+  let c = C.comparaisons.find(x => normaliserNom(x.article) === normaliserNom(nom));
+  if (!c) {
+    c = { id: idUnique('c'), article: nom, quantite: num(b.moq) > 0 ? num(b.moq) : 100,
+      prix_vente_vise_gnf: 0, offres: [], choisi: null, motif: '', note: '', source: 'marche' };
+    C.comparaisons.push(c);
+  }
+  c.offres = c.offres || [];
+  c.maj = maintenant;
+  c.offres.push({ id: idUnique('o'), fournisseur: f ? mkNomFournisseur(f) : '', fournisseur_id: f ? f.id : '',
+    prix: num(b.prix), devise: b.devise || mkDevise(), moq: num(b.moq), delai: 0, qualite: 0,
+    note: String(b.note || '').trim(), photo: b.photo || '', photo2: b.photo2 || '', vu_le: maintenant });
+  C.voyage.marche_devise = b.devise || mkDevise();
+  sauverLocal();
+  mkBrouillonEffacer();
+  const resume = nom + (num(b.prix) > 0 ? ' : ' + mkPrixCourt({ prix: b.prix, devise: b.devise }) : '') + (f ? '\nChez ' + mkNomFournisseur(f) : '');
+  MB = null; MF = null;
+  if (suite) { marcheOuvrir({ neuf: true, fid: f ? f.id : '' }); avertir('✅ Gardé — ' + resume, 3500); }
+  else { fermerBoite(); allerA('comparer'); avertir('✅ Gardé dans Comparer — ' + resume, 4500); }
+}
+function mkFermer() {
+  mkLireChamps();
+  if (!mkBrouillonVide(MB)) {
+    // On ne jette rien : la fiche reste en brouillon et revient au prochain appui sur 📷 Marché.
+    mkBrouillonGarder();
+    avertir('Fiche gardée en brouillon : elle revient au prochain appui sur 📷 Marché.', 4500);
+  } else { MB = null; MF = null; mkBrouillonEffacer(); }
+  fermerBoite();
+}
+function mkRecommencer() {
+  if (!confirmerEnDeuxTemps('mk-recommencer', 'Effacer cette fiche (photos, prix, notes) ?')) return;
+  mkBrouillonEffacer(); MB = null; MF = null; marcheOuvrir({ neuf: true });
+}
+// La boîte se ferme aussi par le geste « retour » : le brouillon reste.
+document.getElementById('boite').addEventListener('close', () => {
+  const d = document.getElementById('boite');
+  if (d.classList.contains('mk-boite')) { d.classList.remove('mk-boite'); if (MB) mkBrouillonGarder(); }
+});
+
+// ---------- L'image en grand ----------
+function mkApercu(src, legende) {
+  if (!src) return;
+  const d = document.createElement('dialog'); d.className = 'mk-apercu';
+  d.innerHTML = `<img src="${src}" alt=""><div class="leg">${legende || ''}</div><button type="button" class="b gris">Fermer</button>`;
+  document.body.appendChild(d);
+  const fermer = () => { try { d.close(); } catch (e) {} d.remove(); };
+  d.querySelector('button').onclick = fermer;
+  d.addEventListener('close', () => d.remove());
+  if (typeof d.showModal === 'function') d.showModal(); else d.setAttribute('open', '');
+}
+function mkVoirOffre(cid, oid, champ) {
+  const c = trouverComparaison(cid); const o = c && (c.offres || []).find(x => x.id === oid);
+  if (o) mkApercu(o[champ || 'photo'], E(c.article) + ' — ' + E(mkPrixCourt(o)) + (o.fournisseur ? '<br>' + E(o.fournisseur) : ''));
+}
+function mkVoirQR(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  mkApercu(f.qr_photo || f.carte_photo, f.qr_photo
+    ? 'Pour l\'ajouter : <b>appuyez longuement sur l\'image</b> → « Enregistrer dans Photos ». Puis dans WeChat : <b>+ → Scanner → icône image</b> → choisissez ce QR.'
+    : 'Carte de visite de ' + E(mkNomFournisseur(f)));
+}
+
+// ---------- Fournisseurs rencontrés : qui contacter ? ----------
+let mkFiltre = 'tous', mkCherche = '';
+const MK_DECISIONS = [['contacter', '✅ À contacter'], ['voir', '🤔 Peut-être'], ['non', '❌ Non']];
+function mkDecider(fid, d) {
+  const f = mkFournisseur(fid); if (!f) return;
+  f.decision = f.decision === d ? '' : d;
+  sauverLocal(); dessiner();
+}
+function mkCompterDecisions() {
+  const n = { tous: 0, contacter: 0, voir: 0, non: 0, rien: 0 };
+  mkFournisseurs().forEach(f => { n.tous++; n[f.decision && n[f.decision] !== undefined ? f.decision : 'rien']++; });
+  return n;
+}
+function mkFiltrer(v) { mkFiltre = v; dessiner(); }
+function mkChercher(v) { mkCherche = v; const z = document.getElementById('mk_liste_four'); if (z) z.innerHTML = mkListeFournisseursHtml(); }
+function mkListeFournisseursHtml() {
+  const q = normaliserNom(mkCherche);
+  const liste = mkFournisseursRecents().filter(f => {
+    if (mkFiltre === 'rien' ? f.decision : (mkFiltre !== 'tous' && f.decision !== mkFiltre)) return false;
+    if (!q) return true;
+    const offres = mkOffresDe(f).map(x => x.c.article).join(' ');
+    return normaliserNom([f.code, f.nom, f.societe, f.wechat, f.tel, f.allee, f.marche, f.remarque, offres].join(' ')).includes(q);
+  });
+  if (!liste.length) return `<div class="carte"><p class="mk-aide" style="font-size:16px">${mkFournisseurs().length
+    ? 'Aucun fournisseur dans ce choix.' : 'Aucun fournisseur pour l\'instant. Touchez <b>📷 Marché</b> devant un stand : photo, prix, et son QR WeChat.'}</p></div>`;
+  return liste.map(mkCarteFournisseurHtml).join('');
+}
+function mkCarteFournisseurHtml(f) {
+  const offres = mkOffresDe(f);
+  const aWx = f.wechat || f.wechat_lien || f.qr_photo;
+  return `<div class="mk-fiche" id="mkf-${f.id}">
+    <div class="mk-fiche-tete">
+      ${f.qr_photo ? `<img class="qr" src="${f.qr_photo}" alt="QR WeChat" onclick="mkVoirQR('${f.id}')">`
+        : f.carte_photo ? `<img class="qr" src="${f.carte_photo}" alt="Carte" onclick="mkVoirQR('${f.id}')">` : '<div class="sans" aria-hidden="true">👤</div>'}
+      <div style="flex:1;min-width:0">
+        <div class="nom"><span class="mk-code">${E(f.code || '—')}</span> ${E(f.nom || f.societe || '(sans nom)')}</div>
+        ${f.societe && f.nom ? `<div class="det">${E(f.societe)}</div>` : ''}
+        ${f.allee || f.marche ? `<div class="det">📍 ${E([f.marche, f.allee].filter(Boolean).join(' · '))}</div>` : ''}
+        <div class="det">${aWx ? '💬 WeChat ' + E(f.wechat && !/^https?:/i.test(f.wechat) ? f.wechat : 'gardé') : '<span class="mk-att">pas de WeChat</span>'}${f.tel ? ' · 📞 ' + E(f.tel) : ''}${f.vu_le ? ' · vu le ' + mkJour(f.vu_le) + ' à ' + mkHeure(f.vu_le) : ''}</div>
+      </div>
+    </div>
+    <div class="mk-decision">${MK_DECISIONS.map(([k, t]) => `<button type="button" class="${f.decision === k ? 'on-' + k : ''}" onclick="mkDecider('${f.id}','${k}')">${t}</button>`).join('')}</div>
+    ${offres.length ? `<div class="mk-produits">${offres.map(({ c, o }) => `<div class="mk-prod">
+        ${o.photo ? `<img src="${o.photo}" alt="" onclick="mkVoirOffre('${c.id}','${o.id}')">` : '<div class="vide">📦</div>'}
+        <div class="t"><b>${E(c.article)}</b>${E(mkPrixCourt(o))}${num(o.moq) ? '<br>min. ' + nf(o.moq) : ''}${o.note ? '<br><span class="mk-aide">' + E(String(o.note).slice(0, 60)) + '</span>' : ''}</div></div>`).join('')}</div>`
+      : '<p class="mk-aide">Aucun produit noté chez lui pour l\'instant.</p>'}
+    ${f.remarque ? `<p class="mk-aide" style="font-size:15px">📝 ${E(f.remarque)}</p>` : ''}
+    <div class="mk-actions">
+      <button type="button" class="b wechat" onclick="mkContact('${f.id}')">💬 L'ajouter sur WeChat</button>
+      <button type="button" class="b vert" onclick="marcheOuvrir({fid:'${f.id}'})">📷 Noter un produit</button>
+      ${f.tel ? `<button type="button" class="b contour" onclick="location.href='tel:${E(String(f.tel).replace(/[^\d+]/g, ''))}'">📞 Appeler</button>` : ''}
+      <button type="button" class="b gris" onclick="mkModifierFournisseur('${f.id}')">✏️ Modifier</button>
+    </div>
+  </div>`;
+}
+function ecranRencontres() {
+  mkAssurerCodes();
+  const n = mkCompterDecisions();
+  const filtres = [['tous', 'Tous'], ['contacter', '✅ À contacter'], ['voir', '🤔 Peut-être'], ['non', '❌ Non'], ['rien', '❔ Pas décidé']];
+  const interp = mkFichesInterprete();
+  return `<button class="b gris" style="margin-bottom:12px;min-height:50px;font-size:16px" onclick="allerA('comparer')">← Retour à Comparer</button>
+  <div class="carte"><h2 style="font-size:19px">👥 Fournisseurs rencontrés (${n.tous})</h2>
+    <p class="mk-aide" style="font-size:15px">Chaque fournisseur avec ses produits, ses prix et son WeChat. Le soir, marquez
+    <b>✅ à contacter</b>, <b>🤔 peut-être</b> ou <b>❌ non</b>. Son <b>code</b> (F01, F02…) est le nom à lui donner dans WeChat :
+    vous le retrouvez ensuite tout de suite.</p>
+    <div class="mk-filtres">${filtres.map(([k, t]) => `<button type="button" class="mk-puce${mkFiltre === k ? ' on' : ''}" onclick="mkFiltrer('${k}')">${t} (${n[k]})</button>`).join('')}</div>
+    <input class="mk-recherche" value="${E(mkCherche)}" placeholder="🔎 Chercher : nom, produit, WeChat, code F…" oninput="mkChercher(this.value)" style="font-size:17px">
+    ${interp.length ? `<div class="alerte a-info" style="font-size:15px">${interp.length} fiche(s) fournisseur faite(s) avec l'<b>Interprète KYLO</b> ne sont pas encore dans le carnet.
+      <div style="height:8px"></div><button class="b contour" style="min-height:50px;font-size:16px" onclick="mkImporterInterprete()">Les ajouter ici</button></div>` : ''}
+    <div style="height:6px"></div>
+    <button class="b vert" style="min-height:56px;font-size:17px" onclick="marcheOuvrir()">📷 Noter un produit vu au marché</button>
+  </div>
+  <div id="mk_liste_four">${mkListeFournisseursHtml()}</div>`;
+}
+// Les fiches d'avant n'ont pas de code : on leur en donne un, une fois, sans rien changer d'autre.
+function mkAssurerCodes() {
+  let change = false;
+  mkFournisseursRecents().slice().reverse().forEach(f => { if (!f.code) { f.code = mkProchainCode(); change = true; } });
+  if (change) sauverLocal();
+}
+
+// ---------- L'ajouter sur WeChat ----------
+function mkTexteNomWeChat(f) {
+  const produits = [...new Set(mkOffresDe(f).map(x => x.c.article))].slice(0, 2).join(', ');
+  return [f.code, f.nom || f.societe, produits].filter(Boolean).join(' ').slice(0, 60);
+}
+function mkCopier(texte, message) {
+  const fini = () => avertir(message || 'Copié.');
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(texte).then(fini, () => mkCopierVieux(texte, fini)); return; }
+  } catch (e) {}
+  mkCopierVieux(texte, fini);
+}
+function mkCopierVieux(texte, fini) {
+  const t = document.createElement('textarea'); t.value = texte; t.setAttribute('readonly', '');
+  t.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+  (document.querySelector('dialog[open]') || document.body).appendChild(t);
+  t.select(); try { t.setSelectionRange(0, 99999); } catch (e) {}
+  let ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+  t.remove();
+  if (ok) fini(); else avertir('Copie impossible ici. Recopiez : ' + texte, 8000);
+}
+function mkPartagerQR(fid) {
+  const f = mkFournisseur(fid); if (!f || !f.qr_photo) return;
+  try {
+    const [tete, donnees] = f.qr_photo.split(',');
+    const bin = atob(donnees); const oct = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) oct[i] = bin.charCodeAt(i);
+    const fichier = new File([oct], (f.code || 'fournisseur') + '-wechat.jpg', { type: (/data:([^;]+)/.exec(tete) || [])[1] || 'image/jpeg' });
+    if (navigator.canShare && navigator.canShare({ files: [fichier] })) {
+      navigator.share({ files: [fichier], title: mkNomFournisseur(f) }).catch(() => {});
+      return;
+    }
+  } catch (e) {}
+  mkVoirQR(fid);
+}
+function mkContact(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const nomWx = mkTexteNomWeChat(f);
+  const id = f.wechat && !/^https?:/i.test(f.wechat) ? f.wechat : '';
+  mkBoite(`<div class="mk-dlg">
+    <h3>💬 Ajouter ${E(mkNomFournisseur(f))} sur WeChat</h3>
+    ${f.qr_photo ? `<img class="mk-grand-qr" src="${f.qr_photo}" alt="QR WeChat">` : ''}
+    ${f.qr_photo ? `<ol class="mk-etapes">
+        <li><b>Appuyez longuement sur le QR</b> ci-dessus → « Enregistrer dans Photos » (ou le bouton juste en dessous).</li>
+        <li>Ouvrez WeChat → <b>+</b> (en haut à droite) → <b>Scanner</b> → l'<b>icône image</b> → choisissez ce QR.</li>
+        <li>Quand il est ajouté, donnez-lui le nom <b>${E(nomWx)}</b> (bouton « Copier le nom »).</li></ol>`
+      : id ? `<ol class="mk-etapes"><li>Copiez son identifiant : <b>${E(id)}</b>.</li>
+        <li>WeChat → <b>+</b> → <b>Ajouter des contacts</b> → collez l'identifiant.</li>
+        <li>Donnez-lui le nom <b>${E(nomWx)}</b>.</li></ol>`
+      : '<p class="mk-aide" style="font-size:15px">Aucun QR ni identifiant WeChat gardé pour lui. Touchez « Modifier » pour photographier son QR ou taper son WeChat.</p>'}
+    <div class="mk-boutons">
+      ${f.qr_photo ? `<button class="b vert" onclick="mkPartagerQR('${f.id}')">🖼️ Enregistrer le QR dans mes photos</button>` : ''}
+      ${id ? `<button class="b vert" onclick="mkCopierId('${f.id}')">📋 Copier son identifiant WeChat</button>` : ''}
+      <button class="b contour" onclick="mkCopierNom('${f.id}')">📋 Copier le nom à lui donner (${E(f.code || '')})</button>
+      ${f.wechat_lien ? `<button class="b contour" onclick="mkOuvrirLien('${f.id}')">🔗 Ouvrir son lien WeChat</button>` : ''}
+      <button class="b contour" onclick="location.href='weixin://'">Ouvrir WeChat</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button>
+    </div></div>`);
+}
+function mkCopierNom(fid) { const f = mkFournisseur(fid); if (f) mkCopier(mkTexteNomWeChat(f), 'Nom copié : dans WeChat, ouvrez son profil → « Remarque » → collez.'); }
+function mkCopierId(fid) { const f = mkFournisseur(fid); if (f && f.wechat) mkCopier(f.wechat, 'Identifiant copié : WeChat → + → Ajouter des contacts → collez.'); }
+function mkOuvrirLien(fid) { const f = mkFournisseur(fid); if (f && f.wechat_lien) window.open(f.wechat_lien, '_blank'); }
+
+// ---------- Dans Comparer : la photo, les francs et le WeChat à côté de chaque prix ----------
+function mkEnteteComparer() {
+  const nOffres = (C.comparaisons || []).reduce((s, c) => s + (c.offres || []).length, 0);
+  const nF = mkFournisseurs().length;
+  return `<div class="mk-entree">
+    <button class="b vert" onclick="marcheOuvrir()">📷 Noter un produit vu au marché</button>
+    <button class="b contour" onclick="allerA('rencontres')">👥 Fournisseurs rencontrés (${nF}) — qui contacter ?</button>
+    <p class="mk-compte">${nOffres} prix noté${nOffres > 1 ? 's' : ''} · ${(C.comparaisons || []).length} produit(s) · ${nF} fournisseur(s). Le dernier noté est en haut.</p>
+  </div>`;
+}
+function mkCelluleFournisseur(c, o) {
+  const f = mkFournisseur(o.fournisseur_id);
+  const nom = f ? mkNomFournisseur(f) : (o.fournisseur || '(sans nom)');
+  const aWx = f && (f.wechat || f.wechat_lien || f.qr_photo);
+  return `<div class="mk-cellule">${o.photo ? `<img src="${o.photo}" alt="" onclick="mkVoirOffre('${c.id}','${o.id}')">` : ''}
+    <div>${E(nom)}${f ? `<br><button type="button" class="mk-wx" onclick="mkContact('${f.id}')">💬 ${aWx ? 'WeChat' : 'Contact'}</button>` : ''}</div></div>`;
+}
+function mkCelluleGnf(o) {
+  const d = o.devise || C.voyage.devise || 'GNF';
+  if (d === 'GNF' || !(num(o.prix) > 0) || !(tauxDe(d) > 0)) return '';
+  return `<div class="mk-gnf">= ${gnfStrict(enGnf(num(o.prix), d))}</div>`;
+}
+function mkOffrePhotos(c, o) {
+  const f = mkFournisseur(o.fournisseur_id);
+  const photos = ['photo', 'photo2'].filter(k => o[k]).map(k => `<img src="${o[k]}" alt="" onclick="mkVoirOffre('${c.id}','${o.id}','${k}')">`).join('');
+  if (!photos && !f && !o.vu_le) return '';
+  return `${photos ? `<div class="mk-photos-offre">${photos}</div>` : ''}
+    <div class="mk-aide">${o.vu_le ? 'Vu le ' + mkJour(o.vu_le) + ' à ' + mkHeure(o.vu_le) : ''}${f ? ` · <button type="button" class="mk-lien" onclick="mkContact('${f.id}')">💬 ${E(mkNomFournisseur(f))}</button>` : ''}</div>`;
+}
+// La boîte est peut-être déjà ouverte (fiche suivante) : on change son contenu sans la rouvrir.
+function mkBoite(html) {
+  const d = document.getElementById('boite');
+  if (d && d.open) { document.getElementById('contenuBoite').innerHTML = html; d.scrollTop = 0; return; }
+  boite(html);
+}
+
+// ---------- Modifier une fiche fournisseur ----------
+function mkModifierFournisseur(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  MF = mkCopieFournisseur(f);
+  boite(`<div class="mk-dlg">
+    <h3>✏️ <span class="mk-code">${E(f.code || '—')}</span> ${E(f.nom || f.societe || 'Fournisseur')}</h3>
+    ${mkChampsFournisseurHtml('mm')}
+    <label for="mm_f_societe">Société</label>
+    <input id="mm_f_societe" value="${E(f.societe)}" oninput="MF.societe=this.value">
+    <label for="mm_f_marche">Marché / ville</label>
+    <input id="mm_f_marche" value="${E(f.marche)}" placeholder="ex : Yiwu, district 2" oninput="MF.marche=this.value">
+    <label for="mm_f_remarque">Remarques — dictez avec le micro du clavier 🎙️</label>
+    <textarea id="mm_f_remarque" rows="3">${E(f.remarque)}</textarea>
+    <div class="mk-boutons">
+      <button class="b vert" onclick="mkEnregistrerFournisseur('${f.id}')">Enregistrer</button>
+      <button class="b gris" onclick="MF=null;fermerBoite()">Fermer sans changer</button>
+      <button class="b rouge" onclick="mkSupprimerFournisseur('${f.id}')">Supprimer ce fournisseur</button>
+    </div></div>`);
+}
+function mkEnregistrerFournisseur(fid) {
+  const f = mkFournisseur(fid); if (!f || !MF) return;
+  mkLireChampsFournisseur('mm');
+  const r = document.getElementById('mm_f_remarque'); if (r) f.remarque = r.value;
+  MK_CHAMPS_F.forEach(k => { if (MF[k] !== undefined) f[k] = String(MF[k]).trim(); });
+  // Le nom affiché dans les offres suit la fiche.
+  (C.comparaisons || []).forEach(c => (c.offres || []).forEach(o => { if (o.fournisseur_id === f.id) o.fournisseur = mkNomFournisseur(f); }));
+  MF = null; sauverLocal(); fermerBoite(); dessiner();
+}
+function mkSupprimerFournisseur(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const n = mkOffresDe(f).length;
+  if (!confirmerEnDeuxTemps('mk-supf-' + fid, 'Supprimer ' + mkNomFournisseur(f) + ' ?' + (n ? ' Ses ' + n + ' prix restent dans Comparer.' : ''))) return;
+  C.fournisseurs = mkFournisseurs().filter(x => x.id !== fid);
+  (C.comparaisons || []).forEach(c => (c.offres || []).forEach(o => { if (o.fournisseur_id === fid) o.fournisseur_id = ''; }));
+  MF = null; sauverLocal(); fermerBoite(); dessiner();
+}
+
+// ---------- Les fiches faites avec l'Interprète KYLO (même site, même téléphone) ----------
+function mkFichesInterprete() {
+  let fiches = [];
+  try { fiches = JSON.parse(localStorage.getItem('kylo.interp.fiches') || '[]'); } catch (e) { fiches = []; }
+  if (!Array.isArray(fiches)) return [];
+  const deja = new Set(mkFournisseurs().map(f => f.interprete_id).filter(Boolean));
+  return fiches.filter(x => x && x.id && !x.example && !deja.has(x.id));
+}
+function mkImporterInterprete() {
+  const fiches = mkFichesInterprete(); if (!fiches.length) return;
+  fiches.forEach(x => {
+    const lien = /^https?:/i.test(x.wechat || '') ? x.wechat : '';
+    mkFournisseurs().unshift({ id: idUnique('f'), code: mkProchainCode(), nom: x.nom || '', societe: x.societe || '', marche: '',
+      batiment: '', allee: x.stand || x.adresse || '', wechat: lien ? '' : (x.wechat || ''), wechat_lien: lien, tel: x.tel || x.whatsapp || '',
+      email: x.email || '', site: x.site || '', qualite: '', remarque: [x.produits, x.prix, x.note].filter(Boolean).join(' · '),
+      le: String(x.creeLe || mkMaintenant()).slice(0, 10), vu_le: x.creeLe || '', source: 'interprete', interprete_id: x.id, decision: '' });
+  });
+  sauverLocal(); avertir(fiches.length + ' fiche(s) de l\'Interprète ajoutée(s).'); dessiner();
+}
+
+// ---------- La fiche Achat : le prix dans sa devise, et les francs juste en dessous ----------
+function majConvAchat() {
+  const z = document.getElementById('a_conv'); if (!z) return;
+  const p = document.getElementById('a_pu'), d = document.getElementById('a_dev');
+  z.innerHTML = p && d ? mkConversionHtml(p.value, d.value, true) : '';
+}
+
+// ---------- Le bouton vert 📷 Marché, sur tous les écrans ----------
+(function () {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'mk-fab'; b.id = 'boutonMarche';
+  b.innerHTML = '<span class="ic" aria-hidden="true">📷</span> Marché';
+  b.setAttribute('aria-label', 'Noter un produit vu au marché : photo, prix, fournisseur');
+  b.onclick = () => marcheOuvrir();
+  document.body.appendChild(b);
+})();
 </script>
 <script>
 

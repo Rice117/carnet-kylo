@@ -10,6 +10,14 @@ Le carnet d'achats de KYLO EURGUINE, en application pour téléphone et ordinate
 
 Version 1.0.3 — 02/10/2026 (mémoire pleine : plus aucun achat perdu en silence ; corrections des deux vérifications indépendantes).
 
+Version 1.2.0 — 19/10/2026 : **Au marché**. Bouton vert 📷 Marché : photo du produit (et du prix), prix dit par
+le vendeur dans sa devise (¥ par défaut) avec les francs guinéens et les euros tout de suite, minimum de commande,
+notes ; QR WeChat ou carte de visite (vCard) lus par le carnet et gardés en image ; tout se range dans Comparer
+(une offre par prix, avec photo) et dans « Fournisseurs rencontrés » (code F01…, ✅ à contacter / 🤔 peut-être / ❌ non,
+ajout sur WeChat). Fiche Achat : les francs sous le prix. Reprise des fiches de l'Interprète. Rien de retiré.
+⚠ Retouche faite directement sur ce fichier (l'ordinateur du magasin n'était pas joignable) : à reporter dans
+`KYLO-Achats.html` avant la prochaine fabrication par `construire.js`, sinon elle serait perdue.
+
 ## fiche.html — page d'aide de l'Interprète KYLO (16/10/2026)
 
 Met une fiche fournisseur dans les Contacts de l'iPhone et lance l'appel. Elle ne garde rien

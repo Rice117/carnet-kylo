@@ -7735,7 +7735,12 @@ function trQuitterEcran(nom) {
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('actif', b.dataset.onglet === o || (b.dataset.onglet === 'rencontres' && TR_SOUS_FOURNISSEURS.includes(o))));
 })();
 window.addEventListener('load', () => setTimeout(() => {
-  trOcrVerifier().then(() => { trOcrMajEtat(); trLancerLectures(); });
+  trOcrVerifier().then(() => {
+    trOcrMajEtat(); trLancerLectures();
+    // Un carnet qui avait déjà la lecture des cartes (1.4.0) range tout de suite les outils des fichiers WeChat (3 Mo),
+    // quel que soit l'onglet ouvert : ainsi un PDF reçu se lira aussi sans Internet.
+    if (trOcrEtat.pret && !trOcrEtat.outils && navigator.onLine !== false) trOcrAuto();
+  });
 }, 800));
 </script>
 <script>

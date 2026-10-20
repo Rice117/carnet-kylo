@@ -892,7 +892,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.5.2';
+window.KYLO_APPLICATION = '1.6.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -4507,7 +4507,7 @@ function mkPrixCourt(o) {
   const p = num(o.prix); if (!(p > 0)) return 'prix ?';
   const d = o.devise || C.voyage.devise || 'GNF';
   const g = enGnf(p, d);
-  return nf(p, 2) + ' ' + mkSym(d) + (d !== 'GNF' && g > 0 ? ' = ' + gnfStrict(g) : '');
+  return nf(p, 2) + ' ' + mkSym(d) + (d !== 'GNF' && g > 0 ? ' = ' + gnfStrict(g) : '') + (d !== 'EUR' && g > 0 && tauxDe('EUR') > 0 ? ' ≈ ' + nf(g / tauxDe('EUR'), 2) + ' €' : '');
 }
 
 // ---------- Les photos : allégées, mais nettes ----------
@@ -4555,7 +4555,7 @@ function mkFicheNeuve(fid) {
   MB = { photo: '', photo2: '', article: '', prix: '', devise: mkDevise(), moq: '', note: '', fid: fid || '', fourOuvert: !fid };
   MF = mkCopieFournisseur(mkFournisseur(fid));
 }
-const MK_CHAMPS_F = ['nom', 'societe', 'contact', 'poste', 'marche', 'allee', 'wechat', 'wechat_lien', 'tel', 'mobile', 'tel_fixe', 'email', 'site', 'alibaba', 'adresse', 'whatsapp_lien', 'qr_photo', 'carte_photo', 'qr_texte'];
+const MK_CHAMPS_F = ['nom', 'societe', 'contact', 'poste', 'marche', 'allee', 'wechat', 'wechat_lien', 'tel', 'mobile', 'tel_fixe', 'email', 'site', 'alibaba', 'adresse', 'whatsapp_lien', 'whatsapp', 'wa_qr', 'qr_photo', 'carte_photo', 'qr_texte'];
 function mkCopieFournisseur(f) {
   const o = {}; MK_CHAMPS_F.forEach(k => { o[k] = f ? (f[k] || '') : ''; });
   if (f && !o.tel) o.tel = f.mobile || f.tel_fixe || '';          // 1.5.2 : le portable, une seule case
@@ -4930,9 +4930,10 @@ function mkLireQrPhoto(p, input) {
   mkEtatQr(p, 'Lecture de la photo…');
   mkLireFichier(fichier).then(img => mkLireQR(img, [1200, 800, 1700, 2400]).then(res => {
     if (res) {
-      const a = mkAnalyserQR(res.texte);
-      MF.qr_photo = mkDecouperQR(res.toile, res.points);
-      mkAppliquerQR(a);
+      const aq = mkAnalyserQR(res.texte), im = mkDecouperQR(res.toile, res.points);
+      if (aq.type === 'whatsapp') { MF.wa_qr = im; MF.whatsapp_lien = /^https?:/i.test(res.texte) ? res.texte : 'https://' + res.texte; }
+      else if (aq.type === 'wechat' || !MF.qr_photo) MF.qr_photo = im;
+      mkAppliquerQR(aq);
     } else {
       MF.carte_photo = mkReduire(img, 1100, 0.72);
     }
@@ -4988,8 +4989,10 @@ async function mkScannerEnDirect(p) {
           if (res && !fini) {
             voile.classList.add('scan-lu'); etat.textContent = 'QR lu ✓';
             if (navigator.vibrate) navigator.vibrate(40);
-            MF.qr_photo = mkDecouperQR(res.toile, res.points);
-            mkAppliquerQR(mkAnalyserQR(res.texte));
+            const aq = mkAnalyserQR(res.texte), im = mkDecouperQR(res.toile, res.points);
+      if (aq.type === 'whatsapp') { MF.wa_qr = im; MF.whatsapp_lien = /^https?:/i.test(res.texte) ? res.texte : 'https://' + res.texte; }
+      else if (aq.type === 'wechat' || !MF.qr_photo) MF.qr_photo = im;
+      mkAppliquerQR(aq);
             fini = true;
             setTimeout(() => { fermer(); mkMajQrZone(p); mkBrouillonGarder(); }, 450);
             return;
@@ -5131,11 +5134,9 @@ function mkCarteFournisseurHtml(f) {
   const aWx = f.wechat || f.wechat_lien || f.qr_photo;
   return `<div class="mk-fiche" id="mkf-${f.id}">
     <div class="mk-fiche-tete">
-      ${f.qr_photo ? `<img class="qr" src="${f.qr_photo}" alt="QR WeChat" onclick="mkVoirQR('${f.id}')">`
-        : f.carte_photo ? `<img class="qr" src="${f.carte_photo}" alt="Carte" onclick="mkVoirQR('${f.id}')">`
-        : ctDocs(f).find(d => d.type === 'carte') ? `<img class="qr ct-mini" data-doc="${E(ctDocs(f).find(d => d.type === 'carte').id)}" alt="Carte" onclick="ctOuvrirDossier('${f.id}')">` : '<div class="sans" aria-hidden="true">👤</div>'}
+      ${asImageTeteHtml(f, 'liste')}
       <div style="flex:1;min-width:0">
-        <div class="nom" style="cursor:pointer" onclick="ctOuvrirDossier('${f.id}')"><span class="mk-code">${E(f.code || '—')}</span> ${E(f.nom || f.societe || '(sans nom)')}</div>
+        <div class="nom" style="cursor:pointer" onclick="ctOuvrirDossier('${f.id}')"><span class="mk-code">${E(f.code || '—')}</span> ${E(asNomTete(f))}</div>
         ${f.societe && f.nom ? `<div class="det">${E(f.societe)}</div>` : ''}
         ${f.allee || f.marche ? `<div class="det">📍 ${E([f.marche, f.allee].filter(Boolean).join(' · '))}</div>` : ''}
         <div class="det">${aWx ? '💬 WeChat ' + E(f.wechat && !/^https?:/i.test(f.wechat) ? f.wechat : 'gardé') : '<span class="mk-att">pas de WeChat</span>'}${fsTel(f) ? ' · 📞 ' + E(ctTelLisible(fsTel(f))) : ''}${f.vu_le ? ' · vu le ' + mkJour(f.vu_le) + ' à ' + mkHeure(f.vu_le) : ''}</div>
@@ -5152,7 +5153,7 @@ function mkCarteFournisseurHtml(f) {
     <div class="mk-actions">
       <button type="button" class="b" style="grid-column:1/-1;min-height:56px;font-size:16px" onclick="ctOuvrirDossier('${f.id}')">📂 Sa fiche : carte, catalogue, prix</button>
       <button type="button" class="b wechat" onclick="mkContact('${f.id}')">💬 L'ajouter sur WeChat</button>
-      <button type="button" class="b vert" onclick="marcheOuvrir({fid:'${f.id}'})">📷 Noter un produit</button>
+      <button type="button" class="b vert" onclick="trStandOuvrir('${f.id}')">📷 Au stand : produit, prix</button>
       ${fsTel(f) ? `<button type="button" class="b contour" onclick="location.href='tel:${E(fsTel(f).replace(/[^\d+]/g, ''))}'">📞 Appeler</button>` : ''}
       <button type="button" class="b gris" onclick="mkModifierFournisseur('${f.id}')">✏️ Modifier</button>
     </div>
@@ -5167,15 +5168,15 @@ function ecranRencontres() {
   const interp = mkFichesInterprete();
   return `<div class="carte"><h2 style="font-size:19px">🏭 Fournisseurs rencontrés (${n.tous})</h2>
     <div class="ct-entree">
-      <button class="b vert tr-gros" onclick="trStandOuvrir()">⚡ Scanner un stand<small>carte + catalogue : tout se range chez lui</small></button>
+      <button class="b vert tr-gros" onclick="asOuvrir()">📷 Au stand<small>sa carte (2 faces), ses QR, ses produits et ses prix : tout au même endroit</small></button>
       <button class="b tr-gros" onclick="trPileOuvrir()">📚 Ranger une pile de photos<small>à l'hôtel : le carnet trie tout seul</small></button>
       <button class="b vert tr-gros" onclick="fwBoite()">📥 Fichier reçu sur WeChat<small>catalogue PDF, prix Excel : tout se remplit seul</small></button>
     </div>
     <div class="mk-deux tr-entree2">
       <button class="b contour" onclick="ctBoiteImport()">🤖 Ajouter ce que Claude a lu</button>
       <button class="b contour" onclick="allerA('catalogues')">📊 Comparer les prix par produit</button>
-      <button class="b contour" onclick="ctNouveauParCarte()">📇 Nouveau fournisseur : sa carte + son catalogue</button>
-      <button class="b contour" onclick="marcheOuvrir()">📷 Noter un produit vu au marché</button>
+      <button class="b contour" onclick="asNouveauStand()">📇 Nouveau fournisseur : sa carte + son catalogue</button>
+      <button class="b contour" onclick="allerA('comparer')">🛒 Les prix vus aux stands (Comparer)</button>
     </div>
     ${trOcrEtatHtml()}
   </div>
@@ -5268,7 +5269,7 @@ function mkEnteteComparer() {
   const nOffres = (C.comparaisons || []).reduce((s, c) => s + (c.offres || []).length, 0);
   const nF = mkFournisseurs().length;
   return `<div class="mk-entree">
-    <button class="b vert" onclick="marcheOuvrir()">📷 Noter un produit vu au marché</button>
+    <button class="b vert" onclick="asOuvrir()">📷 Noter un produit vu au marché</button>
     <button class="b contour" onclick="allerA('rencontres')">👥 Fournisseurs rencontrés (${nF}) — qui contacter ?</button>
     <button class="b contour" onclick="allerA('catalogues')">📊 Comparer les prix par produit (catalogues)</button>
     <p class="mk-compte">${nOffres} prix noté${nOffres > 1 ? 's' : ''} · ${(C.comparaisons || []).length} produit(s) · ${nF} fournisseur(s). Le dernier noté est en haut.</p>
@@ -5369,8 +5370,8 @@ function majConvAchat() {
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'mk-fab'; b.id = 'boutonMarche';
   b.innerHTML = '<span class="ic" aria-hidden="true">📷</span> Marché';
-  b.setAttribute('aria-label', 'Noter un produit vu au marché : photo, prix, fournisseur');
-  b.onclick = () => marcheOuvrir();
+  b.setAttribute('aria-label', 'Au stand : sa carte, ses QR, ses produits et ses prix');
+  b.onclick = () => (typeof asOuvrir === 'function' ? asOuvrir() : marcheOuvrir());
   document.body.appendChild(b);
 })();
 </script>
@@ -5565,7 +5566,7 @@ function ctPrixHtml(p) {
   const d = p.devise || 'USD', t = tauxDe(d);
   if (!(t > 0)) return `<span class="mk-att">Taux du ${E(d)} à remplir (Voyage → Taux de change)</span>`;
   const g = prix * t;
-  return `= ${gnfStrict(g)} <span class="rendu">· arrivé au magasin ≈ ${gnfStrict(g * (1 + fraisPourcent() / 100))}</span>`;
+  return `= ${gnfStrict(g)}${d !== 'EUR' && tauxDe('EUR') > 0 ? ' ≈ ' + nf(g / tauxDe('EUR'), 2) + ' €' : ''} <span class="rendu">· arrivé au magasin ≈ ${gnfStrict(g * (1 + fraisPourcent() / 100))}</span>`;
 }
 function ctPrixGnf(p) { const prix = num(p.prix), t = tauxDe(p.devise || 'USD'); return prix > 0 && t > 0 ? prix * t : 0; }
 
@@ -5902,7 +5903,7 @@ function ecranDossier() {
   return `<button class="b gris" style="margin-bottom:12px;min-height:50px;font-size:16px" onclick="ctDossier=null;allerA('rencontres')">← Tous les fournisseurs</button>
   <div class="carte">
     <div class="mk-fiche-tete">
-      ${f.qr_photo ? `<img class="qr" src="${f.qr_photo}" alt="QR WeChat" onclick="mkVoirQR('${f.id}')">` : '<div class="sans" aria-hidden="true">🏭</div>'}
+      ${asImageTeteHtml(f, 'dossier')}
       <div style="flex:1;min-width:0">
         <p class="ct-titre"><span class="mk-code">${E(f.code || '—')}</span> ${E(f.nom || f.societe || 'Nouveau fournisseur')}</p>
         ${f.societe ? `<p class="ct-sous">${E(f.societe)}</p>` : ''}
@@ -5915,6 +5916,7 @@ function ecranDossier() {
     ${ctStatutPrixHtml(f)}
     ${trLuAutoHtml(f)}${trEnLecture(f) ? '<div class="ct-statut">⏳ Le carnet lit sa carte…</div>' : ''}
     <div class="ct-entree">
+      <button class="b vert" onclick="trStandOuvrir('${f.id}')">📷 Au stand : sa carte, ses QR, ses produits et ses prix</button>
       <button class="b vert" onclick="trDemander('${f.id}')">✉️ ${f.demande_le ? 'Redemander' : 'Demander'} les prix (WeChat, e-mail)</button>
       ${ctProduits(f).length ? `<button class="b contour" onclick="trBoiteReponse('${f.id}')">💬 Coller sa réponse : les prix se placent seuls</button>` : ''}
       ${f.demande_le && ctNbPrix(f) < Math.max(1, ctProduits(f).length) ? `<button class="b contour" onclick="ctBoiteDemande('${f.id}', true)">🔔 Relancer</button>` : ''}
@@ -5931,7 +5933,8 @@ function ecranDossier() {
   <details class="ct-section" open><summary>📇 Sa carte et ses coordonnées</summary>
     ${cartes.length ? `<div class="ct-mini-grille">${cartes.map(d => ctMiniHtml(f, d)).join('')}</div>` : ''}
     <div class="mk-deux" style="margin-top:8px">
-      <label class="b vert" for="ct_carte">📷 Photo de sa carte</label>
+      <button type="button" class="b vert" onclick="trStandOuvrir('${f.id}')">📷 Photo de sa carte (face 1, face 2)</button>
+      <label class="b contour" for="ct_carte">🖼️ Photo de carte déjà prise</label>
       <button type="button" class="b contour" onclick="ctBoiteTexteCarte('${f.id}')">📋 Coller le texte de la carte</button>
     </div>
     <input type="file" id="ct_carte" accept="image/*" multiple class="champ-cache" onchange="ctAjouterPhotos('${f.id}','carte',this)">
@@ -5946,7 +5949,7 @@ function ecranDossier() {
     <div class="mk-deux">
       <label class="b vert" for="ct_pages">📷 Ajouter des pages</label>
       <button type="button" class="b contour" onclick="ctPartagerDocs('${f.id}')"${docs.length ? '' : ' disabled'}>📤 Envoyer ces photos</button>
-      <button type="button" class="b contour" onclick="trStandOuvrir('${f.id}')">⚡ Photos en rafale</button>
+      <button type="button" class="b contour" onclick="trStandOuvrir('${f.id}')">📷 Pages en rafale (Au stand)</button>
       <button type="button" class="b contour" onclick="trDecoupeOuvrir('${f.id}')"${pages.length ? '' : ' disabled'}>✂️ Découper les produits</button>
     </div>
     <input type="file" id="ct_pages" accept="image/*" multiple class="champ-cache" onchange="ctAjouterPhotos('${f.id}','page',this)">
@@ -5960,6 +5963,7 @@ function ecranDossier() {
       <button class="b contour" style="min-height:52px;font-size:16px" onclick="ctBoiteImport()">🤖 Ajouter ce que Claude a lu</button></div>
   </details>
 
+  ${asVusAuStandHtml(f)}
   <details class="ct-section" open><summary>📦 Ses produits (${ctProduits(f).length}) · 💰 ${ctNbPrix(f)} prix</summary>
     ${ctListeProduitsDossier(f)}
     <div class="mk-deux" style="margin-top:10px">
@@ -6340,6 +6344,7 @@ async function ctVoirDoc(fid, did) {
   dlg.innerHTML = `<div class="leg">${E(mkNomFournisseur(f))} — ${doc && doc.type === 'carte' ? 'carte' : 'page ' + (docs.filter(d => d.type !== 'carte').indexOf(doc) + 1)}</div>
     <div class="ct-zoom-boite"><img src="${src}" alt=""></div>
     <div class="ct-actions-apercu">
+      ${doc && doc.type === 'carte' ? '<button type="button" class="b vert" data-a="relire">🔁 Relire la carte et remplir les cases</button>' : ''}
       <button type="button" class="b contour" data-a="zoom">🔍 Agrandir</button>
       <button type="button" class="b" style="background:#1aad19;color:#fff" data-a="envoyer">💬 L'envoyer (WeChat…)</button>
       <button type="button" class="b rouge" data-a="suppr">🗑 Supprimer</button>
@@ -6348,6 +6353,7 @@ async function ctVoirDoc(fid, did) {
   const fermer = () => { try { dlg.close(); } catch (e) {} dlg.remove(); };
   dlg.addEventListener('close', () => dlg.remove());
   dlg.querySelector('[data-a="fermer"]').onclick = fermer;
+  const relire = dlg.querySelector('[data-a="relire"]'); if (relire) relire.onclick = () => { fermer(); asRelireCarte(fid, did); };
   dlg.querySelector('[data-a="zoom"]').onclick = (ev) => { const b = dlg.querySelector('.ct-zoom-boite'); b.classList.toggle('zoom'); ev.target.textContent = b.classList.contains('zoom') ? '🔍 Réduire' : '🔍 Agrandir'; };
   dlg.querySelector('[data-a="envoyer"]').onclick = () => {
     mkCopier('Hello, please quote the price of every model on this page (USD, MOQ, pcs per carton). Thank you!\n您好，请报这一页所有型号的价格（美元单价、起订量、每箱数量），谢谢！',
@@ -7771,7 +7777,7 @@ function trAstucesHtml() {
 
 // ---------- 9. L'onglet 🏭 Fournisseurs, et le carnet qui se rouvre là où on l'a laissé ----------
 const TR_SOUS_FOURNISSEURS = ['rencontres', 'dossier', 'catalogues', 'stand', 'pile', 'vendeur'];
-const TR_ONGLETS_GARDES = ['voyage', 'radar', 'negocier', 'enquete', 'comparer', 'achats', 'frais', 'prix', 'objectif', 'strategie', 'envoi', 'rencontres', 'catalogues', 'dossier'];
+const TR_ONGLETS_GARDES = ['voyage', 'radar', 'negocier', 'enquete', 'comparer', 'achats', 'frais', 'prix', 'objectif', 'strategie', 'envoi', 'rencontres', 'catalogues', 'dossier', 'stand'];
 function trGarderOnglet(nom) {
   try {
     if (TR_ONGLETS_GARDES.includes(nom)) localStorage.setItem('kylo_onglet', nom);
@@ -10136,7 +10142,10 @@ async function fsCartePhoto(p, input) {
   // 1. Le QR (WeChat, carte de visite) : tout de suite, comme avant.
   let qr = null;
   try { qr = await mkLireQR(img, [1200, 800, 1700, 2400]); } catch (e) {}
-  if (qr && MF === mf) { mf.qr_photo = mkDecouperQR(qr.toile, qr.points); mkAppliquerQR(mkAnalyserQR(qr.texte)); }
+  if (qr && MF === mf) { const aq = mkAnalyserQR(qr.texte), im = mkDecouperQR(qr.toile, qr.points);
+      if (aq.type === 'whatsapp') { mf.wa_qr = im; mf.whatsapp_lien = /^https?:/i.test(qr.texte) ? qr.texte : 'https://' + qr.texte; }
+      else if (aq.type === 'wechat' || !mf.qr_photo) mf.qr_photo = im;
+      mkAppliquerQR(aq); }
   // 2. La carte rangée chez le fournisseur, et lue en entier.
   let f = fsFournisseurDuFormulaire(p);
   if (!f) return;
@@ -10152,6 +10161,8 @@ async function fsCartePhoto(p, input) {
   if (mf.tel) fsAccorderTel(f, mf.tel);
   if (mf.wechat_lien && !f.wechat_lien) f.wechat_lien = mf.wechat_lien;
   if (mf.qr_photo && !f.qr_photo) f.qr_photo = mf.qr_photo;
+  if (mf.wa_qr && !f.wa_qr) f.wa_qr = mf.wa_qr;
+  if (mf.whatsapp_lien && !f.whatsapp_lien) f.whatsapp_lien = mf.whatsapp_lien;
   sauverLocal();
   if (MF === mf) mf.carte_doc = id;
   const avant = {}; TR_CHAMPS_LUS.concat(['nom', 'wechat_lien']).forEach(k => { avant[k] = f[k]; });
@@ -10167,7 +10178,7 @@ async function fsCartePhoto(p, input) {
   const remplis = [];
   const depuis = { nom: g.nom, societe: g.societe, contact: g.contact, tel: fsTel(g), wechat: g.wechat, email: g.email, allee: g.allee };
   Object.keys(depuis).forEach(k => { if (depuis[k] && !String(mf[k] || '').trim()) { mf[k] = depuis[k]; remplis.push(k); } });
-  ['mobile', 'tel_fixe', 'poste', 'site', 'alibaba', 'adresse', 'wechat_lien', 'whatsapp_lien', 'qr_photo'].forEach(k => { if (g[k] && !mf[k]) mf[k] = g[k]; });
+  ['mobile', 'tel_fixe', 'poste', 'site', 'alibaba', 'adresse', 'wechat_lien', 'whatsapp_lien', 'whatsapp', 'qr_photo', 'wa_qr'].forEach(k => { if (g[k] && !mf[k]) mf[k] = g[k]; });
   mf.carte_lue = true;
   fsMajChamps(p, remplis);
   const noms = FS_CHAMPS_FORM.filter(([k]) => remplis.includes(k)).map(([, l]) => l);
@@ -10295,7 +10306,7 @@ function fsEtapes(f) {
   return { carte, coord, wx, cata, cataDemande: !!f.catalogue_demande_le, prixDemandes: !!f.demande_le, prix, prixStand, lecture };
 }
 function fsProchaine(f, e) {
-  if (!e.coord) return [e.carte ? '📇 Reprendre sa carte (de près, à plat)' : '📇 Photo de sa carte', `ctOuvrirDossier('${f.id}')`];
+  if (!e.coord) return [e.carte ? '📇 Reprendre sa carte (de près, à plat)' : '📇 Photo de sa carte', `trStandOuvrir('${f.id}')`];
   if (!e.cata && !e.cataDemande) return ['📖 Demander son catalogue', `fsDemanderCatalogue('${f.id}')`];
   if (!e.cata) return ['📥 Son catalogue est arrivé', `fwBoite('${f.id}')`];
   if (!e.prixDemandes && !e.prix) return ['✉️ Demander les prix', `trDemander('${f.id}')`];
@@ -10429,6 +10440,1136 @@ window.addEventListener('load', () => setTimeout(async () => {
     if (ongletActif === 'rencontres' || ongletActif === 'dossier') dessiner();
   } catch (e) {}
 }, 1500));
+</script>
+<style>
+/* ===================== 1.6.0 — AU STAND, TOUT AU MÊME ENDROIT (20/10/2026, nuit) =====================
+   Riche : « tout était divisé, tout était mélangé » — la carte d'un côté, le prix de l'autre, le QR ailleurs,
+   2 ou 3 fiches pour la même carte. Ici : UN écran par stand. Textes jamais sous 14 px. */
+.as{padding-bottom:20px}
+.as-haut{display:flex;align-items:center;gap:10px;margin:0 0 8px}
+.as-haut .b{min-height:48px;font-size:16px;flex:none;width:auto;padding:8px 14px}
+.as-titre{font-size:20px;font-weight:900;color:var(--bleu)}
+.as-qui{position:sticky;top:var(--as-haut,0px);z-index:6;background:var(--fond);padding:6px 0 8px;border-bottom:1px solid var(--lisiere);margin-bottom:10px}
+.as-qui-nom{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:900;line-height:1.25;overflow-wrap:anywhere}
+.as-qui-nom .n{flex:1;min-width:0}
+.as-qui-nom .as-neuf{flex:none;border:2px solid var(--vert);color:var(--vert);background:var(--carte);border-radius:999px;font:inherit;font-size:15px;font-weight:900;padding:8px 12px;min-height:44px}
+.as-qui-nom .mk-code{font-size:20px;flex:none}
+.as-qui-det{font-size:15px;color:var(--texte-note);margin-top:2px;overflow-wrap:anywhere}
+.as-puces{display:flex;gap:8px;overflow-x:auto;padding:8px 0 2px;-webkit-overflow-scrolling:touch}
+.as-puces .mk-puce{flex:none;font-size:15px}
+.as-puces .mk-puce.nouveau{border-color:var(--vert);color:var(--vert);font-weight:900}
+.as-sec h2{font-size:18px;margin:0 0 6px}
+.as-tuiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+.as-tuile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:122px;
+  border:2px dashed var(--bleu);border-radius:14px;background:var(--bleu-pale);color:var(--bleu);font:inherit;font-weight:800;font-size:16px;
+  padding:8px;overflow:hidden;text-align:center;line-height:1.25;cursor:pointer}
+.as-tuile .ic{font-size:34px;line-height:1}
+.as-tuile.ok{border-style:solid;border-color:var(--vert);background:#000}
+.as-tuile img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.as-tuile .leg{position:absolute;left:6px;right:6px;bottom:6px;background:rgba(0,0,0,.7);color:#fff;border-radius:8px;padding:4px 6px;font-size:14px;font-weight:800}
+.as-etat{font-size:15px;font-weight:700;line-height:1.45;border-radius:12px;padding:10px 12px;margin:10px 0 0;background:var(--bleu-pale);color:var(--bleu)}
+.as-etat.ok{background:var(--vert-pale);color:var(--vert)}
+.as-etat.att{background:var(--ambre-pale);color:var(--ambre)}
+.as-etat:empty{display:none}
+.as-champs label,.as-prod-form label{font-size:15px;font-weight:700;margin-top:10px;display:block}
+.as-champs input,.as-prod-form input,.as-prod-form select,.as textarea{font-size:17px;width:100%}
+.as-champs input.as-lu{background:var(--vert-pale);border-color:var(--vert)}
+.as-plus summary{font-size:16px;font-weight:800;color:var(--bleu);min-height:46px;display:flex;align-items:center;margin-top:8px}
+.as-prix{display:grid;grid-template-columns:1.3fr 1fr;gap:10px}
+.as-ajouter{width:100%;min-height:58px;font-size:17px;margin-top:12px}
+.as-prod{display:flex;gap:10px;align-items:center;border-top:1px solid var(--lisiere);padding:10px 0}
+.as-prod img,.as-prod .vide{width:76px;height:76px;border-radius:10px;object-fit:cover;flex:none;background:var(--gris-clair);
+  display:flex;align-items:center;justify-content:center;font-size:30px}
+.as-prod .t{font-size:15px;line-height:1.4;min-width:0;flex:1;overflow-wrap:anywhere}
+.as-prod .t b{font-size:16px}
+.as-prod .gnf{font-weight:900;color:var(--vert)}
+.as-prod .suppr{flex:none;border:0;background:none;font-size:22px;min-width:44px;min-height:44px;color:var(--rouge)}
+.as-double{border:2px solid var(--ambre);background:var(--ambre-pale);color:var(--noir);border-radius:12px;padding:10px 12px;font-size:15px;font-weight:700;margin-top:10px;line-height:1.45}
+.as-double .b{min-height:50px;font-size:16px;margin-top:8px}
+.as-bas{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 30px}
+.as-bas .b{min-height:62px;font-size:17px}
+.as .tr-bande{margin-top:8px}
+/* L'appareil photo du carnet : un cadre blanc, et SEULE la partie dans le cadre est gardée. */
+dialog.as-cam{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;max-width:none;max-height:none;margin:0;
+  padding:calc(10px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));border:0;background:#000;color:#fff;z-index:9999}
+dialog.as-cam[open]{display:flex;flex-direction:column;gap:10px}
+dialog.as-cam::backdrop{background:#000}
+.as-cam-titre{font-size:19px;font-weight:900;text-align:center;line-height:1.25}
+.as-cam-zone{position:relative;flex:1;min-height:200px;border-radius:14px;overflow:hidden;background:#111}
+.as-cam-zone video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.as-cadre{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border:3px solid #fff;border-radius:12px;
+  box-shadow:0 0 0 3000px rgba(0,0,0,.55);pointer-events:none}
+.as-cadre.f-carte{width:88%;aspect-ratio:1.586/1}
+.as-cadre.f-carre{width:80%;aspect-ratio:1/1}
+.as-cadre.f-page{height:86%;aspect-ratio:.72/1;max-width:94%}
+.as-cadre.f-large{width:92%;aspect-ratio:2/1}
+.as-cadre.f-qr{width:66%;aspect-ratio:1/1}
+dialog.as-lu .as-cadre{border-color:#34c759}
+.as-eclair{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s}
+.as-eclair.on{opacity:.85;transition:none}
+.as-cam-aide{font-size:16px;font-weight:700;text-align:center;line-height:1.4;min-height:44px}
+.as-cam-compte{font-size:16px;font-weight:900;text-align:center;color:#34c759}
+.as-cam-compte:empty{display:none}
+.as-cam-bas{display:flex;justify-content:center}
+.as-declencheur{width:78px;height:78px;border-radius:50%;border:5px solid #fff;background:#fff;box-shadow:inset 0 0 0 4px #000;flex:none;cursor:pointer}
+.as-declencheur:active{transform:scale(.94)}
+.as-cam-autres{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.as-cam-autres .b{min-height:52px;font-size:15px;margin:0}
+</style>
+<script>
+'use strict';
+// ===================== 1.6.0 — AU STAND, TOUT AU MÊME ENDROIT (20/10/2026, nuit) =====================
+// Riche, 20/10 à 21 h 57 : « tout était divisé, tout était mélangé » — remplir d'un côté, revenir de l'autre
+// pour le prix en euros et en francs, scanner le QR ailleurs, d'où 2 ou 3 fiches pour la même carte ; la face 2
+// de la carte devenait un autre fournisseur ; le QR WhatsApp faisait disparaître le WeChat ; la photo prenait
+// « tout l'alentour » au lieu du cadre ; les cases ne se remplissaient pas.
+// → UN écran « 📷 Au stand » : 1. sa carte (face 1, face 2 : la même fiche, les cases se remplissent),
+//   2. ses QR (WeChat et WhatsApp, chacun sa place), 3. ses produits et ses prix (¥ → francs et euros, tout de suite),
+//   4. catalogue et panneau, 5. notes. L'appareil photo du carnet montre un cadre blanc et ne garde QUE le cadre.
+window.KYLO_STAND = '1.6.0';
+const AS_CLE = 'kylo_au_stand';
+let asProd = asProdVide(), asDerniere = 0;
+function asProdVide() { return { photo: '', photo2: '', article: '', prix: '', devise: '', moq: '', note: '' }; }
+function asProdRempli(p) { p = p || asProd; return !!(p.photo || p.photo2 || num(p.prix) > 0 || String(p.article || '').trim()); }
+// Le brouillon du produit : le texte dans la mémoire, les photos dans la réserve des photos (elles ne prennent pas
+// la place du carnet).
+function asSauver(activite) {
+  if (activite) asDerniere = Date.now();
+  const prod = Object.assign({}, asProd, { photo: asProd.photo ? '1' : '', photo2: asProd.photo2 ? '1' : '' });
+  try { localStorage.setItem(AS_CLE, JSON.stringify({ fid: trStand.fid || '', prod, t: asDerniere })); } catch (e) {}
+}
+function asPhotoBrouillon(champ, valeur) { ctEcrire('as~' + champ, valeur || '').catch(() => {}); }
+// Le stand en cours revient tel qu'il était (le téléphone a pu fermer le carnet pendant que Riche était dans WeChat).
+function asRestaurer() {
+  if (asRestaurer.fait) return; asRestaurer.fait = true;
+  try {
+    const o = JSON.parse(localStorage.getItem(AS_CLE) || 'null'); if (!o) return;
+    asDerniere = Number(o.t) || 0;
+    if (!trStand.fid && o.fid && mkFournisseur(o.fid)) trStand.fid = o.fid;
+    if (o.prod && !asProdRempli()) {
+      asProd = Object.assign(asProdVide(), o.prod, { photo: '', photo2: '' });
+      ['photo', 'photo2'].forEach(champ => {
+        if (o.prod[champ] !== '1') return;
+        ctLire('as~' + champ).then(src => {
+          if (!src || asProd[champ]) return;
+          asProd[champ] = src;
+          const t = document.getElementById(champ === 'photo' ? 'as_ph1' : 'as_ph2');
+          if (t) { t.classList.add('ok'); t.innerHTML = `<img src="${src}" alt=""><span class="leg">✓ ${champ === 'photo' ? 'Produit' : 'Étiquette'} · changer</span>`; }
+        }).catch(() => {});
+      });
+    }
+  } catch (e) {}
+}
+// 📷 (le bouton vert) : le stand où l'on est, s'il a bougé il y a moins de 20 minutes ; sinon un nouveau stand.
+function asOuvrir(fid) {
+  asRestaurer();
+  if (fid) { if (trStand.fid !== fid) { asProdEnregistrerSiRempli(); asProd = asProdVide(); } trStand.fid = fid; asDerniere = Date.now(); }
+  else if (trStand.fid && Date.now() - asDerniere > (asProdRempli() ? 3 * 3600e3 : 20 * 60e3)) { trStand.fid = ''; }
+  trStand.erreur = '';
+  asSauver(false);
+  allerA('stand'); window.scrollTo(0, 0);
+}
+// L'ancien « ⚡ Scanner un stand » : avec un fournisseur, chez lui ; sans, un nouveau stand.
+function trStandOuvrir(fid) { if (fid) asOuvrir(fid); else asNouveauStand(); }
+function asNouveauStand() {
+  asRestaurer();
+  asProdEnregistrerSiRempli();
+  trStand.fid = ''; trStand.nCartes = 0; trStand.num = ''; trStand.erreur = '';
+  asProd = asProdVide(); asDerniere = Date.now(); asSauver(false);
+  allerA('stand'); window.scrollTo(0, 0);
+}
+function asChoisir(fid) { asOuvrir(fid); avertir('Vous êtes chez ' + mkNomFournisseur(mkFournisseur(fid)) + '.', 2500); }
+function asQuitter() { asProdEnregistrerSiRempli(); const f = trStandF(); allerA(f ? 'rencontres' : 'rencontres'); }
+function asSaFiche() { asProdEnregistrerSiRempli(); const f = trStandF(); if (f) ctOuvrirDossier(f.id); else allerA('rencontres'); }
+function asStandSuivant() {
+  asProdEnregistrerSiRempli();
+  const f = trStandF();
+  if (!f) { avertir('Ce stand est encore vide : commencez par la face 1 de sa carte.'); return; }
+  const nc = ctDocs(f).filter(d => d.type === 'carte').length, np = mkOffresDe(f).length;
+  trStand.fid = ''; trStand.nCartes = 0; trStand.num = '';
+  asProd = asProdVide(); asSauver(true);
+  dessiner(); window.scrollTo(0, 0);
+  avertir('✅ ' + mkNomFournisseur(f) + ' est rangé : ' + nc + ' face(s) de carte, ' + np + ' produit(s)'
+    + (f.wechat_lien || f.qr_photo ? ', WeChat ✓' : '') + (f.whatsapp_lien || f.wa_qr ? ', WhatsApp ✓' : '') + '.\nStand suivant : sa carte d\'abord.', 4500);
+}
+
+// ---------- L'écran ----------
+function ecranStand() {
+  asRestaurer();
+  const f = trStandF();
+  setTimeout(() => {
+    const n = document.querySelector('nav'); if (n) document.documentElement.style.setProperty('--as-haut', (n.getBoundingClientRect().height || 0) + 'px');
+    ctRemplirMinis(); asMajConversion(); trMajBande(); trOcrAuto();
+  }, 0);
+  return `<div class="as">
+    <div class="as-haut"><button type="button" class="b gris" onclick="asQuitter()">← Fournisseurs</button><div class="as-titre">📷 Au stand</div></div>
+    <div class="as-qui" id="as_qui">${asQuiHtml()}</div>
+    <div id="as_qui_det">${asQuiDetHtml()}</div>
+    ${trOcrEtat.pret === true ? '' : trOcrEtatHtml()}
+    <section class="carte as-sec"><h2>📇 1. Sa carte de visite</h2>
+      <p class="mk-aide" style="font-size:15px">Les deux faces vont dans la MÊME fiche. Les cases se remplissent seules (en vert : lu sur la carte, à vérifier).</p>
+      <div class="as-tuiles" id="as_cartes">${asCartesHtml(f)}</div>
+      <div id="as_carte_etat">${asCarteEtatHtml(f)}</div>
+      <div id="as_double">${asDoubleHtml(f)}</div>
+      <div class="as-champs" id="as_champs">${asChampsHtml(f)}</div>
+    </section>
+    <section class="carte as-sec"><h2>💬 2. Ses QR codes</h2>
+      <p class="mk-aide" style="font-size:15px">Chacun sa place : le WeChat ne remplace jamais le WhatsApp (et l'inverse).</p>
+      <div class="as-tuiles" id="as_qr">${asQrHtml(f)}</div>
+    </section>
+    <section class="carte as-sec" id="as_sec_prod"><h2>📦 3. Ses produits et ses prix</h2>
+      <div class="as-prod-form" id="as_form">${asFormProduitHtml()}</div>
+      <div id="as_produits">${asProduitsHtml(f)}</div>
+    </section>
+    <section class="carte as-sec"><h2>📖 4. Catalogue et panneau du stand</h2>
+      <div class="as-tuiles">
+        <button type="button" class="as-tuile" onclick="asPages('page')"><span class="ic">📖</span><span>Pages du catalogue</span></button>
+        <button type="button" class="as-tuile" onclick="asPages('stand')"><span class="ic">🏷️</span><span>Panneau du stand (son numéro)</span></button>
+      </div>
+      <div class="tr-bande" id="tr_bande"></div>
+    </section>
+    <section class="carte as-sec"><h2>📝 5. Notes</h2>
+      <label for="as_note" style="font-size:15px;font-weight:700">Ce qu'il faut retenir — dictez avec le micro du clavier 🎙️</label>
+      <textarea id="as_note" rows="3" placeholder="ex : bonne qualité, échantillon gratuit, livre en 30 jours…" oninput="asChamp('remarque', this.value)">${E(f ? f.remarque || '' : '')}</textarea>
+    </section>
+    <div class="as-bas">
+      <button type="button" class="b vert" onclick="asStandSuivant()">✅ Stand suivant</button>
+      <button type="button" class="b contour" onclick="asSaFiche()">📂 Sa fiche</button>
+    </div>
+    <input type="file" id="tr_stand_appareil" accept="image/*" capture="environment" class="champ-cache" onchange="asFichierCarte(this)">
+    <input type="file" id="tr_stand_photos" accept="image/*" multiple class="champ-cache" onchange="asFichiersPages(this)">
+  </div>`;
+}
+function asNomTete(f) {
+  return String(f.nom || f.societe || f.contact || '').trim() || (f.wechat && !/^https?:/i.test(f.wechat) ? 'WeChat ' + f.wechat : '') || '(sans nom)';
+}
+// En haut (reste visible en descendant) : chez qui on est, et « ➕ Nouveau stand ».
+function asQuiHtml() {
+  const f = trStandF();
+  return `<div class="as-qui-nom">${f ? `<span class="mk-code">${E(f.code || '—')}</span><span class="n">${E(asNomTete(f) === '(sans nom)' ? 'Nouveau fournisseur' : asNomTete(f))}</span>
+      <button type="button" class="as-neuf" onclick="asNouveauStand()">➕ Nouveau stand</button>`
+    : '<span class="n">🆕 Nouveau stand — commencez par la face 1 de sa carte</span>'}</div>`;
+}
+// Juste dessous : ce qu'on sait de lui, et revenir chez un fournisseur déjà vu.
+function asQuiDetHtml() {
+  const f = trStandF();
+  const autres = mkFournisseursRecents().filter(x => !f || x.id !== f.id).slice(0, 6);
+  const det = f ? [f.contact && '👤 ' + f.contact, fsTel(f) && '📞 ' + ctTelLisible(fsTel(f)),
+    f.wechat && !/^https?:/i.test(f.wechat) ? '💬 ' + f.wechat : (f.wechat_lien || f.qr_photo ? '💬 WeChat ✓' : ''),
+    (f.whatsapp_lien || f.wa_qr || f.whatsapp) ? '🟢 WhatsApp ✓' : '', f.allee && '📍 ' + f.allee].filter(Boolean) : [];
+  return `${det.length ? `<div class="as-qui-det">${E(det.join(' · '))}</div>` : ''}
+    ${autres.length ? `<div class="as-puces" aria-label="Revenir chez un fournisseur déjà vu">${autres.map(x => `<button type="button" class="mk-puce" onclick="asChoisir('${x.id}')">↩ ${E(mkNomFournisseur(x))}</button>`).join('')}</div>` : ''}`;
+}
+
+// ---------- 1. La carte : face 1, face 2, une seule fiche ----------
+function asCartesDe(f) {
+  const c = f ? ctDocs(f).filter(d => d.type === 'carte') : [];
+  const f1 = c.find(d => d.face === 1) || c.find(d => !d.face);
+  const f2 = c.find(d => d.face === 2) || c.find(d => d !== f1 && d.face !== 1);
+  return [f1, f2];
+}
+function asCartesHtml(f) {
+  const [a, b] = asCartesDe(f);
+  const tuile = (d, n) => `<button type="button" class="as-tuile${d ? ' ok' : ''}" id="as_face${n}" onclick="asCarte(${n})">${d
+    ? `<img class="ct-mini" data-doc="${E(d.id)}" alt="Face ${n}"><span class="leg">✓ Face ${n}${d.a_lire ? ' · ⏳ lecture' : ''} · toucher</span>`
+    : `<span class="ic" aria-hidden="true">${n === 1 ? '📇' : '🔄'}</span><span>Face ${n}<br>${n === 1 ? '(devant)' : '(dos)'}</span>`}</button>`;
+  return tuile(a, 1) + tuile(b, 2);
+}
+async function asCarte(n) {
+  const f = trStandF(), d = f && asCartesDe(f)[n - 1];
+  if (d) { asMenuCarte(f, d, n); return; }
+  await asPhotoCarte(n, false);
+}
+async function asPhotoCarte(n, remplacer) {
+  const r = await asCamera({ forme: 'carte', titre: n === 1 ? '📇 Face 1 de sa carte (devant)' : '🔄 Face 2 de sa carte (dos)',
+    aide: 'Toute la carte DANS le cadre blanc, à plat, bien éclairée, sans reflet. Seul le cadre est gardé.' });
+  if (r && r.toile) await asGarderCarte(n, r.toile, r.origine, remplacer);
+}
+function asMenuCarte(f, d, n) {
+  mkBoite(`<div class="mk-dlg"><h3>${n === 1 ? '📇 Face 1' : '🔄 Face 2'} de sa carte</h3>
+    <div style="text-align:center"><img class="ct-mini" data-doc="${E(d.id)}" alt="" style="max-width:100%;max-height:40vh;border-radius:10px"></div>
+    <div class="mk-boutons">
+      <button class="b vert" onclick="fermerBoite();asRelireCarte('${f.id}','${d.id}')">🔁 Relire la carte et remplir les cases</button>
+      <button class="b contour" onclick="fermerBoite();asPhotoCarte(${n}, true)">📷 Reprendre la photo (de plus près, à plat)</button>
+      <button class="b contour" onclick="fermerBoite();ctVoirDoc('${f.id}','${d.id}')">🔍 Voir en grand</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button>
+    </div></div>`);
+  ctRemplirMinis();
+}
+async function asGarderCarte(n, toile, origine, remplacer) {
+  const f = trStandFournisseur();
+  const ancien = asCartesDe(f)[n - 1];
+  let d;
+  try { d = await trRangerPhoto(f, 'carte', toile); }
+  catch (e) { avertir('⚠ Photo non rangée : la mémoire du téléphone est peut-être pleine.'); return null; }
+  d.face = n; d.origine = origine === 'camera' ? 'cadre' : 'photo';
+  if (ancien && (remplacer || ancien.face === n)) {
+    f.docs = ctDocs(f).filter(x => x !== ancien);
+    ctEffacer(ancien.id).catch(() => {}); ctEffacer(ancien.id + '~m').catch(() => {}); delete ctMiniCache[ancien.id];
+  }
+  trStand.nCartes = asCartesDe(f).filter(Boolean).length;
+  sauverLocal(); asSauver(true);
+  asMajTout();
+  if (navigator.vibrate) navigator.vibrate(40);
+  return d;
+}
+// Une carte venue de l'appareil photo du téléphone (ou d'une photo déjà prise) : face 1, sinon face 2.
+async function asFichierCarte(input) {
+  const fichiers = Array.from((input && input.files) || []); if (input) input.value = '';
+  for (const fi of fichiers) {
+    try {
+      const img = await mkLireFichier(fi), f = trStandF();
+      const [a, b] = asCartesDe(f);
+      await asGarderCarte(!a ? 1 : (!b ? 2 : 2), mkToile(img, 2600), 'fichier', !!(a && b));
+    } catch (e) { avertir('Une photo n\'a pas pu être rangée (mémoire pleine ?).'); }
+  }
+}
+async function asFichiersPages(input) {
+  const fichiers = Array.from((input && input.files) || []); if (input) input.value = '';
+  for (const fi of fichiers) {
+    try { await trRangerPhoto(trStandFournisseur(), 'page', await mkLireFichier(fi)); } catch (e) { avertir('Une photo n\'a pas pu être rangée (mémoire pleine ?).'); }
+  }
+  asSauver(true); asMajTout();
+}
+// Relire une carte (toucher sa photo) : ce que le téléphone avait lu (cases vertes) peut être remplacé par la
+// nouvelle lecture ; ce que Riche a tapé ne l'est jamais.
+function asRelireCarte(fid, did) {
+  const f = mkFournisseur(fid), d = f && ctDocs(f).find(x => x.id === did); if (!d) return;
+  d.lu_qr = false; d.lu_ocr = false; d.a_lire = true; d.relire = true; delete d.lu_erreur;
+  sauverLocal();
+  if (ongletActif === 'stand') asMajTout(); else if (ongletActif === 'dossier') dessiner();
+  avertir(trOcrEtat.pret === true ? '🔁 Lecture de la carte… les cases se remplissent dans quelques secondes.'
+    : '🔁 La carte sera relue dès que la lecture sera prête (ouvrez le carnet une fois avec Internet).', 3500);
+  setTimeout(trLancerLectures, 50);
+}
+function asCarteEtatHtml(f) {
+  if (!f) return '';
+  const cartes = ctDocs(f).filter(d => d.type === 'carte');
+  if (!cartes.length) return '';
+  const enLecture = cartes.some(d => d.a_lire);
+  const lu = [f.contact && '👤 ' + f.contact, f.societe && '🏭 ' + f.societe, fsTel(f) && '📞 ' + ctTelLisible(fsTel(f)), f.whatsapp && '🟢 ' + ctTelLisible(f.whatsapp),
+    f.email && '✉️ ' + f.email, f.wechat && !/^https?:/i.test(f.wechat) && '💬 ' + f.wechat].filter(Boolean);
+  if (enLecture && trOcrEtat.pret !== true) return `<div class="as-etat att">📇 Carte gardée. La lecture du texte n'est pas encore prête dans ce téléphone :
+    elle se fera toute seule dès que le carnet aura été ouvert une fois avec Internet (wifi de l'hôtel).${lu.length ? '<br>Déjà lu : ' + E(lu.join(' · ')) : ''}</div>`;
+  if (enLecture) return `<div class="as-etat">⏳ Lecture de la carte… (quelques secondes, vous pouvez continuer)${lu.length ? '<br>' + E(lu.join(' · ')) : ''}</div>`;
+  if (!lu.length) return `<div class="as-etat att">⚠ Rien de lisible sur la carte. Touchez la face → « Reprendre la photo » : de plus près, à plat, sans reflet.
+    Ou tapez son nom et son portable ci-dessous.</div>`;
+  const verts = (f.lu_auto || []).filter(k => String(f[k] || '').trim()).length;
+  return `<div class="as-etat ok">✅ Lu sur la carte : ${E(lu.join(' · '))}${verts ? '<br>Les cases en vert viennent de la carte : vérifiez-les.' : ''}</div>`;
+}
+// La même personne déjà dans le carnet (même portable, e-mail ou WeChat) : réunir en un appui.
+function asDoubleHtml(f) {
+  if (!f) return '';
+  const p = fsDoublons().find(([a, b]) => a === f || b === f); if (!p) return '';
+  const g = p[0] === f ? p[1] : p[0];
+  return `<div class="as-double">🔁 Déjà dans le carnet : <b>${E(mkNomFournisseur(g))}</b> (${p[2][0] === 't' ? 'même téléphone' : p[2][0] === 'e' ? 'même e-mail' : 'même WeChat'}).
+    <button type="button" class="b vert" onclick="asReunir('${g.id}')">Réunir dans ${E(g.code || 'sa fiche')} (rien n'est perdu)</button></div>`;
+}
+function asReunir(gid) {
+  const f = trStandF(); if (!f) return;
+  fsReunir(gid, f.id);
+  trStand.fid = gid; asSauver(true);
+  if (ongletActif !== 'stand') allerA('stand'); else dessiner();
+}
+
+// Les cases : les mêmes que dans Sa fiche ; ce qui est tapé est gardé tout de suite (aucun bouton « Garder »).
+const AS_CHAMPS = [['nom', 'Nom affiché (marque — contact)', 'ex : Star — Lily'], ['societe', 'Société', 'ex : Guangzhou Star Electronics Co., Ltd'],
+  ['contact', 'Contact (la personne)', 'ex : 王丽 Lily'], ['mobile', 'Portable', '+86…'], ['whatsapp', 'WhatsApp (numéro)', '+86…'],
+  ['wechat', 'WeChat (identifiant)', 'ex : lily_star88'], ['email', 'E-mail', 'ex : lily@exemple.com'], ['allee', 'Stand (hall, numéro)', 'ex : 11.2 C23']];
+const AS_CHAMPS_PLUS = [['poste', 'Poste', 'ex : Sales Manager'], ['tel_fixe', 'Téléphone fixe', ''], ['site', 'Site', ''], ['alibaba', 'Boutique Alibaba', ''],
+  ['adresse', 'Adresse de l\'usine', ''], ['marche', 'Marché / ville', 'ex : Foire de Canton']];
+function asValeur(f, k) {
+  if (!f) return '';
+  const v = k === 'mobile' ? (f.mobile || f.tel || '') : f[k];
+  return k === 'wechat' && /^https?:/i.test(v || '') ? '' : String(v || '');
+}
+function asChampHtml(f, [k, l, ph]) {
+  const v = asValeur(f, k), vert = f && (f.lu_auto || []).includes(k) && v.trim();
+  return `<label for="as_${k}">${E(l)}</label><input id="as_${k}" class="${vert ? 'as-lu' : ''}" value="${E(v)}" placeholder="${E(ph)}"${
+    /mobile|whatsapp|tel_fixe/.test(k) ? ' inputmode="tel"' : ''}${/email|site|wechat|alibaba/.test(k) ? ' autocapitalize="off" autocorrect="off" spellcheck="false"' : ''}
+    oninput="asChamp('${k}', this.value)">`;
+}
+function asChampsHtml(f) {
+  const plus = AS_CHAMPS_PLUS.filter(([k]) => asValeur(f, k).trim()).length;
+  return AS_CHAMPS.map(c => asChampHtml(f, c)).join('')
+    + `<details class="as-plus"${plus ? ' open' : ''}><summary>➕ Autres cases (poste, fixe, site, adresse)${plus ? ' · ' + plus : ''}</summary>${AS_CHAMPS_PLUS.map(c => asChampHtml(f, c)).join('')}</details>`;
+}
+function asChamp(k, v) {
+  const f = trStandFournisseur();
+  ctMajChamp(f.id, k, v);
+  if (k === 'mobile') fsAccorderTel(f, v);
+  if (Array.isArray(f.lu_auto) && f.lu_auto.includes(k)) {   // tapé ou corrigé à la main : vérifié
+    f.lu_auto = f.lu_auto.filter(x => x !== k);
+    const ch = document.getElementById('as_' + k); if (ch) ch.classList.remove('as-lu');
+  }
+  if (k !== 'nom' && k !== 'remarque') {
+    const avant = f.nom; trSynchroNomAuto(f);
+    const n = document.getElementById('as_nom'); if (n && f.nom !== avant && document.activeElement !== n) n.value = f.nom || '';
+  }
+  asSauver(true); asMajQui();
+}
+
+// ---------- 2. Les QR : WeChat et WhatsApp, chacun sa place ----------
+function asQrHtml(f) {
+  const wx = f && (f.qr_photo || f.wechat_lien), wa = f && (f.wa_qr || f.whatsapp_lien);
+  return `<button type="button" class="as-tuile${wx ? ' ok' : ''}" id="as_qr_wx" onclick="asQR('wechat')">${f && f.qr_photo
+      ? `<img src="${f.qr_photo}" alt="QR WeChat"><span class="leg">✓ WeChat · toucher</span>`
+      : `<span class="ic" aria-hidden="true">💬</span><span>${wx ? 'WeChat ✓<br>(lien gardé)' : 'Scanner son<br>QR WeChat'}</span>`}</button>
+    <button type="button" class="as-tuile${wa ? ' ok' : ''}" id="as_qr_wa" onclick="asQR('whatsapp')">${f && f.wa_qr
+      ? `<img src="${f.wa_qr}" alt="QR WhatsApp"><span class="leg">✓ WhatsApp · toucher</span>`
+      : `<span class="ic" aria-hidden="true">🟢</span><span>${wa ? 'WhatsApp ✓<br>(lien gardé)' : 'Scanner son<br>QR WhatsApp'}</span>`}</button>`;
+}
+async function asQR(genre) {
+  const f = trStandF();
+  if (f && (genre === 'wechat' ? (f.qr_photo || f.wechat_lien) : (f.wa_qr || f.whatsapp_lien))) {
+    mkBoite(`<div class="mk-dlg"><h3>${genre === 'wechat' ? '💬 Son QR WeChat' : '🟢 Son QR WhatsApp'}</h3>
+      ${(genre === 'wechat' ? f.qr_photo : f.wa_qr) ? `<img class="mk-grand-qr" src="${genre === 'wechat' ? f.qr_photo : f.wa_qr}" alt="">` : ''}
+      <div class="mk-boutons">
+        ${genre === 'wechat' ? `<button class="b wechat" onclick="fermerBoite();mkContact('${f.id}')">💬 L'ajouter sur WeChat</button>`
+          : `<button class="b tr-wa" onclick="fermerBoite();trOuvrirWhatsApp('${f.id}')">🟢 Ouvrir WhatsApp</button>`}
+        <button class="b contour" onclick="fermerBoite();asScannerQR('${genre}')">🔲 Scanner à nouveau</button>
+        <button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+    return;
+  }
+  await asScannerQR(genre);
+}
+async function asScannerQR(genre) {
+  // Le téléphone vise encore l'autre QR (déjà gardé) : on ne le reprend pas, on attend le bon.
+  const ignorer = (texte) => {
+    const f = trStandF(); if (!f) return '';
+    const a = mkAnalyserQR(texte);
+    if (genre === 'whatsapp' && a.type === 'wechat' && f.wechat_lien && a.champs.wechat_lien === f.wechat_lien) return 'C\'est son QR WeChat (déjà gardé) : visez maintenant son QR WhatsApp.';
+    if (genre === 'wechat' && a.type === 'whatsapp' && f.whatsapp_lien && f.whatsapp_lien.replace(/^https?:\/\//, '') === texte.replace(/^https?:\/\//, '')) return 'C\'est son QR WhatsApp (déjà gardé) : visez maintenant son QR WeChat.';
+    return '';
+  };
+  const r = await asCamera({ forme: 'qr', qr: true, ignorer, titre: genre === 'wechat' ? '💬 Son QR WeChat' : '🟢 Son QR WhatsApp',
+    aide: 'Visez le QR dans le carré (sur son téléphone ou sur sa carte) : il se lit tout seul.' });
+  if (!r) return;
+  let qrs = r.qrs || [];
+  if (!qrs.length && r.toile) { try { qrs = await trLireTousQR(r.toile); } catch (e) {} }
+  if (!qrs.length) { avertir('Aucun QR lu. Rapprochez-vous, bien droit, avec de la lumière, puis réessayez.', 4000); return; }
+  asRangerQR(trStandFournisseur(), qrs, genre);
+}
+function asRangerQR(f, qrs, genre) {
+  const msgs = [];
+  qrs.forEach(q => {
+    const a = mkAnalyserQR(q.texte);
+    if (a.type === 'wechat') {
+      f.wechat_lien = a.champs.wechat_lien; if (q.image) f.qr_photo = q.image; delete f.qr_dessine;
+      msgs.push(genre === 'whatsapp' ? 'C\'était son QR WeChat : rangé à la place WeChat (le WhatsApp ne bouge pas).' : '💬 QR WeChat lu et gardé.');
+    } else if (a.type === 'whatsapp') {
+      f.whatsapp_lien = /^https?:/i.test(q.texte) ? q.texte : 'https://' + q.texte; if (q.image) f.wa_qr = q.image;
+      if (a.champs.tel && !String(f.whatsapp || '').trim()) f.whatsapp = a.champs.tel;
+      msgs.push(genre === 'wechat' ? 'C\'était son QR WhatsApp : rangé à la place WhatsApp (le WeChat ne bouge pas).' : '🟢 QR WhatsApp lu et gardé.');
+    } else {
+      const remplis = trAppliquerQR(f, [q]);
+      msgs.push(remplis.length ? '📇 QR lu : ' + remplis.length + ' case(s) remplie(s).' : 'QR lu (ce n\'est ni WeChat ni WhatsApp) : gardé dans sa fiche.');
+    }
+  });
+  delete f.ct_neuf; f.vu_le = f.vu_le || mkMaintenant();
+  trSynchroNomAuto(f); sauverLocal(); asSauver(true); asMajTout();
+  if (navigator.vibrate) navigator.vibrate(40);
+  avertir(msgs.join('\n'), 3500);
+}
+
+// ---------- 3. Les produits : photo, prix en francs et en euros tout de suite, quantité ----------
+function asFormProduitHtml() {
+  const p = asProd, d = p.devise || mkDevise();
+  return `<div class="as-tuiles">
+      <button type="button" class="as-tuile${p.photo ? ' ok' : ''}" id="as_ph1" onclick="asPhotoProduit('photo')">${p.photo
+        ? `<img src="${p.photo}" alt=""><span class="leg">✓ Produit · changer</span>` : '<span class="ic" aria-hidden="true">📦</span><span>Photo du produit</span>'}</button>
+      <button type="button" class="as-tuile${p.photo2 ? ' ok' : ''}" id="as_ph2" onclick="asPhotoProduit('photo2')">${p.photo2
+        ? `<img src="${p.photo2}" alt=""><span class="leg">✓ Étiquette · changer</span>` : '<span class="ic" aria-hidden="true">🏷️</span><span>Étiquette ou prix<br>(facultatif)</span>'}</button>
+    </div>
+    <label for="as_article">Quel produit ?</label>
+    <input id="as_article" list="as_liste" value="${E(p.article)}" placeholder="ex : ventilateur 16 pouces" autocomplete="off" oninput="asProd.article=this.value;asSauver(true)">
+    <datalist id="as_liste">${mkNomsProduits().map(n => `<option value="${E(n)}">`).join('')}</datalist>
+    <div class="as-prix">
+      <div><label for="as_prix">Prix d'une pièce</label><input id="as_prix" inputmode="decimal" value="${E(p.prix)}" placeholder="0" autocomplete="off"
+        oninput="asProd.prix=this.value;asMajConversion();asSauver(true)"></div>
+      <div><label for="as_devise">Devise</label><select id="as_devise" onchange="asProd.devise=this.value;asMajConversion();asSauver(true)">
+        ${codesDevises().map(x => `<option value="${x}" ${x === d ? 'selected' : ''}>${mkSym(x) === x ? x : mkSym(x) + ' ' + x}</option>`).join('')}</select></div>
+    </div>
+    <div class="mk-conv" id="as_conv"></div>
+    <div class="mk-taux" id="as_taux"></div>
+    <label for="as_moq">Quantité minimum de commande</label>
+    <input id="as_moq" inputmode="numeric" value="${E(p.moq)}" placeholder="ex : 500 pièces" autocomplete="off" oninput="asProd.moq=this.value;asSauver(true)">
+    <label for="as_pnote">Détails (couleur, taille, qualité…)</label>
+    <input id="as_pnote" value="${E(p.note)}" placeholder="ex : 3 couleurs, carton de 20" oninput="asProd.note=this.value;asSauver(true)">
+    <button type="button" class="b vert as-ajouter" onclick="asAjouterProduit()">➕ Ajouter ce produit chez lui</button>`;
+}
+function asMajConversion() {
+  const z = document.getElementById('as_conv'); if (!z) return;
+  const d = asProd.devise || mkDevise();
+  z.innerHTML = mkConversionHtml(asProd.prix, d, false);
+  const t = document.getElementById('as_taux'); if (!t) return;
+  t.innerHTML = d === 'GNF' ? '' : (tauxDe(d) > 0 && !asMajConversion.ouvert
+    ? `Taux du carnet : 1 ${E(mkSym(d))} = ${nf(tauxDe(d), 2)} GNF${tauxDe('EUR') > 0 ? ' · 1 € = ' + nf(tauxDe('EUR'), 0) + ' GNF' : ''} <button type="button" onclick="asMajConversion.ouvert=true;asMajConversion()">changer</button>`
+    : `<label for="as_tx" style="margin:0">1 ${E(mkSym(d))} =</label> <input id="as_tx" inputmode="decimal" value="${tauxDe(d) || ''}" placeholder="ex : 1230" style="width:120px"> GNF
+       <button type="button" onclick="asFixerTaux()">valider</button>`);
+}
+function asFixerTaux() {
+  const ch = document.getElementById('as_tx'), v = num(ch && ch.value), d = asProd.devise || mkDevise();
+  if (!(v > 0)) { avertir('Tapez combien de francs guinéens vaut 1 ' + d + '.'); return; }
+  C.voyage.taux = C.voyage.taux || {}; C.voyage.taux[d] = v;
+  asMajConversion.ouvert = false; sauverLocal(); if (typeof majBandeau === 'function') majBandeau(); asMajConversion();
+  avertir('Taux du carnet changé : 1 ' + d + ' = ' + nf(v, 2) + ' GNF. Il sert pour tout le voyage.');
+}
+async function asPhotoProduit(champ) {
+  const r = await asCamera({ forme: 'carre', titre: champ === 'photo' ? '📦 Photo du produit' : '🏷️ Étiquette ou prix',
+    aide: champ === 'photo' ? 'Le produit DANS le cadre blanc, de face. Seul le cadre est gardé.' : 'L\'étiquette (ou le prix écrit) dans le cadre.' });
+  if (!r || !r.toile) return;
+  asProd[champ] = mkReduire(r.toile, 900, 0.72);
+  asPhotoBrouillon(champ, asProd[champ]);
+  asSauver(true);
+  const t = document.getElementById(champ === 'photo' ? 'as_ph1' : 'as_ph2');
+  if (t) { t.classList.add('ok'); t.innerHTML = `<img src="${asProd[champ]}" alt=""><span class="leg">✓ ${champ === 'photo' ? 'Produit' : 'Étiquette'} · changer</span>`; }
+  if (champ === 'photo') { const a = document.getElementById(asProd.article ? 'as_prix' : 'as_article'); if (a) setTimeout(() => a.focus(), 300); }
+}
+function asAjouterProduit(silence) {
+  const p = asProd;
+  if (!asProdRempli(p)) { if (!silence) avertir('Prenez la photo du produit, ou tapez son nom ou son prix.'); return false; }
+  const f = trStandFournisseur(), maintenant = mkMaintenant();
+  const nom = String(p.article || '').trim() || ('Produit vu à ' + mkHeure(maintenant) + ' chez ' + (f.code || ''));
+  C.comparaisons = C.comparaisons || [];
+  let c = C.comparaisons.find(x => normaliserNom(x.article) === normaliserNom(nom));
+  if (!c) {
+    c = { id: idUnique('c'), article: nom, quantite: num(p.moq) > 0 ? num(p.moq) : 100, prix_vente_vise_gnf: 0, offres: [], choisi: null, motif: '', note: '', source: 'stand' };
+    C.comparaisons.push(c);
+  }
+  c.offres = c.offres || []; c.maj = maintenant;
+  const devise = p.devise || mkDevise();
+  c.offres.push({ id: idUnique('o'), fournisseur: mkNomFournisseur(f), fournisseur_id: f.id, prix: num(p.prix), devise, moq: num(p.moq),
+    delai: 0, qualite: 0, note: String(p.note || '').trim(), photo: p.photo || '', photo2: p.photo2 || '', vu_le: maintenant });
+  C.voyage.marche_devise = devise;
+  f.vu_le = maintenant; delete f.ct_neuf;
+  sauverLocal();
+  asProd = asProdVide(); asProd.devise = devise; asSauver(true);
+  asPhotoBrouillon('photo', ''); asPhotoBrouillon('photo2', '');
+  const form = document.getElementById('as_form'); if (form) { form.innerHTML = asFormProduitHtml(); asMajConversion(); }
+  asMajProduits(); asMajQui();
+  if (!silence) avertir('✅ Ajouté chez ' + mkNomFournisseur(f) + ' : ' + nom + (num(p.prix) > 0 ? '\n' + mkPrixCourt({ prix: p.prix, devise }) : ''), 3500);
+  return true;
+}
+// Rien n'est perdu : un produit commencé (photo ou prix) est ajouté avant de changer de stand.
+function asProdEnregistrerSiRempli() { if (asProd.photo || num(asProd.prix) > 0) asAjouterProduit(true); }
+function asProduitsHtml(f) {
+  const L = f ? mkOffresDe(f) : [];
+  if (!L.length) return '<p class="mk-aide" style="font-size:15px;margin-top:10px">Aucun produit noté chez lui pour l\'instant.</p>';
+  return `<div style="margin-top:12px;font-size:16px;font-weight:900">Notés chez lui (${L.length})</div>` + L.map(({ c, o }) => `<div class="as-prod">
+      ${o.photo ? `<img src="${o.photo}" alt="" onclick="mkVoirOffre('${c.id}','${o.id}')">` : '<div class="vide" aria-hidden="true">📦</div>'}
+      <div class="t"><b>${E(c.article)}</b><br><span class="gnf">${E(mkPrixCourt(o))}</span>${num(o.moq) ? '<br>min. ' + nf(o.moq) + ' pièces' : ''}${o.note ? '<br>' + E(String(o.note).slice(0, 80)) : ''}</div>
+      <button type="button" class="suppr" aria-label="Retirer ce prix" onclick="asRetirerProduit('${c.id}','${o.id}')">🗑</button></div>`).join('');
+}
+function asRetirerProduit(cid, oid) {
+  const c = trouverComparaison(cid); if (!c) return;
+  if (!confirmerEnDeuxTemps('as-ret-' + oid, 'Retirer ce produit et son prix ?')) return;
+  c.offres = (c.offres || []).filter(o => o.id !== oid);
+  if (!c.offres.length && c.source === 'stand') C.comparaisons = C.comparaisons.filter(x => x !== c);
+  sauverLocal();
+  if (ongletActif === 'stand') { asMajProduits(); asMajQui(); } else dessiner();
+}
+// Sa fiche : les produits vus au stand, avec leur prix en francs et en euros (les mêmes chiffres que Comparer).
+function asVusAuStandHtml(f) {
+  const n = mkOffresDe(f).length;
+  return `<details class="ct-section" open><summary>🛒 Vus au stand : ses prix (${n})</summary>
+    ${n ? asProduitsHtml(f) : '<p class="mk-aide" style="font-size:15px">Aucun produit noté au stand chez lui.</p>'}
+    <button type="button" class="b contour" style="min-height:52px;font-size:16px;margin-top:8px" onclick="trStandOuvrir('${f.id}')">📷 Noter un produit et son prix (Au stand)</button>
+  </details>`;
+}
+// La photo en tête de chaque fournisseur : son PRODUIT d'abord (on sait tout de suite ce qu'on a vu chez lui),
+// sinon sa carte, sinon son QR.
+function asImageTeteHtml(f, ecran) {
+  const ouvrir = `ctOuvrirDossier('${f.id}')`;
+  const o = mkOffresDe(f).find(x => x.o.photo);
+  if (o) return `<img class="qr" src="${o.o.photo}" alt="Produit" onclick="${ecran === 'dossier' ? `mkVoirOffre('${o.c.id}','${o.o.id}')` : ouvrir}">`;
+  const p = ctProduits(f).find(x => x.photo_doc);
+  if (p) return `<img class="qr ct-mini" data-doc="${E(p.photo_doc)}" alt="Produit" onclick="${ouvrir}">`;
+  const c = asCartesDe(f)[0];
+  if (c) return `<img class="qr ct-mini" data-doc="${E(c.id)}" alt="Carte" onclick="${ecran === 'dossier' ? `ctVoirDoc('${f.id}','${c.id}')` : ouvrir}">`;
+  if (f.carte_photo) return `<img class="qr" src="${f.carte_photo}" alt="Carte" onclick="${ouvrir}">`;
+  if (f.qr_photo) return `<img class="qr" src="${f.qr_photo}" alt="QR WeChat" onclick="mkVoirQR('${f.id}')">`;
+  return `<div class="sans" aria-hidden="true">${ecran === 'dossier' ? '🏭' : '👤'}</div>`;
+}
+// À la première ouverture de la 1.6.0 : les cartes des fournisseurs à qui il manque le contact, le portable ou
+// l'e-mail sont relues avec la nouvelle lecture. Seules les cases VIDES se remplissent ; rien n'est effacé.
+window.addEventListener('load', () => setTimeout(() => {
+  try {
+    if (C.ordre_160) return;
+    let n = 0;
+    fournisseursListe().forEach(f => {
+      if (String(f.contact || '').trim() && fsTel(f) && String(f.email || '').trim()) return;
+      ctDocs(f).filter(d => d.type === 'carte' && !d.a_lire).forEach(d => {
+        if (n >= 60) return;            // les 60 cartes les plus récentes : le téléphone reste libre pour les nouvelles
+        d.lu_qr = false; d.lu_ocr = false; d.a_lire = true; d.relu_160 = true; n++;
+      });
+    });
+    C.ordre_160 = new Date().toISOString(); sauverLocal();
+    if (n) {
+      avertir('🔁 Carnet 1.6.0 : ' + n + ' carte(s) relue(s) avec la nouvelle lecture, pour remplir les cases encore vides (rien n\'est effacé).', 6000);
+      setTimeout(trLancerLectures, 300);
+    }
+  } catch (e) {}
+}, 2600));
+// Le carnet rouvert par le téléphone (après WeChat) revient sur « Au stand » s'il y était.
+if (typeof ongletActif !== 'undefined' && ongletActif === 'stand') document.body.classList.add('tr-plein');
+
+// ---------- 4. Catalogue et panneau : en rafale ----------
+async function asPages(type) {
+  let n = 0;
+  await asCamera({ forme: type === 'page' ? 'page' : 'large', rafale: true,
+    titre: type === 'page' ? '📖 Pages du catalogue (une après l\'autre)' : '🏷️ Panneau du stand',
+    aide: type === 'page' ? 'Une page entière dans le cadre. Appuyez pour chaque page, puis « Terminé ».' : 'Le panneau avec le numéro du stand dans le cadre.',
+    surPhoto: async (toile) => {
+      await trRangerPhoto(trStandFournisseur(), type, toile); n++;
+      asSauver(true); trMajBande();
+      return n + (type === 'page' ? ' page(s) rangée(s) chez lui ✓' : ' photo(s) du panneau ✓');
+    } });
+  if (n) asMajTout();
+}
+
+// ---------- Mise à jour de l'écran sans couper Riche s'il écrit ----------
+function asMajQui() {
+  const z = document.getElementById('as_qui'); if (z) z.innerHTML = asQuiHtml();
+  const d = document.getElementById('as_qui_det'); if (d) d.innerHTML = asQuiDetHtml();
+}
+function asMajProduits() { const z = document.getElementById('as_produits'); if (z) z.innerHTML = asProduitsHtml(trStandF()); }
+function asMajChamps() {
+  const f = trStandF();
+  [...AS_CHAMPS, ...AS_CHAMPS_PLUS].forEach(([k]) => {
+    const ch = document.getElementById('as_' + k); if (!ch) return;
+    const v = asValeur(f, k);
+    if (document.activeElement !== ch && ch.value !== v) ch.value = v;
+    ch.classList.toggle('as-lu', !!(f && (f.lu_auto || []).includes(k) && v.trim()));
+  });
+}
+function asMajTout() {
+  if (ongletActif !== 'stand') return;
+  const f = trStandF();
+  const ids = { as_cartes: () => asCartesHtml(f), as_carte_etat: () => asCarteEtatHtml(f), as_double: () => asDoubleHtml(f), as_qr: () => asQrHtml(f) };
+  Object.keys(ids).forEach(id => { const z = document.getElementById(id); if (z) z.innerHTML = ids[id](); });
+  asMajChamps(); asMajQui(); asMajProduits(); trMajBande(); ctRemplirMinis();
+}
+// Appelée par la lecture des cartes (en arrière-plan) quand l'écran Au stand est ouvert.
+function trMajEtatStand() { asMajTout(); }
+
+// ---------- L'appareil photo du carnet : le cadre blanc, et seule la partie DANS le cadre est gardée ----------
+let asFlux = null, asFluxMinuterie = null;
+async function asFluxObtenir() {
+  clearTimeout(asFluxMinuterie);
+  if (asFlux && asFlux.active && asFlux.getVideoTracks().some(t => t.readyState === 'live')) return asFlux;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('pas de caméra dans ce navigateur');
+  asFlux = await navigator.mediaDevices.getUserMedia({ audio: false,
+    video: { facingMode: { ideal: 'environment' }, width: { ideal: 3840 }, height: { ideal: 2160 } } });
+  return asFlux;
+}
+function asFluxRelacher(delai) { clearTimeout(asFluxMinuterie); asFluxMinuterie = setTimeout(asFluxArreter, delai == null ? 45000 : delai); }
+function asFluxArreter() {
+  clearTimeout(asFluxMinuterie);
+  if (asFlux) { try { asFlux.getTracks().forEach(t => t.stop()); } catch (e) {} asFlux = null; }
+}
+function trCameraArreter() {
+  if (trStand.flux) { try { trStand.flux.getTracks().forEach(t => t.stop()); } catch (e) {} trStand.flux = null; }
+  asFluxArreter();
+}
+// De retour dans le carnet (après WeChat) : si l'appareil photo était ouvert, il se rallume.
+function trCameraDemarrer() {
+  const v = document.querySelector('dialog.as-cam video'); if (!v) return;
+  asFluxObtenir().then(fl => { v.srcObject = fl; v.play().catch(() => {}); }).catch(() => {});
+}
+function trMajBande() {
+  const z = document.getElementById('tr_bande'); if (!z) return;
+  const f = trStandF();
+  const docs = f ? ctDocs(f).filter(d => d.type !== 'carte').slice().reverse() : [];
+  const ic = { page: '📖', produit: '📦', stand: '🏷️' };
+  z.innerHTML = docs.map(d => `<div class="v"><img class="ct-mini" data-doc="${E(d.id)}" alt="" onclick="ctVoirDoc('${f.id}','${d.id}')"><span>${ic[d.type] || '📖'}</span></div>`).join('');
+  ctRemplirMinis();
+}
+// Le cadre à l'écran → la même zone dans l'image de la caméra (la vidéo remplit l'écran en « cover »).
+function asRectVideo(v, cadre) {
+  const vr = v.getBoundingClientRect(), cr = cadre.getBoundingClientRect();
+  const vw = v.videoWidth, vh = v.videoHeight;
+  const e = Math.max(vr.width / vw, vr.height / vh);
+  const ox = (vr.width - vw * e) / 2, oy = (vr.height - vh * e) / 2;
+  let x = (cr.left - vr.left - ox) / e, y = (cr.top - vr.top - oy) / e, w = cr.width / e, h = cr.height / e;
+  const m = 0.035;                                   // une petite marge : les bords de la carte restent dans la photo
+  x -= w * m; y -= h * m; w *= 1 + 2 * m; h *= 1 + 2 * m;
+  const x0 = Math.max(0, x), y0 = Math.max(0, y), x1 = Math.min(vw, x + w), y1 = Math.min(vh, y + h);
+  return { x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0) };
+}
+function asDecouper(src, r, max) {
+  const e = Math.min(1, max / Math.max(r.w, r.h));
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(r.w * e)); c.height = Math.max(1, Math.round(r.h * e));
+  const g = c.getContext('2d', { willReadFrequently: true }); g.imageSmoothingQuality = 'high';
+  g.drawImage(src, r.x, r.y, r.w, r.h, 0, 0, c.width, c.height);
+  return c;
+}
+// La netteté d'une image (variance du laplacien) : on garde la plus nette de 4 images prises de suite.
+function asNettete(c) {
+  const p = mkToile(c, 320), W = p.width, H = p.height;
+  const d = p.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data;
+  const L = new Float32Array(W * H);
+  for (let i = 0, j = 0; i < L.length; i++, j += 4) L[i] = d[j] * 0.299 + d[j + 1] * 0.587 + d[j + 2] * 0.114;
+  let s = 0, s2 = 0, n = 0;
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+    const i = y * W + x, l = 4 * L[i] - L[i - 1] - L[i + 1] - L[i - W] - L[i + W];
+    s += l; s2 += l * l; n++;
+  }
+  return n ? s2 / n - (s / n) * (s / n) : 0;
+}
+async function asCliche(v, cadre) {
+  let meilleure = null, note = -1;
+  for (let i = 0; i < 4; i++) {
+    const c = asDecouper(v, asRectVideo(v, cadre), 2600), n = asNettete(c);
+    if (n > note) { note = n; meilleure = c; }
+    if (i < 3) await new Promise(ok => setTimeout(ok, 90));
+  }
+  return meilleure;
+}
+// Ouvre l'appareil photo du carnet. Rend { toile, origine, qrs? } (ou null si Annuler).
+// o = { forme: 'carte'|'carre'|'page'|'large'|'qr', titre, aide, qr: lit les QR en direct, surPhoto: rafale }
+function asCamera(o) {
+  return new Promise(resolve => {
+    let fini = false, boucle = null;
+    const dlg = document.createElement('dialog'); dlg.className = 'as-cam';
+    dlg.innerHTML = `<div class="as-cam-titre">${E(o.titre || '📷')}</div>
+      <div class="as-cam-zone"><video muted autoplay playsinline webkit-playsinline></video><div class="as-cadre f-${E(o.forme || 'carre')}"></div><div class="as-eclair"></div></div>
+      <div class="as-cam-aide" role="status">${E(o.aide || '')}</div>
+      <div class="as-cam-compte"></div>
+      <div class="as-cam-bas"><button type="button" class="as-declencheur" aria-label="Prendre la photo"></button></div>
+      <div class="as-cam-autres">
+        <label class="b contour" for="as_cam_natif">📷 Appareil photo du téléphone</label>
+        <label class="b contour" for="as_cam_galerie">🖼️ Photo déjà prise</label>
+        <button type="button" class="b gris as-cam-fin" style="grid-column:1/-1">${o.surPhoto ? '✓ Terminé' : 'Annuler'}</button>
+      </div>
+      <input type="file" id="as_cam_natif" accept="image/*" capture="environment" class="champ-cache">
+      <input type="file" id="as_cam_galerie" accept="image/*"${o.surPhoto ? ' multiple' : ''} class="champ-cache">`;
+    document.body.appendChild(dlg);
+    try { dlg.showModal(); } catch (e) { dlg.setAttribute('open', ''); }
+    const v = dlg.querySelector('video'), aide = dlg.querySelector('.as-cam-aide'), cadre = dlg.querySelector('.as-cadre');
+    const compte = dlg.querySelector('.as-cam-compte');
+    v.muted = true;
+    const finir = (res) => {
+      if (fini) return; fini = true; clearTimeout(boucle);
+      try { v.srcObject = null; } catch (e) {}
+      try { if (dlg.open) dlg.close(); } catch (e) {}
+      dlg.remove(); asFluxRelacher(); resolve(res || null);
+    };
+    dlg.addEventListener('cancel', (e) => { e.preventDefault(); finir(null); });
+    dlg.querySelector('.as-cam-fin').onclick = () => finir(o.surPhoto ? { fait: true } : null);
+    let occupe = false;
+    const prendre = async (toile, origine) => {
+      if (o.surPhoto) {
+        try { const t = await o.surPhoto(toile, origine); compte.textContent = t || ''; }
+        catch (e) { aide.textContent = '⚠ Photo non rangée : la mémoire du téléphone est peut-être pleine.'; }
+        return;
+      }
+      if (o.qr) {
+        aide.textContent = 'Lecture du QR…';
+        let qrs = []; try { qrs = await trLireTousQR(toile); } catch (e) {}
+        if (!qrs.length && origine === 'camera') { aide.textContent = 'Aucun QR lu sur cette photo : rapprochez-vous, bien droit, puis réessayez.'; return; }
+        finir({ toile, origine, qrs }); return;
+      }
+      finir({ toile, origine });
+    };
+    dlg.querySelector('.as-declencheur').onclick = async () => {
+      if (occupe) return;
+      if (!v.videoWidth) { aide.textContent = 'La caméra n\'est pas prête : touchez « 📷 Appareil photo du téléphone ».'; return; }
+      occupe = true;
+      try {
+        const ec = dlg.querySelector('.as-eclair'); ec.classList.add('on'); setTimeout(() => ec.classList.remove('on'), 70);
+        if (navigator.vibrate) navigator.vibrate(30);
+        await prendre(await asCliche(v, cadre), 'camera');
+      } finally { occupe = false; }
+    };
+    const depuisFichiers = async (input) => {
+      const L = Array.from(input.files || []); input.value = '';
+      for (const fi of L) {
+        if (fini) break;
+        try { await prendre(mkToile(await mkLireFichier(fi), 2600), 'fichier'); }
+        catch (e) { aide.textContent = 'Cette photo ne s\'ouvre pas : reprenez-la.'; }
+      }
+    };
+    dlg.querySelector('#as_cam_natif').onchange = function () { depuisFichiers(this); };
+    dlg.querySelector('#as_cam_galerie').onchange = function () { depuisFichiers(this); };
+    (async () => {
+      try {
+        const flux = await asFluxObtenir(); if (fini) return;
+        v.srcObject = flux;
+        await new Promise(ok => { if (v.readyState >= 1) ok(); else v.addEventListener('loadedmetadata', ok, { once: true }); setTimeout(ok, 3000); });
+        try { await v.play(); } catch (e) {}
+        if (!o.qr || fini) return;
+        // Le QR se lit tout seul, dans le carré seulement.
+        const chercher = async () => {
+          if (fini) return;
+          try {
+            if (v.videoWidth) {
+              const t = asDecouper(v, asRectVideo(v, cadre), 1100);
+              const r = await mkLireQR(t, [1100, 720]);
+              const deja = r && o.ignorer ? o.ignorer(r.texte) : '';
+              if (deja) { aide.textContent = deja; r.ignore = true; }
+              if (r && !r.ignore && !fini) {
+                dlg.classList.add('as-lu'); aide.textContent = 'QR lu ✓';
+                if (navigator.vibrate) navigator.vibrate(40);
+                const qrs = [{ texte: r.texte, image: mkDecouperQR(r.toile, r.points) }];
+                setTimeout(() => finir({ toile: t, origine: 'camera', qrs }), 350);
+                return;
+              }
+            }
+          } catch (e) { /* on continue de regarder */ }
+          boucle = setTimeout(chercher, 200);
+        };
+        chercher();
+      } catch (e) {
+        aide.textContent = 'L\'appareil photo du carnet ne s\'ouvre pas (' + (e && e.name ? e.name : 'refusé') + ') : touchez « 📷 Appareil photo du téléphone ».';
+      }
+    })();
+  });
+}
+
+// ---------- La lecture de la carte, plus juste ----------
+// 1. telle quelle (agrandie si elle est petite) ; 2. tournée d'un quart si la carte était en hauteur ;
+// 3. redressée si elle était de travers ; 4. rognée autour du texte lu si elle était loin. On garde la meilleure.
+function asAgrandir(src, cible) {
+  const l = src.videoWidth || src.naturalWidth || src.width, h = src.videoHeight || src.naturalHeight || src.height;
+  const e = Math.min(2.6, cible / Math.max(l, h));
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(l * e)); c.height = Math.max(1, Math.round(h * e));
+  const g = c.getContext('2d', { willReadFrequently: true }); g.imageSmoothingQuality = 'high';
+  g.drawImage(src, 0, 0, c.width, c.height);
+  return c;
+}
+// L'angle des lignes de texte (en degrés) : on cherche l'inclinaison où les bords des lettres s'alignent le mieux.
+function asAngleTexte(toile) {
+  const p = mkToile(toile, 640), W = p.width, H = p.height;
+  const d = p.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data;
+  const L = new Float32Array(W * H);
+  for (let i = 0, j = 0; i < L.length; i++, j += 4) L[i] = d[j] * 0.299 + d[j + 1] * 0.587 + d[j + 2] * 0.114;
+  const mags = [], pts = [];
+  for (let y = 1; y < H - 1; y += 1) for (let x = 1; x < W - 1; x += 1) {
+    const i = y * W + x, gx = L[i + 1] - L[i - 1], gy = L[i + W] - L[i - W];
+    const m = Math.abs(gx) + Math.abs(gy);
+    if (m > 60) { pts.push(x, y); mags.push(m); }
+  }
+  if (pts.length < 400) return 0;
+  const pas = Math.max(1, Math.floor(pts.length / 2 / 24000));
+  const D = Math.ceil(Math.hypot(W, H)) + 2;
+  let meilleur = 0, note = -1;
+  for (let a = -40; a <= 40; a += 1) {
+    const r = a * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+    const h = new Float32Array(D * 2);
+    for (let k = 0; k < pts.length; k += 2 * pas) { const yy = pts[k + 1] * c - pts[k] * s + D; h[(yy | 0)]++; }
+    let n = 0; for (let k = 0; k < h.length; k++) n += h[k] * h[k];
+    if (n > note) { note = n; meilleur = a; }
+  }
+  return meilleur;
+}
+function asTournerFin(toile, deg) {
+  const r = deg * Math.PI / 180, c = Math.abs(Math.cos(r)), s = Math.abs(Math.sin(r));
+  const W = toile.width, H = toile.height;
+  const o = document.createElement('canvas'); o.width = Math.round(W * c + H * s); o.height = Math.round(W * s + H * c);
+  const g = o.getContext('2d', { willReadFrequently: true });
+  g.fillStyle = '#fff'; g.fillRect(0, 0, o.width, o.height);
+  g.translate(o.width / 2, o.height / 2); g.rotate(r); g.drawImage(toile, -W / 2, -H / 2);
+  return o;
+}
+// La zone du texte : les mots bien lus les plus serrés (la carte), pas ceux d'un catalogue posé à côté.
+function asZoneTexte(passe) {
+  const T = passe.toile, bons = (passe.r.mots || []).filter(m => m.c >= 45 && m.b && String(m.t).replace(/[^A-Za-z0-9一-鿿]/g, '').length >= 2);
+  if (bons.length < 2) return null;
+  const cx = m => (m.b.x0 + m.b.x1) / 2, cy = m => (m.b.y0 + m.b.y1) / 2;
+  const R = 0.22 * Math.hypot(T.width, T.height);
+  let graine = bons[0], max = -1;
+  bons.forEach(m => { const n = bons.filter(x => Math.hypot(cx(x) - cx(m), cy(x) - cy(m)) <= R).length; if (n > max) { max = n; graine = m; } });
+  const grappe = bons.filter(x => Math.hypot(cx(x) - cx(graine), cy(x) - cy(graine)) <= R * 1.3);
+  let x0 = Math.min(...grappe.map(m => m.b.x0)), y0 = Math.min(...grappe.map(m => m.b.y0));
+  let x1 = Math.max(...grappe.map(m => m.b.x1)), y1 = Math.max(...grappe.map(m => m.b.y1));
+  const mx = (x1 - x0) * 0.25 + 30, my = (y1 - y0) * 0.35 + 30;
+  x0 = Math.max(0, x0 - mx); y0 = Math.max(0, y0 - my); x1 = Math.min(T.width, x1 + mx); y1 = Math.min(T.height, y1 + my);
+  if ((x1 - x0) * (y1 - y0) > 0.7 * T.width * T.height) return null;   // déjà serrée : rien à gagner
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+function asSombre(toile) {
+  const p = mkToile(toile, 200), d = p.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, p.width, p.height).data;
+  let s = 0; for (let j = 0; j < d.length; j += 4) s += d[j] * 0.299 + d[j + 1] * 0.587 + d[j + 2] * 0.114;
+  return s / (d.length / 4) < 105;
+}
+function asInverser(toile) {
+  const c = document.createElement('canvas'); c.width = toile.width; c.height = toile.height;
+  const g = c.getContext('2d', { willReadFrequently: true }); g.filter = 'invert(1) grayscale(1) contrast(1.4)'; g.drawImage(toile, 0, 0);
+  return c;
+}
+async function asOcrCarte(img, qrs) {
+  if (!(await trOcrDispo())) return null;
+  let m = null;
+  asOcrCarte.passes = [];
+  const passe = async (toile, deg, quoi) => {
+    const r = await trOcrLire(toile, 'eng+chi_sim', '3'), s = trScore(r);
+    const o = { s, r, toile, deg, quoi };
+    asOcrCarte.passes.push(quoi + ' ' + toile.width + '×' + toile.height + ' : ' + s);
+    if (!m || s > m.s) m = o;
+    return o;
+  };
+  const base = asAgrandir(img, 1800);
+  await passe(base, 0, 'telle');
+  if (m.s < 14) for (const deg of [90, 270]) { await passe(trTourner(base, deg), deg, 'quart'); if (m.s >= 14) break; }
+  if (m.s < 14) {
+    const a = asAngleTexte(m.toile);
+    if (Math.abs(a) >= 3) await passe(asTournerFin(m.toile, -a), m.deg, 'redressée');
+  }
+  // Une carte prise de loin dont on a lu le QR : la carte est autour de lui.
+  if (m.s < 14 && qrs && qrs.length && qrs[0].pts && qrs[0].pts.length >= 3) {
+    const W = base.width, H = base.height, xs = qrs[0].pts.map(p => p.x * W), ys = qrs[0].pts.map(p => p.y * H);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    const q = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), 20) * 1.3, cote = Math.min(Math.max(W, H), q * 6);
+    if (cote < 0.8 * Math.max(W, H)) {
+      const z = { x: Math.max(0, cx - cote / 2), y: Math.max(0, cy - cote / 2) }; z.w = Math.min(W - z.x, cote); z.h = Math.min(H - z.y, cote);
+      let autour = asAgrandir(asDecouper(base, z, 4000), 1800);
+      const a = asAngleTexte(autour); if (Math.abs(a) >= 3) autour = asTournerFin(autour, -a);
+      await passe(autour, 0, 'autour du QR');
+    }
+  }
+  // Rognée autour des mots déjà lus (la carte seule, agrandie) ; inversée si la carte est foncée (lettres blanches).
+  if (m.s < 14) {
+    const z = asZoneTexte(m);
+    if (z) {
+      let rog = asAgrandir(asDecouper(m.toile, z, 4000), 1800);
+      const a = asAngleTexte(rog); if (Math.abs(a) >= 3) rog = asTournerFin(rog, -a);
+      const deg0 = m.deg, quoi0 = m.quoi;
+      await passe(rog, deg0, quoi0 === 'telle' ? 'rognée' : quoi0 + ', rognée');
+      if (m.s < 14 && asSombre(rog)) await passe(asInverser(rog), deg0, 'rognée, inversée');
+    }
+  }
+  if (m.s < 8 && asSombre(m.toile)) await passe(asInverser(m.toile), m.deg, 'inversée');
+  if (m.s < 4) await passe(trTourner(base, 180), 180, 'retournée');
+  let texte = m.r.texte;
+  if (m.s >= 4) { try { texte += '\n' + (await trOcrLire(m.toile, 'eng+chi_sim', '11')).texte; } catch (e) {} }
+  return { texte, deg: m.deg, score: m.s, mots: m.r.mots, quoi: m.quoi };
+}
+// La lecture d'une photo rangée (carte, panneau) — la même partout : Au stand, Sa fiche, la pile, « Mettre de l'ordre ».
+async function trLireDoc(f, d) {
+  const src = await ctLire(d.id);
+  if (!src) { d.lu_qr = d.lu_ocr = true; return; }
+  const img = await trImage(src);
+  let qrs = [];
+  const ranger = (liste) => { if (d.relire) asRangerQRLus(f, liste); else trAppliquerQR(f, liste); };
+  if (!d.lu_qr) {
+    qrs = d.type === 'carte' ? await trLireTousQR(img, false, { points: true }) : [];
+    d.qr_n = qrs.length; ranger(qrs);
+    d.lu_qr = true; d.qr_a_fouiller = d.type === 'carte' && qrs.length < 2;
+  }
+  if (!d.lu_ocr && await trOcrDispo()) {
+    if (d.type === 'stand') {
+      const o = await trOcrCarte(img, true); d.lu_ocr = true; if (!o) return;
+      const m = trNettoyer(o.texte).match(/\b(\d{1,2}\.\d)\s?([A-Z])\s?-?(\d{1,3})\b/);
+      if (m && !f.allee) { f.allee = m[1] + ' ' + m[2] + m[3]; f.lu_auto = [...new Set([...(f.lu_auto || []), 'allee'])]; }
+      return;
+    }
+    let o = await asOcrCarte(img, qrs);
+    // Les cases d'abord (vite) ; ensuite on cherche partout un 2e QR, ou un QR petit et loin — et s'il situe la
+    // carte dans une photo prise de loin, on relit le texte autour de lui.
+    if (d.qr_a_fouiller) {
+      delete d.qr_a_fouiller;
+      try {
+        const tous = await trLireTousQR(img, true, { cadre: d.origine === 'cadre', budget: 7000, points: true });
+        const nouveaux = tous.filter(q => !qrs.some(x => x.texte === q.texte));
+        if (nouveaux.length) { ranger(nouveaux); d.qr_n = tous.length; }
+        if (o && o.score < 14 && nouveaux.length) { const o2 = await asOcrCarte(img, nouveaux); if (o2 && o2.score > o.score) o = o2; }
+      } catch (e) {}
+    }
+    d.lu_ocr = true;
+    if (!o) return;
+    d.score = o.score; if (o.deg) d.sens = o.deg; if (o.quoi && o.quoi !== 'telle') d.lecture = o.quoi;
+    const r = trLireTexteCarte(o.texte);
+    // Beaucoup de texte et aucune coordonnée : une page de catalogue prise en « carte » (jamais une face choisie Au stand).
+    if (!d.face && o.mots.length > 70 && !r.email && !r.mobile && !r.tel_fixe) { d.type = 'page'; return; }
+    if (d.relire) {
+      // Relire : une case lue par le téléphone (verte, pas vérifiée) peut prendre la nouvelle valeur.
+      const lus = Array.isArray(f.lu_auto) ? f.lu_auto : [];
+      TR_CHAMPS_LUS.forEach(k => { if (r[k] && lus.includes(k) && String(f[k] || '') !== r[k]) f[k] = ''; });
+      if (r.mobile && lus.includes('mobile')) f.tel = '';
+      if (f.nom_auto) f.nom = '';
+      delete d.relire;
+    }
+    d.lu = Object.keys(r).filter(k => r[k]);
+    trAppliquerCarte(f, r);
+    if (f.mobile && !String(f.tel || '').trim()) f.tel = f.mobile;
+  } else if (d.qr_a_fouiller) {   // la lecture du texte n'est pas prête : les QR, eux, se cherchent déjà partout
+    delete d.qr_a_fouiller;
+    try { const tous = await trLireTousQR(img, true, { cadre: d.origine === 'cadre', budget: 7000 }); const nv = tous.filter(q => !qrs.some(x => x.texte === q.texte)); if (nv.length) ranger(nv); } catch (e) {}
+  }
+}
+// Tous les QR d'une photo de carte : WeChat ET WhatsApp. La photo est agrandie si elle est petite, et si moins de
+// deux QR sont trouvés on cherche morceau par morceau (deux QR côte à côte se gênent l'un l'autre).
+async function trLireTousQR(source, fouiller, opts) {
+  opts = opts || {};
+  const trouves = [], debut = Date.now(), budget = opts.budget || 8000;
+  // z : où se trouve ce morceau dans la photo entière (en fractions), pour situer le QR — et donc la carte.
+  const garder = (texte, toile, points, z) => {
+    if (!texte || trouves.some(q => q.texte === texte)) return;
+    z = z || { x: 0, y: 0, w: 1, h: 1 };
+    trouves.push({ texte, image: mkDecouperQR(toile, points),
+      pts: (points || []).map(p => ({ x: z.x + p.x / toile.width * z.w, y: z.y + p.y / toile.height * z.h })) });
+  };
+  let natif = null, Z = null;
+  try { natif = await mkLecteurNatif(); } catch (e) {}
+  const lire = (toile, max, z) => { for (let k = 0; k < max; k++) { const r = mkZXingLire(Z, toile); if (!r) break; garder(r.texte, toile, r.points, z); trMasquer(toile, r.points); } };
+  const l0 = Math.max(source.videoWidth || source.naturalWidth || source.width, source.videoHeight || source.naturalHeight || source.height);
+  for (const t of [1600, Math.min(2400, Math.max(l0, 1300)), 1100]) {
+    const toile = t > l0 ? asAgrandir(source, t) : mkToile(source, t);
+    if (natif) { try { (await natif.detect(toile) || []).forEach(x => garder(x.rawValue, toile, x.cornerPoints || [])); } catch (e) {} }
+    if (!Z) { try { Z = await mkChargerZXing(); } catch (e) { if (!natif) return trouves.map(({ texte, image }) => ({ texte, image })); } }
+    if (Z) lire(toile, 5);
+    if (trouves.length >= 2) break;
+  }
+  if (Z && fouiller !== false && trouves.length < 2) {
+    // Deux QR côte à côte se gênent : on regarde par fenêtres carrées, chacune assez petite pour n'en voir qu'un.
+    const src = l0 > 1400 ? mkToile(source, 1400) : asAgrandir(source, 1400), W = src.width, H = src.height, petit = Math.min(W, H);
+    const essai = (x, y, cote) => {
+      x = Math.max(0, Math.min(W - cote, x)); y = Math.max(0, Math.min(H - cote, y));
+      if (cote < 40 || x < 0 || y < 0) return;
+      const e = Math.min(2, 640 / cote), c = document.createElement('canvas'); c.width = Math.round(cote * e); c.height = c.width;
+      c.getContext('2d', { willReadFrequently: true }).drawImage(src, x, y, cote, cote, 0, 0, c.width, c.height);
+      lire(c, 1, { x: x / W, y: y / H, w: cote / W, h: cote / H });
+    };
+    if (trouves.length === 1 && trouves[0].pts.length >= 3) {
+      // Un QR trouvé : le 2e est presque toujours juste à côté, de la même taille.
+      const xs = trouves[0].pts.map(p => p.x * W), ys = trouves[0].pts.map(p => p.y * H);
+      const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+      const q = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) * 1.35, cote = Math.min(petit, q * 1.5);
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+        if (trouves.length >= 2) break;
+        essai(cx + dx * q * 1.15 - cote / 2, cy + dy * q * 1.15 - cote / 2, cote);
+      }
+    } else if (!trouves.length) {
+      for (const f of [0.42, 0.6]) {
+        const cote = petit * f, pas = cote / 3;
+        for (let y = 0; y <= H - cote + 1 && trouves.length < 2; y += pas)
+          for (let x = 0; x <= W - cote + 1 && trouves.length < 2; x += pas) { if (Date.now() - debut > budget) break; essai(x, y, cote); }
+        if (trouves.length) break;
+      }
+    }
+    // Un petit QR dans une grande photo (carte posée loin, de travers) : morceau par morceau, agrandi.
+    if (!trouves.length && !opts.cadre && Date.now() - debut < budget) {
+      const grand = mkToile(source, 2400), GW = grand.width, GH = grand.height;
+      for (const taille of [0.5, 0.25]) {
+        const pas = taille / 2;
+        for (let fy = 0; fy <= 1 - taille + 1e-6 && !trouves.length; fy += pas) {
+          for (let fx = 0; fx <= 1 - taille + 1e-6 && !trouves.length; fx += pas) {
+            const tw = GW * taille, th = GH * taille, e = 1400 / Math.max(tw, th);
+            const c = document.createElement('canvas'); c.width = Math.round(tw * e); c.height = Math.round(th * e);
+            c.getContext('2d', { willReadFrequently: true }).drawImage(grand, GW * fx, GH * fy, tw, th, 0, 0, c.width, c.height);
+            lire(c, 3, { x: fx, y: fy, w: taille, h: taille });
+          }
+        }
+        if (trouves.length) break;
+      }
+    }
+  }
+  return opts.points ? trouves : trouves.map(({ texte, image }) => ({ texte, image }));
+}
+// Un QR trouvé est caché pour chercher le suivant — juste lui : deux QR côte à côte (WeChat et WhatsApp au dos
+// d'une carte) restaient cachés ensemble, et le 2e n'était jamais lu.
+function trMasquer(toile, points) {
+  if (!points || !points.length) return;
+  const xs = points.map(p => p.x), ys = points.map(p => p.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const cote = Math.max(x1 - x0, y1 - y0, 20), m = cote * 0.2;
+  const g = toile.getContext('2d'); g.fillStyle = '#fff';
+  g.fillRect(x0 - m, y0 - m, x1 - x0 + 2 * m, y1 - y0 + 2 * m);
+}
+function asRangerQRLus(f, qrs) {
+  (qrs || []).forEach(q => {
+    const a = mkAnalyserQR(q.texte);
+    if (a.type === 'wechat') { f.wechat_lien = a.champs.wechat_lien; if (q.image) f.qr_photo = q.image; }
+    else if (a.type === 'whatsapp') { f.whatsapp_lien = /^https?:/i.test(q.texte) ? q.texte : 'https://' + q.texte; if (q.image) f.wa_qr = q.image; }
+    else trAppliquerQR(f, [q]);
+  });
+}
+
+// ---------- La lecture du texte de la carte : les étiquettes chinoises et anglaises ----------
+// (avant : seuls les portables chinois étaient reconnus comme portables ; « WhatsApp : +86… » et « WeChat : 138… »
+// étaient oubliés ; « .corn » au lieu de « .com » cassait l'e-mail.)
+const asLireTexteCarteAvant = trLireTexteCarte;
+trLireTexteCarte = function (texteBrut) {
+  const propre = asPreNettoyer(texteBrut);
+  const r = asLireTexteCarteAvant(propre);
+  asCompleterLecture(r, propre);
+  return r;
+};
+function asPreNettoyer(t) {
+  return String(t || '')
+    .replace(/([一-鿿])[ \t]+(?=[一-鿿])/g, '$1')            // « 宁 波 厨 具 » (le lecteur écarte les caractères chinois) → « 宁波厨具 »
+    .replace(/＠/g, '@').replace(/：/g, ':').replace(/（/g, '(').replace(/）/g, ')')
+    .replace(/([A-Za-z0-9])\s*@\s*([A-Za-z0-9])/g, '$1@$2')
+    .replace(/(@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*)\.c[o0](?:rn|m|n)\b/gi, '$1.com')
+    .replace(/(@[A-Za-z0-9-]+)\s*[,，]\s*(com|cn|net)\b/gi, '$1.$2')
+    .replace(/\b(gmai|hotmai)1\b/gi, '$1l').replace(/@(163|126|qq|sina|gmail|hotmail|outlook|yahoo|foxmail)\s*\.\s*/gi, '@$1.');
+}
+// Les noms de famille chinois les plus courants : un nom seul sur sa ligne commence par l'un d'eux (sinon c'est un
+// morceau mal lu, comme « 三三 » lu dans les rayures d'une carte).
+const AS_NOMS_CN = '王李张刘陈杨黄赵吴周徐孙马朱胡郭何高林罗郑梁谢宋唐许韩冯邓曹彭曾肖田董袁潘于蒋蔡余杜叶程苏魏吕丁任沈姚卢姜崔钟谭陆汪范金石廖贾夏韦付方白邹孟熊秦邱江尹薛闫段雷侯龙史陶黎贺顾毛郝龚邵万钱严覃武戴莫孔向汤常温康施文牛樊葛邢安齐易乔伍庞颜倪庄聂章鲁岳翟殷詹申欧耿关兰焦俞左柳甘祝包宁尚符舒阮柯纪梅童凌毕单季裴霍涂成苗谷盛曲翁冉骆蓝路游辛靳管柴蒙鲍华喻祁蒲房滕屈饶解牟艾尤阳时穆农司卓古吉缪简车项连芦麦褚娄窦戚岑景党宫费卜冷晏席卫米柏宗瞿桂全佟应臧闵苟邬边卞姬师和仇栾隋商刁沙荣巫寇桑郎甄丛仲虞敖巩明佘池查麻苑迟邝';
+const AS_PAS_ID = /^(whats\s*app|we\s*chat|mobile|phone|tel|email|e-?mail|number|id|account|skype|line)$/i;
+const AS_RE_NUM = /(?:\+|00)?\(?\d[\d\s().-]{6,}\d/g;
+function asNumero(s) {
+  let d = String(s || '').replace(/[^\d+]/g, '').replace(/^00/, '+');
+  const chiffres = d.replace(/\D/g, '');
+  if (chiffres.length < 8 || chiffres.length > 15) return '';
+  const sans86 = chiffres.replace(/^86/, '');
+  if (/^1[3-9]\d{9}$/.test(sans86)) return '+86' + sans86;
+  return d.startsWith('+') ? d : (chiffres.startsWith('86') ? '+' + chiffres : d);
+}
+function asCompleterLecture(r, texte) {
+  if (r.wechat && AS_PAS_ID.test(r.wechat)) delete r.wechat;
+  // Une adresse chinoise qui est en fait le nom de la société mal lu (sans aucun chiffre) : écartée.
+  if (r.adresse && !/[A-Za-z]{3}/.test(r.adresse) && !/\d/.test(r.adresse) && /公|司|有限/.test(r.adresse)) delete r.adresse;
+  // Une « société » chinoise mal lue (« 厂州明呈电器科靶有限公局 ») : gardée seulement si elle finit comme une société.
+  if (r.societe && /[一-鿿]/.test(r.societe) && !/[A-Za-z]{3}/.test(r.societe)) {
+    const soc = r.societe.replace(/\s/g, '');
+    if (/(有限公司|公司|工厂|厂|商行|集团|商店|店)$/.test(soc) && !/^厂/.test(soc)) r.societe = soc; else delete r.societe;
+  }
+  const lignes = String(texte || '').split('\n').map(l => l.trim()).filter(Boolean);
+  lignes.forEach((l, i) => {
+    const suivante = lignes[i + 1] || '';
+    const nums = (l.match(AS_RE_NUM) || []).map(asNumero).filter(Boolean);
+    const numsSuite = nums.length ? nums : (/[:：]\s*$/.test(l) ? (suivante.match(AS_RE_NUM) || []).map(asNumero).filter(Boolean) : []);
+    // WhatsApp : le numéro de la même ligne (souvent le même que le portable).
+    if (/whats\s*app|\bwa\s*[:：]|\bw\/a\b/i.test(l) && numsSuite[0] && !r.whatsapp) r.whatsapp = numsSuite[0];
+    // Portable : « Mob / Mobile / Cell / M: / 手机 » même hors de Chine (Hong Kong, Vietnam…).
+    if (/\b(mob(?:ile)?|cell(?:phone)?|m\s*[:：])|手机|移动电话/i.test(l) && numsSuite[0] && !r.mobile) {
+      r.mobile = numsSuite[0];
+      if (r.tel_fixe && r.tel_fixe.replace(/\D/g, '').endsWith(r.mobile.replace(/\D/g, '').slice(-9))) delete r.tel_fixe;
+    }
+    // WeChat : un identifiant, ou un numéro (« WeChat : 138… », « 微信同号 » = même numéro que le portable).
+    if (/we\s*chat|weixin|微信|v信|\bwx\s*[:：]/i.test(l) && !r.wechat) {
+      const id = l.replace(/^.*?(?:we\s*chat|weixin|微信号?|v信|wx)\s*(?:id|号)?\s*[:：]?\s*/i, '').match(/^([A-Za-z][A-Za-z0-9_-]{4,29})\b/);
+      const suite = suivante.replace(/^[:：]\s*/, '').match(/^([A-Za-z][A-Za-z0-9_-]{4,29})$/);   // « 微信 » seul, « : kevin_nb88 » dessous
+      if (id && !AS_PAS_ID.test(id[1])) r.wechat = id[1];
+      else if (suite && !AS_PAS_ID.test(suite[1])) r.wechat = suite[1];
+      else if (numsSuite[0]) r.wechat = numsSuite[0].replace(/^\+86/, '');
+      else if (/同号|same/i.test(l) && r.mobile) r.wechat = r.mobile.replace(/^\+86/, '');
+    }
+    // Le contact écrit avec son étiquette : « Name: … », « 姓名 : … », « 联系人 : … ».
+    const nm = l.match(/^(?:name|contact(?:\s*person)?|attn|姓\s*名|联系人)\s*[:：]\s*(.{2,30})$/i);
+    if (nm && !/@|\d{4,}/.test(nm[1])) r.contact = nm[1].trim();
+  });
+  // Un nom chinois seul sur sa ligne (2 à 4 caractères), à côté d'un prénom anglais ou d'un poste.
+  if (!r.contact) {
+    const i = lignes.findIndex(l => /^[一-鿿]{2,4}$/.test(l.replace(/\s/g, '')) && AS_NOMS_CN.includes(l.replace(/\s/g, '')[0])
+      && !/公司|有限|经理|总监|主管|销售|业务|地址|电话|手机|邮箱|网址|传真|微信|工厂|厂|中国|广州|深圳/.test(l));
+    if (i >= 0) {
+      const nomCn = lignes[i].replace(/\s/g, '');
+      const voisin = [lignes[i + 1], lignes[i - 1]].map(x => String(x || '').match(/^([A-Z][a-z]{1,15}(?:\s+[A-Z][a-z]{1,15})?)\s*$/)).find(Boolean);
+      r.contact = voisin && !TR_LIEUX.test(voisin[1] + ' ') && !TR_MOTS_PAS_NOM.test(voisin[1]) ? nomCn + ' ' + voisin[1] : nomCn;
+    }
+  }
+  // Le poste en chinois.
+  if (!r.poste) { const p = lignes.map(l => l.match(/(总经理|副总经理|销售经理|业务经理|外贸经理|国际贸易部经理|外贸业务员|业务员|销售代表|销售总监|经理|总监|主管|老板)/)).find(Boolean); if (p) r.poste = p[1]; }
+  if (r.whatsapp && r.mobile && r.whatsapp.replace(/\D/g, '').slice(-9) === r.mobile.replace(/\D/g, '').slice(-9)) r.whatsapp = r.mobile;
+  return r;
+}
+// La lecture rapide de la 1.4.0 garde le même parcours : « 📋 Coller le texte de la carte » profite aussi des étiquettes.
+const asCtLireTexteCarteAvant = ctLireTexteCarte;
+ctLireTexteCarte = function (texte) { const propre = asPreNettoyer(texte); const r = asCtLireTexteCarteAvant(propre); asCompleterLecture(r, propre); return r; };
 </script>
 <script>
 

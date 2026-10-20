@@ -69,6 +69,19 @@ les cases lues par le téléphone, jamais celles tapées. Lecture des cartes : l
 de société), lettres écartées recollées, e-mail coupé recollé. Rien de retiré.
 ⚠ Même remarque : à reporter dans `KYLO-Achats.html` (module `fiche-1.5.2.html` et les retouches de `construire-1.5.2.py`).
 
+Version 1.6.0 — 21/10/2026 : **Au stand, tout au même endroit**. Un seul écran « 📷 Au stand » (le bouton vert 📷, Fournisseurs,
+Sa fiche et Comparer y mènent) : 1. sa carte de visite, face 1 et face 2 dans la MÊME fiche, les cases se remplissent seules
+(en vert : à vérifier) ; 2. ses QR WeChat et WhatsApp, chacun à sa place (l'un n'efface plus l'autre ; un QR montré dans la
+mauvaise case va à la bonne ; l'autre QR déjà gardé est ignoré) ; 3. ses produits : photo, prix → francs guinéens ET euros tout
+de suite, quantité, « Ajouter » (rien n'est perdu en passant au stand suivant) ; 4. catalogue et panneau en rafale ; 5. notes.
+L'appareil photo du carnet montre un cadre blanc et ne garde que le cadre (la plus nette de 4 images). La même personne déjà
+dans le carnet : « Réunir » en un appui. Le carnet refermé par le téléphone revient au même stand avec le produit commencé.
+Lecture des cartes : agrandie, tournée, redressée, rognée autour du texte ou du QR, inversée si la carte est foncée ; étiquettes
+chinoises et anglaises (手机, 微信, WhatsApp, Mob, Name…) ; deux QR côte à côte lus tous les deux. En tête de chaque fournisseur :
+la photo de son produit. Sa fiche : « Vus au stand : ses prix » (francs et euros) ; toucher une carte → « Relire la carte ».
+À la première ouverture, les cartes des fiches incomplètes sont relues (seules les cases vides se remplissent). Rien de retiré.
+⚠ Même remarque : à reporter dans `KYLO-Achats.html` (module `stand-1.6.0.html` et les retouches de `construire-1.6.0.py`).
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

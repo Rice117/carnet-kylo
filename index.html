@@ -892,7 +892,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.5.0';
+window.KYLO_APPLICATION = '1.5.1';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -5454,6 +5454,17 @@ const CT_CONTENEURS = [['20 pieds', 28], ['40 HC', 67]];   // les mêmes volumes
 
 // ---------- Les familles de produits (une image vaut mieux qu'un mot) ----------
 const CT_FAMILLES = [
+  ['🔥', 'Aspirateur à cendres', ['ash vacuum', 'ash cleaner', 'aspirateur a cendres', 'cendres', '吸灰']],
+  ['🏊', 'Aspirateur de bassin', ['pond cleaner', 'pond vacuum', 'aspirateur de bassin', '池塘']],
+  ['🪵', 'Dépoussiéreur bois et souffleur', ['wood collector', 'wood dust', 'dust collector', 'blower', 'souffleur', 'depoussiereur', '集尘']],
+  ['🧩', 'Accessoires d\'aspirateur', ['filters accessories', 'filter accessories', 'hoses & tubes', 'hoses and tubes', 'brushes', 'accessoires d\'aspirateur', 'vacuum accessories']],
+  ['🧼', 'Injecteur-extracteur (lavage)', ['washing vacuum', 'carpet cleaning', 'carpet cleaner', 'spray vacuum', 'spray & extraction', 'extraction cleaning', 'shampoo', 'injecteur', '洗地']],
+  ['🧽', 'Nettoyeur de taches et vapeur', ['spot cleaner', 'steam cleaner', 'steam vacuum', 'nettoyeur vapeur', 'nettoyeur de taches', '蒸汽']],
+  ['🫧', 'Serpillière et brosse électrique', ['floor mop', 'electric mop', 'spray mop', 'cleaning brush', 'serpilliere', '拖把']],
+  ['🛞', 'Aspirateur traîneau', ['canister', 'cyclone', 'aspirateur traineau', '卧式']],
+  ['🧹', 'Aspirateur balai et à main', ['stick vacuum', 'cordless', 'handheld', 'hand vacuum', 'aspirateur balai', 'aspirateur a main', '手持', '无线吸尘']],
+  ['💧', 'Aspirateur eau et poussière', ['wet and dry', 'wet & dry', 'wet/dry', 'wetand dry', 'eau et poussiere', 'commercial vacuum', 'industrial vacuum', 'professional vacuum', 'professionall vacuum', 'commercial series', 'commerical', '干湿']],
+  ['🪣', 'Aspirateur cuve sec', ['dry drum', 'drum vacuum', 'dry vacuum', 'dry cleaning', 'cuve sec', '桶式']],
   ['☕', 'Tasse cuiseuse électrique', ['tasse cuiseuse', 'cooking mug', 'electric mug', '电煮杯', '煮面杯']],
   ['🍚', 'Cuiseur à riz', ['cuiseur', 'rice cooker', '电饭煲', '电饭锅']],
   ['🏸', 'Tapette à moustiques électrique', ['tapette', 'swatter', 'racket', 'raquette', '灭蚊拍']],
@@ -5479,7 +5490,8 @@ const CT_FAMILLES = [
   ['👟', 'Chaussures et sacs', ['chaussure', 'sandale', 'basket', 'sac a main', 'sac a dos', 'sacs', 'shoe', 'handbag', 'backpack', '鞋']],
   ['🧸', 'Jouets', ['jouet', 'toy', 'poupee', '玩具']],
   ['🥫', 'Alimentaire', ['alimentaire', 'conserve', 'food', 'boisson', 'biscuit', '食品']],
-  ['🛋️', 'Meubles', ['meuble', 'chaise', 'canape', 'furniture', '家具']]
+  ['🛋️', 'Meubles', ['meuble', 'chaise', 'canape', 'furniture', '家具']],
+  ['🌪️', 'Aspirateur', ['vacuum', 'aspirateur', '吸尘器']]
 ];
 function ctFamille(cat) {
   const n = normaliserNom(cat);
@@ -6403,7 +6415,8 @@ function ctTrouverFournisseur(x) {
     || L.find(f => tels.length && [f.mobile, f.tel, f.tel_fixe, f.whatsapp].map(ctCleTel).filter(Boolean).some(t => tels.includes(t)))
     || L.find(f => x.wechat_lien && f.wechat_lien === x.wechat_lien)
     || L.find(f => so && normaliserNom(f.societe) === so)
-    || L.find(f => no && normaliserNom(f.nom) === no) || null;
+    || L.find(f => no && normaliserNom(f.nom) === no)
+    || L.find(f => x.code && f.code && String(f.code).trim().toUpperCase() === String(x.code).trim().toUpperCase()) || null;
 }
 const CT_CHAMPS_IMPORT = ['nom', 'societe', 'contact', 'poste', 'mobile', 'tel_fixe', 'whatsapp', 'whatsapp_lien', 'email', 'site', 'alibaba', 'wechat', 'wechat_lien',
   'adresse', 'marche', 'allee', 'certifications', 'categories', 'catalogue'];
@@ -6806,7 +6819,7 @@ html[data-theme="sombre"] .tr-types button.on{color:#0c1526}
 // Ce que le téléphone lit seul : QR, téléphones, e-mails, société, contact (vérifiés ensuite d'un coup d'œil).
 // Ce qu'il ne lit pas bien : les étiquettes des catalogues → Claude les lit et découpe chaque produit.
 
-window.KYLO_TERRAIN = '1.5.0';
+window.KYLO_TERRAIN = '1.5.1';
 
 // ---------- 1. La lecture du texte, sans Internet (Tesseract.js 5, rangé dans le téléphone) ----------
 const TR_OCR_CACHE = 'kylo-ocr-1';
@@ -7755,7 +7768,7 @@ window.addEventListener('load', () => setTimeout(() => {
 //   - « 💬 Coller la réponse » : chaque prix va tout seul sur son produit (par numéro ou par référence) ;
 //   - « ✂️ Découper » : poser 4 coins sur un bloc de produits, choisir lignes × colonnes → une photo par produit.
 
-window.KYLO_PRODUITS = '1.5.0';
+window.KYLO_PRODUITS = '1.5.1';
 
 // ---------- 1. La photo d'un produit ----------
 function trPhotoProduitHtml(f, p) {
@@ -7775,7 +7788,7 @@ function trResume(p) {
   const t = String(p.caracteristiques || '');
   const premier = t.split('·')[0].trim();
   // La 1re caractéristique (« noir mat », « 4 LED anti-moustiques ») si elle est courte, puis les chiffres utiles.
-  const tete = premier && premier.length <= 34 && !/capacit|puissance|contenance|mAh/i.test(premier) ? premier : '';
+  const tete = premier && premier.length <= 34 && !/capacit|puissance|contenance|mAh/i.test(premier) && normaliserNom(premier) !== normaliserNom(p.categorie) ? premier : '';
   const r = [tete, trCourt(p)].filter(Boolean).join(' · ');
   return r || (t.length > 70 ? t.slice(0, 68) + '…' : t);
 }
@@ -7913,14 +7926,22 @@ async function trPhotosImport(imp, suivi) {
 // « capacités 1,0 / 1,5 / … / 2,8 L · puissance 400 / … / 1000 W » → « 1,0–2,8 L · 400–1000 W »
 function trCourt(p) {
   const t = String(p.caracteristiques || '');
-  const L = (t.match(/capacit[^·]*/i) || [''])[0].match(/\d+(?:[.,]\d+)?/g) || t.match(/\d+(?:[.,]\d+)?(?=\s*L\b)/g);
-  const W = (t.match(/puissance[^·]*/i) || [''])[0].match(/\d{2,4}/g) || t.match(/\d{2,4}(?=\s*W\b)/g);
+  // Le premier groupe de chiffres d'une unité, tel qu'il est écrit : « 300–400 W », « 800 / 1000 / 1400 W » → 800–1400 W, « 1,6 L ».
+  const groupe = (seg, unite) => {
+    const m = String(seg || '').match(new RegExp('(\\d+(?:[.,]\\d+)?(?:\\s*(?:[–\\-\\/]|à)\\s*\\d+(?:[.,]\\d+)?)*)\\s*' + unite + '(?![A-Za-z])', 'i'));
+    if (!m) return null; const n = m[1].match(/\d+(?:[.,]\d+)?/g); return n.length > 1 ? n[0] + '–' + n[n.length - 1] : n[0];
+  };
+  const segCap = (t.match(/capacit[^·]*/i) || [''])[0], segPui = (t.match(/puissance[^·]*/i) || [''])[0];
+  const nCap = segCap.match(/\d+(?:[.,]\d+)?/g);
+  const L = groupe(segCap, 'L') || (nCap && nCap.length ? (nCap.length > 1 ? nCap[0] + '–' + nCap[nCap.length - 1] : nCap[0]) : null) || groupe(t, 'L');
+  const W = groupe(segPui, 'W') || groupe(t, 'W');
   const mah = t.match(/(\d{3,5}(?:\/\d{3,5})*)\s*mAh/i);   // « 1200/1800 mAh » reste entier (pas seulement 1800)
   const ml = t.match(/(\d{2,4})\s*mL/i);
   const bouts = [];
-  if (L && L.length) bouts.push(L.length > 1 ? L[0] + '–' + L[L.length - 1] + ' L' : L[0] + ' L');
+  const mat = /\binox\b|stainless/i.test(t) ? (/\bPP\b|plastique/i.test(t) ? 'inox ou PP' : 'inox') : /\bPP\b/.test(t) ? 'PP' : '';
+  if (L) bouts.push(L + ' L' + (mat ? ' ' + mat : ''));
   else if (ml) bouts.push(ml[1] + ' mL');
-  if (W && W.length) bouts.push(W.length > 1 ? W[0] + '–' + W[W.length - 1] + ' W' : W[0] + ' W');
+  if (W) bouts.push(W + ' W');
   if (mah) bouts.push(mah[1] + ' mAh');
   return bouts.join(' · ').replace(/\./g, ',');
 }
@@ -8482,7 +8503,7 @@ async function trDecAjouter() {
 // touche sa réponse (gros boutons) ou tape un chiffre. Riche relit tout en français sur la fiche, et les prix
 // donnés au stand vont directement sur les produits. Les mêmes questions se copient pour WeChat.
 
-window.KYLO_VENDEUR = '1.5.0';
+window.KYLO_VENDEUR = '1.5.1';
 const TR_Q = {
   base: { nom: '📋 Pour tous les vendeurs', q: [
     ['usine', '你们是工厂还是贸易公司？', 'Usine ou commerce ?', 'choix', [['工厂', 'Usine'], ['贸易公司', 'Commerce (revendeur)'], ['都是', 'Les deux']], 1],
@@ -8508,6 +8529,15 @@ const TR_Q = {
     ['e_ce', '有CE认证吗？', 'Certificat CE ?', 'choix', [['有', 'Oui'], ['没有', 'Non']]],
     ['e_pieces', '可以给备用零件吗？（内胆、电源线）', 'Pièces de rechange (cuve, cordon) ?', 'choix', [['可以，免费', 'Oui, gratuites'], ['可以，要付钱', 'Oui, payantes'], ['不可以', 'Non']]],
     ['e_matiere', '外壳是什么材料？', 'Matière du boîtier ?', 'choix', [['不锈钢', 'Inox'], ['塑料', 'Plastique'], ['铁喷漆', 'Métal peint'], ['其他', 'Autre']]]] },
+  aspirateur: { nom: '🧹 Aspirateurs', q: [
+    ['a_moteur', '电机是纯铜线的吗？', 'Moteur bobiné en cuivre pur ?', 'choix', [['纯铜', 'Cuivre pur'], ['铝线', 'Aluminium'], ['都可以做', 'Les deux possibles']], 1],
+    ['a_puissance', '实际功率是多少瓦？', 'Puissance réelle (W) ?', 'nombre', ['瓦', 'W'], 1],
+    ['a_filtre', '过滤器可以水洗吗？', 'Filtre lavable à l\'eau ?', 'choix', [['可以', 'Oui'], ['不可以', 'Non']], 1],
+    ['a_pieces', '滤芯、尘袋、软管可以单独买吗？', 'Filtres, sacs, tuyaux vendus à part ?', 'choix', [['可以', 'Oui'], ['不可以', 'Non']], 1],
+    ['a_melange', '一个货柜可以混装不同型号吗？', 'Plusieurs modèles dans un même conteneur ?', 'choix', [['可以', 'Oui'], ['可以，每个型号有最低数量', 'Oui, avec un minimum par modèle'], ['不可以', 'Non']], 1],
+    ['a_cable', '电源线多长？', 'Longueur du câble ?', 'nombre', ['米', 'm']],
+    ['a_bruit', '噪音多少分贝？', 'Bruit (dB) ?', 'nombre', ['分贝', 'dB']],
+    ['a_cuve', '桶有不锈钢和塑料两种吗？', 'Cuve inox ET plastique possibles ?', 'choix', [['都有', 'Oui, les deux'], ['只有不锈钢', 'Inox seulement'], ['只有塑料', 'Plastique seulement']]]] },
   riz: { nom: '🍚 Cuiseur à riz', q: [
     ['r_cuve', '内胆是不粘的吗？', 'Cuve anti-adhésive ?', 'choix', [['是', 'Oui'], ['不是', 'Non']], 1],
     ['r_epaisseur', '内胆有多厚？', 'Épaisseur de la cuve ?', 'nombre', ['毫米', 'mm']],
@@ -8584,7 +8614,11 @@ const TR_Q_PAR_FAMILLE = { 'Tasse cuiseuse électrique': ['electro', 'riz'], 'Cu
   'Lampe frontale': ['eclairage'], 'Solaire': ['eclairage'], 'Téléphones': ['telephone'], 'Chargeurs et câbles': ['telephone'],
   'Écouteurs et casques': ['telephone'], 'Batteries externes': ['telephone'], 'Enceintes': ['telephone'], 'Beauté et cosmétiques': ['beaute'],
   'Outils et bricolage': ['bricolage'], 'Cuisine et maison': ['cuisine'], 'Vêtements et tissus': ['textile'], 'Chaussures et sacs': ['chaussures'],
-  'Jouets': ['jouets'], 'Alimentaire': ['alimentaire'], 'Meubles': ['meubles'] };
+  'Jouets': ['jouets'], 'Alimentaire': ['alimentaire'], 'Meubles': ['meubles'],
+  'Aspirateur à cendres': ['electro', 'aspirateur'], 'Aspirateur de bassin': ['electro', 'aspirateur'], 'Dépoussiéreur bois et souffleur': ['electro', 'aspirateur'],
+  'Accessoires d\'aspirateur': ['aspirateur'], 'Injecteur-extracteur (lavage)': ['electro', 'aspirateur'], 'Nettoyeur de taches et vapeur': ['electro', 'aspirateur'],
+  'Serpillière et brosse électrique': ['electro'], 'Aspirateur traîneau': ['electro', 'aspirateur'], 'Aspirateur balai et à main': ['electro', 'aspirateur'],
+  'Aspirateur eau et poussière': ['electro', 'aspirateur'], 'Aspirateur cuve sec': ['electro', 'aspirateur'], 'Aspirateur': ['electro', 'aspirateur'] };
 function trQuestion(id) { for (const k of Object.keys(TR_Q)) { const q = TR_Q[k].q.find(x => x[0] === id); if (q) return q; } return null; }
 function trFamillesDe(f) {
   const res = new Set();
@@ -8842,6 +8876,22 @@ function trQuestionsDepuisOnglet() {
 .fw-gtab button{font:inherit;font-size:14px;font-weight:800;border-radius:10px;border:2px solid var(--bleu);background:var(--carte);color:var(--bleu);padding:4px 10px;min-height:40px}
 .fw-gtab tr.on td{background:var(--vert-pale)}
 .fw-fichiers .muet,.fw-gtab .muet{font-size:14px}
+/* 1.5.1 — « À qui ? » avant d'ouvrir WeChat */
+.tr-aqui{position:fixed;inset:0;z-index:50;background:var(--carte);overflow:auto;padding:18px 16px 28px;font-size:16px;line-height:1.4}
+.tr-aqui h3{font-size:22px;margin:0 0 12px}
+.tr-aqui .qui{display:flex;gap:14px;align-items:center;border:3px solid var(--vert);border-radius:16px;padding:12px;background:var(--vert-pale)}
+.tr-aqui .qui .code{font-size:40px;font-weight:900;color:var(--vert);line-height:1;min-width:92px;text-align:center}
+.tr-aqui .qui .nom{font-size:19px;font-weight:900}
+.tr-aqui .qui .cn{font-size:20px;font-weight:700}
+.tr-aqui .qui .det{font-size:15px;color:var(--texte-note)}
+.tr-aqui .carte-img{width:100%;max-height:200px;object-fit:contain;border-radius:12px;border:1px solid var(--lisiere);margin-top:10px;background:#fff}
+.tr-aqui .etape{font-size:16px;margin:12px 0 0;padding:10px 12px;border-radius:12px;background:var(--bleu-pale)}
+.tr-aqui .etape b{color:var(--bleu)}
+.tr-aqui .une-fois{font-size:16px;margin:12px 0 0;padding:10px 12px;border-radius:12px;background:var(--ambre-pale)}
+.tr-aqui button{font:inherit;font-size:17px;font-weight:900;border-radius:14px;min-height:56px;width:100%;margin-top:10px;border:0}
+.tr-aqui button.ok{background:#1aad19;color:#fff}
+.tr-aqui button.cp{background:var(--carte);color:var(--bleu);border:2px solid var(--bleu)}
+.tr-aqui button.non{background:var(--gris-clair);color:var(--texte)}
 </style>
 <script>
 'use strict';
@@ -8856,7 +8906,7 @@ function trQuestionsDepuisOnglet() {
 //   - Des photos (pages, capture d'écran des prix) : rangées ; une capture de prix est lue.
 // Rien n'est rangé avant que Riche voie ce que le carnet a trouvé et touche « Tout ranger ».
 
-window.KYLO_FICHIERS = '1.5.0';
+window.KYLO_FICHIERS = '1.5.1';
 
 // ---------- Les outils (rangés une fois avec la lecture des cartes ; sinon pris sur Internet) ----------
 async function fwOutil(f) {
@@ -8903,12 +8953,22 @@ const FW_TRAD = [[/lithium\s*battery|li-?polymer|锂电池|电池容量|电池/g
   [/modular/gi, 'modulaire'], [/led\s*base/gi, 'socle lumineux'], [/human\s*sensing/gi, 'détecteur de présence'], [/light\s*induction/gi, 'capteur de lumière'],
   [/(\d+)\s*pcs\b(?!\s*\/)/gi, '$1 LED']];
 function fwFrancais(t) { let s = String(t || ''); FW_TRAD.forEach(([re, fr]) => { s = s.replace(re, fr); }); return s.replace(/\s*[:：]\s*/g, ' : ').replace(/\s+/g, ' ').trim(); }
-const FW_RE_REF = /\b([A-Z]{1,5})[- ]?(\d{2,6}[A-Z]{0,3})((?:\/[A-Z]{0,2}\d{2,6}[A-Z]{0,3})*)\b/g;
+// 1.5.1 : on garde l'écriture du fournisseur : WD-989, YS-817B, EC823-15L, EC813V-20P, EC832(AC), EC-899 (DC), EC823 pro.
+const FW_RE_REF = /\b([A-Z]{1,5})([- ]?)(\d{2,6}[A-Z]{0,3})((?:-(?:\d{1,3}[A-Z]{0,2}|CAR|STICK|PRO|MINI|MAX|PLUS))?)((?:\/[A-Z]{0,2}\d{2,6}[A-Z]{0,3})*)(?![A-Z0-9])(\s?\(\s?(?:AC|DC)\s?\)|\s(?:PRO|EK)(?![A-Z0-9]))?/g;
+const FW_RE_UNITE = /(?:MM|CM|ML|KG|HZ|MAH|KPA|PCS|AW)$/;
 function fwRefsDans(t) {
   const res = []; let m; FW_RE_REF.lastIndex = 0;
-  const s = String(t || '').toUpperCase();
-  while ((m = FW_RE_REF.exec(s))) { if (!CT_PAS_MODELE.test(m[1])) res.push({ ref: m[1] + '-' + m[2] + (m[3] || ''), prefixe: m[1] }); }
+  const s = String(t || '').toUpperCase().replace(/（/g, '(').replace(/）/g, ')');
+  while ((m = FW_RE_REF.exec(s))) {
+    if (CT_PAS_MODELE.test(m[1]) || m[1] === 'X' || FW_RE_UNITE.test(m[3] + m[4])) continue;
+    const suite = (m[6] || '').replace(/\s+/g, ' ').replace(/\(\s/, '(').replace(/\s\)/, ')');
+    res.push({ ref: m[1] + (m[2] === ' ' ? '-' : m[2]) + m[3] + m[4] + (m[5] || '') + suite, prefixe: m[1] });
+  }
   return res;
+}
+// Une référence lue sur l'image d'une page : les confusions courantes de la lecture (O/0, I/1 entre deux chiffres, £C → EC).
+function fwCorrigerOcr(t) {
+  return String(t || '').replace(/^[£€]/, 'E').replace(/(\d)[OQD](?=\d)/g, '$10').replace(/(\d)[Il|](?=\d)/g, '$11').replace(/[—–−]/g, '-');
 }
 
 // ---------- Lire un catalogue PDF ----------
@@ -8918,6 +8978,62 @@ function fwBoiteImage(ctm, vt) {
   const coins = [[0, 0], [1, 0], [0, 1], [1, 1]].map(([x, y]) => { const p = [ctm[0] * x + ctm[2] * y + ctm[4], ctm[1] * x + ctm[3] * y + ctm[5]]; return [vt[0] * p[0] + vt[2] * p[1] + vt[4], vt[1] * p[0] + vt[3] * p[1] + vt[5]]; });
   const xs = coins.map(c => c[0]), ys = coins.map(c => c[1]);
   return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
+}
+function fwBoiteRect(ctm, vt, mm) {
+  const coins = [[mm[0], mm[1]], [mm[2], mm[1]], [mm[0], mm[3]], [mm[2], mm[3]]].map(([x, y]) => { const p = [ctm[0] * x + ctm[2] * y + ctm[4], ctm[1] * x + ctm[3] * y + ctm[5]]; return [vt[0] * p[0] + vt[2] * p[1] + vt[4], vt[1] * p[0] + vt[3] * p[1] + vt[5]]; });
+  const xs = coins.map(c => c[0]), ys = coins.map(c => c[1]);
+  return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
+}
+// Un chemin pdf.js (plusieurs rectangles ou contours réunis) → la boîte de chaque morceau.
+function fwMorceauxDeChemin(O, ops, args) {
+  const res = []; let j = 0, cur = null;
+  const pt = (x, y) => { if (!cur) cur = { n: 0, mm: [x, y, x, y] }; cur.mm[0] = Math.min(cur.mm[0], x); cur.mm[1] = Math.min(cur.mm[1], y); cur.mm[2] = Math.max(cur.mm[2], x); cur.mm[3] = Math.max(cur.mm[3], y); };
+  const fin = () => { if (cur) res.push(cur); cur = null; };
+  for (let i = 0; i < ops.length; i++) {
+    const op = ops[i] | 0;
+    if (op === O.rectangle) { fin(); const x = args[j++], y = args[j++], w = args[j++], h = args[j++]; cur = { n: 1, mm: [Math.min(x, x + w), Math.min(y, y + h), Math.max(x, x + w), Math.max(y, y + h)] }; fin(); }
+    else if (op === O.moveTo) { fin(); pt(args[j++], args[j++]); cur.n++; }
+    else if (op === O.lineTo) { pt(args[j++], args[j++]); cur.n++; }
+    else if (op === O.curveTo) { pt(args[j++], args[j++]); pt(args[j++], args[j++]); pt(args[j++], args[j++]); cur.n++; }
+    else if (op === O.curveTo2 || op === O.curveTo3) { pt(args[j++], args[j++]); pt(args[j++], args[j++]); cur.n++; }
+    else if (op === O.closePath) { if (cur) cur.n++; }
+  }
+  fin();
+  return res;
+}
+// 1.5.1 : les images (avec leur identifiant, pour les détourer) et les barres de couleur (rangées de tableau, étiquettes).
+async function fwDessinsDeLaPage(lib, page, vp) {
+  const ops = await page.getOperatorList(), O = lib.OPS, images = [], barres = [];
+  let glyphes = 0;                                               // lettres dessinées : petits contours remplis
+  let ctm = [1, 0, 0, 1, 0, 0], coul = [0, 0, 0], chemin = null; const pile = [];
+  const s = vp.scale;
+  for (let i = 0; i < ops.fnArray.length; i++) {
+    const fn = ops.fnArray[i], a = ops.argsArray[i];
+    if (fn === O.save) pile.push([ctm, coul]);
+    else if (fn === O.restore) { const x = pile.pop(); if (x) { ctm = x[0]; coul = x[1]; } else { ctm = [1, 0, 0, 1, 0, 0]; } }
+    else if (fn === O.transform) ctm = fwMul(ctm, a);
+    else if (fn === O.paintFormXObjectBegin) { pile.push([ctm, coul]); if (Array.isArray(a[0]) && a[0].length === 6) ctm = fwMul(ctm, a[0]); }
+    else if (fn === O.paintFormXObjectEnd) { const x = pile.pop(); if (x) { ctm = x[0]; coul = x[1]; } }
+    else if (fn === O.setFillRGBColor) coul = typeof a[0] === 'string' ? [parseInt(a[0].slice(1, 3), 16), parseInt(a[0].slice(3, 5), 16), parseInt(a[0].slice(5, 7), 16)] : [a[0], a[1], a[2]];
+    else if (fn === O.constructPath) chemin = fwMorceauxDeChemin(O, a[0] || [], a[1] || []);
+    else if (fn === O.fill || fn === O.eoFill || fn === O.fillStroke || fn === O.eoFillStroke || fn === O.closeFillStroke || fn === O.closeEOFillStroke) {
+      const L = 0.299 * coul[0] + 0.587 * coul[1] + 0.114 * coul[2];
+      if (chemin) chemin.forEach(mc => { if (mc.n > 6) { const b = fwBoiteRect(ctm, vp.transform, mc.mm); if (b.y1 - b.y0 < 60 * s && b.x1 - b.x0 < 80 * s) glyphes++; } });
+      if (chemin && L < 225) chemin.forEach(mc => {
+        if (mc.n > 14) return;                                    // une lettre dessinée, pas une barre
+        const b = fwBoiteRect(ctm, vp.transform, mc.mm), lg = b.x1 - b.x0, ht = b.y1 - b.y0;
+        if (ht >= 6 * s && ht <= 34 * s && lg >= 35 * s) barres.push(Object.assign(b, { L, coul }));
+      });
+      chemin = null;
+    }
+    else if (fn === O.endPath || fn === O.stroke || fn === O.closeStroke) chemin = null;
+    else if (fn === O.paintImageXObject || fn === O.paintInlineImageXObject || fn === O.paintJpegXObject || fn === O.paintImageMaskXObject)
+      images.push(Object.assign(fwBoiteImage(ctm, vp.transform), { id: typeof a[0] === 'string' ? a[0] : '', iw: a[1], ih: a[2], masque: fn === O.paintImageMaskXObject }));
+  }
+  // Une même barre dessinée deux fois (fond + contour) : une seule.
+  const uniques = [];
+  barres.forEach(b => { if (!uniques.some(u => Math.abs(u.x0 - b.x0) < 3 && Math.abs(u.y0 - b.y0) < 3 && Math.abs(u.x1 - b.x1) < 3)) uniques.push(b); });
+  return { images, barres: uniques, glyphes };
 }
 async function fwImagesDeLaPage(lib, page, vp) {
   const ops = await page.getOperatorList(), O = lib.OPS, res = [];
@@ -8960,8 +9076,12 @@ async function fwLirePdf(fichier, suivi) {
     useSystemFonts: true, disableFontFace: false }).promise;
   const n = Math.min(doc.numPages, 80);
   const pages = [], texteContacts = [];
+  const ocr = await trOcrDispo().catch(() => false);
+  let nbDessinees = 0, tDessin = 0;
   for (let i = 1; i <= n; i++) {
-    if (suivi) suivi('Page ' + i + ' sur ' + n + '…', i / n);
+    const reste = nbDessinees ? Math.round(tDessin / nbDessinees * (n - i + 1) / 60000) : 0;
+    if (suivi) suivi('Page ' + i + ' sur ' + n + (nbDessinees ? ' — lecture des lettres dessinées' + (reste >= 1 ? ' (encore ≈ ' + reste + ' min, laissez le carnet ouvert)' : '') : '') + '…', i / n);
+    const tPage = Date.now();
     const page = await doc.getPage(i);
     const base = page.getViewport({ scale: 1 });
     const vp = page.getViewport({ scale: Math.min(3, 1700 / Math.max(base.width, base.height) * (base.width > base.height ? 1.25 : 1)) });
@@ -8969,22 +9089,70 @@ async function fwLirePdf(fichier, suivi) {
     const g = c.getContext('2d', { willReadFrequently: true }); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
     await page.render({ canvasContext: g, viewport: vp }).promise;
     const morceaux = fwMorceaux(lib, await page.getTextContent(), vp);
-    let images = [];
-    try { images = await fwImagesDeLaPage(lib, page, vp); } catch (e) {}
-    pages.push({ num: i, toile: c, morceaux, images, l: c.width, h: c.height });
-    if (i <= 2 || i > n - 2) texteContacts.push(fwLignesContact(morceaux.map(m => m.s)));
+    let des = { images: [], barres: [], glyphes: 0 };
+    try { des = await fwDessinsDeLaPage(lib, page, vp); } catch (e) {}
+    const p = { num: i, morceaux, images: des.images, barres: des.barres, l: c.width, h: c.height, dessinee: morceaux.length < 2 && des.glyphes >= 40 };
+    // 1.5.1 : une page sans texte (lettres dessinées) : on détoure ses photos et on lit ses lettres, page par page.
+    if (p.dessinee && ocr) {
+      nbDessinees++;
+      try { fwDetourerImages(page, p.images, c); } catch (e) {}
+      p.images = p.images.filter(b => !b.cachee);
+      p.images.forEach(b => { const a = (b.x1 - b.x0) * (b.y1 - b.y0); if (!b.photo && !b.double && a >= c.width * c.height * 0.003 && a <= c.width * c.height * 0.4) b.photo = fwRogner(c, b); });
+      p.toile = c;
+      try { await fwLireLettresDessinees(p, page, vp); } catch (e) { p.motsOcr = p.motsOcr || []; }
+      // Une étiquette sur une barre étroite (grille d'accessoires) : la case au-dessus est sa photo.
+      (p.barres || []).forEach(b => {
+        if (!b.texte || !fwRefsDans(fwCorrigerOcr(b.texte)).length) return;
+        if ((b.x1 - b.x0) < c.width * 0.3) { const lg = b.x1 - b.x0; b.caseAuDessus = fwRogner(c, { x0: b.x0, y0: Math.max(0, b.y0 - lg * 0.62), x1: b.x1, y1: b.y0 - 1 }); return; }
+        // une barre longue avec plusieurs étiquettes : une case au-dessus de chaque étiquette
+        if (/ITEM|MODEL|型号|货号/i.test(b.texte)) return;          // une rangée de tableau, pas des étiquettes
+        const ms = (p.motsOcr || []).filter(m => m.barre === b && fwRefsDans(fwCorrigerOcr(m.s)).length).sort((a, z) => a.x0 - z.x0);
+        if (ms.length < 2) return;
+        const cs = ms.map(m => (m.x0 + m.x1) / 2), pas = (cs[cs.length - 1] - cs[0]) / (cs.length - 1);
+        ms.forEach((m, i) => { m.caseAuDessus = fwRogner(c, { x0: Math.max(b.x0, cs[i] - pas / 2), y0: Math.max(0, b.y0 - pas * 0.8), x1: Math.min(b.x1, cs[i] + pas / 2), y1: b.y0 - 1 }); });
+      });
+      if (i <= 2 || i > n - 2) texteContacts.push(fwLignesContact(fwLignesOcr(p.motsOcr)));
+      tDessin += Date.now() - tPage;
+    }
+    // Les morceaux de page à découper plus tard (les produits) : la page est gardée en JPEG, pas en entier.
+    p.src = c.toDataURL('image/jpeg', 0.8); p.mini = mkReduire(c, 280, 0.62);
+    p.toile = null; c.width = c.height = 1;
+    pages.push(p);
+    if (!p.dessinee && (i <= 2 || i > n - 2)) texteContacts.push(fwLignesContact(morceaux.map(m => m.s)));
     page.cleanup();
   }
   const total = doc.numPages;
   try { doc.destroy(); } catch (e) {}
-  const produits = fwProduitsDesPages(pages);
-  const prix = fwTablesDePrix(pages);
+  const texte = pages.filter(p => !p.dessinee);
+  let produits = [];
+  if (texte.length) { const r = fwProduitsDesPages(texte); produits = r.produits; await fwRognerTout(r.aRogner, suivi); }
+  const lues = pages.filter(p => p.dessinee && p.motsOcr);
+  if (lues.length) produits = produits.concat(fwProduitsDessines(lues));
+  const prix = fwTablesDePrix(texte);
   const contacts = trLireTexteCarte(texteContacts.join('\n'));
-  const nbTexte = pages.filter(p => p.morceaux.length >= 5).length;
-  const res = { type: 'pdf', nom: fichier.name, total, lues: n, scanne: nbTexte === 0, produits, prix, contacts,
-    pages: pages.map(p => ({ num: p.num, src: p.toile.toDataURL('image/jpeg', 0.8), mini: mkReduire(p.toile, 280, 0.62) })) };
-  pages.forEach(p => { p.toile.width = p.toile.height = 1; });
+  const res = { type: 'pdf', nom: fichier.name, total, lues: n, scanne: texte.filter(p => p.morceaux.length >= 5).length === 0 && !lues.some(p => p.motsOcr.length >= 5),
+    dessine: lues.length, produits, prix, contacts, pages: pages.map(p => ({ num: p.num, src: p.src, mini: p.mini })) };
   return res;
+}
+// Les mots lus sur une page dessinée, remis en lignes (pour les coordonnées du fournisseur).
+function fwLignesOcr(mots) {
+  const L = [];
+  (mots || []).filter(m => !m.barre).slice().sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0).forEach(m => {
+    const l = L.find(x => Math.abs(x.y0 - m.y0) < m.h * 0.6 && m.x0 - x.x1 < m.h * 2 && m.x0 >= x.x0); if (l) { l.s += ' ' + m.s; l.x1 = m.x1; } else L.push({ s: m.s, x0: m.x0, x1: m.x1, y0: m.y0 });
+  });
+  return L.map(l => l.s);
+}
+// Découper les photos des produits, page par page (une page décodée à la fois).
+async function fwRognerTout(demandes, suivi) {
+  const parPage = new Map(); demandes.forEach(d => { if (!parPage.has(d.p)) parPage.set(d.p, []); parPage.get(d.p).push(d); });
+  let k = 0;
+  for (const [p, ds] of parPage) {
+    k++; if (suivi) suivi('Photos des produits : page ' + k + ' sur ' + parPage.size + '…', k / parPage.size);
+    let im; try { im = await trImage(p.src); } catch (e) { continue; }
+    const c = document.createElement('canvas'); c.width = p.l; c.height = p.h; c.getContext('2d').drawImage(im, 0, 0, p.l, p.h);
+    ds.forEach(d => { const ph = fwRogner(c, { x0: d.boite.x0 + 4, y0: d.boite.y0 + 4, x1: d.boite.x1 - 4, y1: d.boite.y1 - 4 }); if (ph) d.prod.photo = ph; });
+    c.width = c.height = 1;
+  }
 }
 // Les lignes d'un fichier qui parlent du fournisseur (e-mail, téléphone, société, poste) — pas les titres d'un tableau.
 function fwLignesContact(lignes) {
@@ -9007,7 +9175,7 @@ function fwProduitsDesPages(pages) {
   const hauteurs = pages.flatMap(p => p.morceaux.map(m => m.h)).sort((a, b) => a - b);
   const hMed = hauteurs.length ? hauteurs[Math.floor(hauteurs.length / 2)] : 10;
   const refs = toutes.filter(r => compte[r.prefixe] >= 2 || r.m.h >= hMed * 1.25);
-  const res = [], vus = new Map(), infos = new Map(), doubles = {};
+  const res = [], vus = new Map(), infos = new Map(), doubles = {}, aRogner = [];
   pages.forEach(p => {
     const ici = refs.filter(r => r.page === p);
     if (!ici.length) return;
@@ -9085,17 +9253,12 @@ function fwProduitsDesPages(pages) {
           Object.keys(prod).forEach(k => { if (!d[k] && prod[k]) d[k] = prod[k]; }); return;
         }
       }
-      if (boite.x1 - boite.x0 > 30 && boite.y1 - boite.y0 > 30) {
-        const e = Math.min(1, 640 / Math.max(boite.x1 - boite.x0, boite.y1 - boite.y0));
-        const c = document.createElement('canvas'); c.width = Math.round((boite.x1 - boite.x0) * e); c.height = Math.round((boite.y1 - boite.y0) * e);
-        c.getContext('2d').drawImage(p.toile, boite.x0, boite.y0, boite.x1 - boite.x0, boite.y1 - boite.y0, 0, 0, c.width, c.height);
-        prod.photo = c.toDataURL('image/jpeg', 0.86);
-      }
+      if (boite.x1 - boite.x0 > 30 && boite.y1 - boite.y0 > 30) aRogner.push({ prod, p, boite });
       if (!vus.has(cle)) vus.set(cle, prod);
       infos.set(prod, { page: p.num, specs: lignes.length > 0 }); res.push(prod);
     }));
   });
-  return res;
+  return { produits: res, aRogner };
 }
 function fwFamilleDeLaPage(p) {
   const grands = p.morceaux.slice().sort((a, b) => b.h - a.h).slice(0, 12).map(m => m.s).join(' ');
@@ -9113,6 +9276,319 @@ function fwProduitDepuis(ref, texte, famille, page, nouveau) {
   if (s.poids_kg) d.poids_kg = s.poids_kg;
   if (/ctn|carton|外箱/i.test(texte) && !s.dim_l) d.a_demander = 'carton, colisage et poids absents du catalogue';
   return d;
+}
+
+// ---------- 1.5.1 : un PDF aux lettres DESSINÉES (Illustrator : texte vectorisé, pas de texte dans le fichier) ----------
+// Riche, 20/10 : le catalogue d'aspirateurs de F05 (51 pages doubles) est fait ainsi. Le carnet :
+//   - détoure les photos de produits que le PDF contient (images avec transparence) ;
+//   - lit les lettres sur l'image de chaque page (lecture des cartes, sans Internet), et à part les lettres
+//     claires sur les barres de couleur (rangées « ITEM NO » des tableaux, étiquettes des accessoires) ;
+//   - range : référence + sa photo + sa famille (titre de la page). Tout est marqué « à vérifier ».
+function fwImageVersToile(img) {
+  if (!img || !img.width || !img.height || img.width * img.height > 16e6) return null;
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  if (img.bitmap) { g.drawImage(img.bitmap, 0, 0); return c; }
+  if (!img.data) return null;
+  const n = img.width * img.height, d = new ImageData(img.width, img.height), src = img.data;
+  if (img.kind === 3 && src.length >= n * 4) d.data.set(src.subarray ? src.subarray(0, n * 4) : src.slice(0, n * 4));
+  else if (img.kind === 2 && src.length >= n * 3) { for (let i = 0, j = 0; i < n; i++, j += 3) { d.data[i * 4] = src[j]; d.data[i * 4 + 1] = src[j + 1]; d.data[i * 4 + 2] = src[j + 2]; d.data[i * 4 + 3] = 255; } }
+  else return null;
+  g.putImageData(d, 0, 0); return c;
+}
+// Une image « détourée » : ses bords sont transparents (un produit sur fond transparent).
+function fwEstDetouree(c) {
+  const g = c.getContext('2d', { willReadFrequently: true }), w = c.width, h = c.height;
+  const pts = []; for (let k = 0; k <= 10; k++) { const x = Math.min(w - 1, Math.round(k * (w - 1) / 10)), y = Math.min(h - 1, Math.round(k * (h - 1) / 10)); pts.push([x, 0], [x, h - 1], [0, y], [w - 1, y]); }
+  let transp = 0; pts.forEach(([x, y]) => { if (g.getImageData(x, y, 1, 1).data[3] < 200) transp++; });
+  return transp >= pts.length * 0.4;
+}
+// La photo détourée, dans le bon sens (comparée à la page rendue), sur fond blanc, recadrée sur le produit.
+function fwPhotoDetouree(src, rendu, b) {
+  // Le bon sens, ET la photo est-elle vraiment visible ? (un PDF garde parfois des photos cachées sous d'autres :
+  // les pixels pleins de la photo doivent ressembler à la page rendue.)
+  const W = 48, prendre = (dessin, fond) => { const c = document.createElement('canvas'); c.width = c.height = W; const g = c.getContext('2d', { willReadFrequently: true }); if (fond) { g.fillStyle = '#fff'; g.fillRect(0, 0, W, W); } dessin(g); return g.getImageData(0, 0, W, W).data; };
+  const ref = prendre(g => g.drawImage(rendu, b.x0, b.y0, Math.max(1, b.x1 - b.x0), Math.max(1, b.y1 - b.y0), 0, 0, W, W), true);
+  let meilleur = null;
+  [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([sx, sy]) => {
+    const d = prendre(g => { g.save(); g.translate(sx < 0 ? W : 0, sy < 0 ? W : 0); g.scale(sx, sy); g.drawImage(src, 0, 0, W, W); g.restore(); }, false);
+    let e = 0, n = 0; for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 220) { e += (Math.abs(d[i] - ref[i]) + Math.abs(d[i + 1] - ref[i + 1]) + Math.abs(d[i + 2] - ref[i + 2])) / 3; n++; }
+    if (n < 20) return;
+    e /= n;
+    if (!meilleur || e < meilleur.e) meilleur = { e, sx, sy };
+  });
+  if (!meilleur || meilleur.e > 100) return null;         // cachée (ou méconnaissable) : pas une photo de produit de cette page
+  // recadrer sur les pixels visibles
+  const g0 = src.getContext('2d', { willReadFrequently: true }), dd = g0.getImageData(0, 0, src.width, src.height).data;
+  let x0 = src.width, y0 = src.height, x1 = 0, y1 = 0;
+  for (let y = 0; y < src.height; y += 2) for (let x = 0; x < src.width; x += 2) if (dd[(y * src.width + x) * 4 + 3] > 30) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 <= x0 || y1 <= y0) { x0 = 0; y0 = 0; x1 = src.width; y1 = src.height; }
+  const m = 6, lw = x1 - x0 + 2 * m, lh = y1 - y0 + 2 * m, e = Math.min(1, 640 / Math.max(lw, lh));
+  const c = document.createElement('canvas'); c.width = Math.round(lw * e); c.height = Math.round(lh * e);
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+  g.save(); g.scale(e, e); g.translate(m - x0, m - y0);
+  g.translate(meilleur.sx < 0 ? x0 + x1 : 0, meilleur.sy < 0 ? y0 + y1 : 0); g.scale(meilleur.sx, meilleur.sy);
+  g.drawImage(src, 0, 0); g.restore();
+  return c.toDataURL('image/jpeg', 0.86);
+}
+// Pendant le rendu d'une page dessinée : on détoure les images de produits (avant que la page soit libérée).
+function fwDetourerImages(page, images, rendu) {
+  const aireP = rendu.width * rendu.height, vues = new Set();
+  images.forEach(b => {
+    const aire = (b.x1 - b.x0) * (b.y1 - b.y0);
+    if (!b.id || b.masque || aire < aireP * 0.003 || aire > aireP * 0.4) return;
+    // une photo qui déborde de la page (catalogue en double page) : gardée si l'essentiel est dans la page
+    const dedans = Math.max(0, Math.min(b.x1, rendu.width) - Math.max(b.x0, 0)) * Math.max(0, Math.min(b.y1, rendu.height) - Math.max(b.y0, 0));
+    if (dedans < aire * 0.6) return;
+    const cle = b.id + ':' + Math.round(b.x0) + ':' + Math.round(b.y0); if (vues.has(cle)) { b.double = true; return; } vues.add(cle);
+    try {
+      const store = b.id.startsWith('g_') ? page.commonObjs : page.objs;
+      if (!store.has(b.id)) return;
+      const c = fwImageVersToile(store.get(b.id)); if (!c) return;
+      b.detouree = fwEstDetouree(c);
+      if (b.detouree) { b.photo = fwPhotoDetouree(c, rendu, b); if (!b.photo) { b.detouree = false; b.cachee = true; } }
+      c.width = c.height = 1;
+    } catch (e) {}
+  });
+}
+// Les cases d'une rangée de tableau : les traits de séparation (colonnes plus claires que la barre sur toute la hauteur).
+function fwCasesDeBarre(toile, b) {
+  const x0 = Math.max(0, Math.floor(b.x0)), y0 = Math.max(0, Math.floor(b.y0)), w = Math.min(toile.width - x0, Math.ceil(b.x1 - b.x0)), h = Math.min(toile.height - y0, Math.ceil(b.y1 - b.y0));
+  if (w < 40 || h < 8) return [];
+  const d = toile.getContext('2d', { willReadFrequently: true }).getImageData(x0, y0, w, h).data;
+  const yA = Math.floor(h * 0.15), yB = Math.ceil(h * 0.85), sep = [];
+  for (let x = 0; x < w; x++) {
+    let clair = 0, n = 0;
+    for (let y = yA; y < yB; y++) { const i = (y * w + x) * 4, v = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; n++; if (v > b.L + 35) clair++; }
+    sep.push(clair >= n * 0.9);
+  }
+  const coupes = []; let debut = -1;
+  for (let x = 0; x <= w; x++) { if (x < w && sep[x]) { if (debut < 0) debut = x; } else if (debut >= 0) { coupes.push((debut + x) / 2); debut = -1; } }
+  const bornes = [0, ...coupes.filter(c => c > 6 && c < w - 6), w], cases = [];
+  for (let i = 0; i + 1 < bornes.length; i++) if (bornes[i + 1] - bornes[i] > 30) cases.push({ x0: x0 + bornes[i] + 1, y0, x1: x0 + bornes[i + 1] - 1, y1: y0 + h });
+  return cases.length >= 2 && cases.length <= 12 ? cases : [];
+}
+// Les lettres claires sur une barre de couleur : on les rend sombres sur fond blanc, puis on lit la ligne.
+function fwToileBarre(rendu, b) {
+  const x0 = Math.max(0, Math.floor(b.x0)), y0 = Math.max(0, Math.floor(b.y0)), w = Math.min(rendu.width - x0, Math.ceil(b.x1 - b.x0)), h = Math.min(rendu.height - y0, Math.ceil(b.y1 - b.y0));
+  if (w < 10 || h < 6) return null;
+  const k = h < 90 ? Math.min(3, 90 / h) : 1;
+  const c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
+  const g = c.getContext('2d', { willReadFrequently: true }); g.imageSmoothingQuality = 'high'; g.drawImage(rendu, x0, y0, w, h, 0, 0, c.width, c.height);
+  const im = g.getImageData(0, 0, c.width, c.height), d = im.data, L = b.L;
+  // L'écart des lettres au fond : vers le blanc (lettres claires) et vers le noir (lettres foncées).
+  const haut = [], bas = [];
+  for (let i = 0; i < d.length; i += 16) { const v = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; if (v > L + 12) haut.push(v - L); else if (v < L - 12) bas.push(L - v); }
+  const p98 = (t) => { if (t.length < 8) return 0; t.sort((a, b) => a - b); return t[Math.floor(t.length * 0.98)]; };
+  const dH = p98(haut), dB = p98(bas);
+  for (let i = 0; i < d.length; i += 4) { const v = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    const lettre = (dH > 24 && v - L > dH * 0.45) || (dB > 24 && L - v > dB * 0.45); const o = lettre ? 0 : 255; d[i] = d[i + 1] = d[i + 2] = o; }
+  // Les traits (bords de case, séparations) ne sont pas des lettres : colonnes ou lignes presque pleines, et le bord.
+  const W = c.width, H = c.height, noir = (x, y) => d[(y * W + x) * 4] === 0, blanchir = (x, y) => { const i = (y * W + x) * 4; d[i] = d[i + 1] = d[i + 2] = 255; };
+  for (let x = 0; x < W; x++) { let n = 0; for (let y = 0; y < H; y++) if (noir(x, y)) n++; if (n > H * 0.7) for (let y = 0; y < H; y++) blanchir(x, y); }
+  for (let y = 0; y < H; y++) { let n = 0; for (let x = 0; x < W; x++) if (noir(x, y)) n++; if (n > W * 0.5) for (let x = 0; x < W; x++) blanchir(x, y); }
+  const bord = Math.max(2, Math.round(H * 0.06));
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (x < bord || x >= W - bord || y < bord || y >= H - bord) blanchir(x, y);
+  g.putImageData(im, 0, 0);
+  // un peu de blanc autour : la lecture aime les marges
+  const c2 = document.createElement('canvas'); c2.width = c.width + 24; c2.height = c.height + 24;
+  const g2 = c2.getContext('2d'); g2.fillStyle = '#fff'; g2.fillRect(0, 0, c2.width, c2.height); g2.drawImage(c, 12, 12);
+  return { c: c2, x0, y0, k, m: 12 };
+}
+async function fwLireLettresDessinees(p, page, vp) {
+  const mots = [];
+  const o = await trOcrLire(p.toile, 'eng', '11');
+  o.mots.forEach(m => { const t = String(m.t || '').trim(); if (t && m.c >= 35) mots.push({ s: t, x0: m.b.x0, y0: m.b.y0, x1: m.b.x1, y1: m.b.y1, h: m.b.y1 - m.b.y0, c: m.c, barre: null }); });
+  p.motsOcr = mots;
+  const barres = (p.barres || []).slice().sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0).slice(0, 60);
+  if (!barres.length || !page) return;
+  // La zone des barres, redessinée 3 fois plus grand (au plus 12 millions de points : la limite d'un iPhone).
+  const z = { x0: Math.min(...barres.map(b => b.x0)), y0: Math.min(...barres.map(b => b.y0)), x1: Math.max(...barres.map(b => b.x1)), y1: Math.max(...barres.map(b => b.y1)) };
+  const k = Math.max(1, Math.min(3, Math.sqrt(12e6 / Math.max(1, (z.x1 - z.x0) * (z.y1 - z.y0)))));
+  const zc = document.createElement('canvas'); zc.width = Math.ceil((z.x1 - z.x0) * k); zc.height = Math.ceil((z.y1 - z.y0) * k);
+  const zg = zc.getContext('2d', { willReadFrequently: true }); zg.fillStyle = '#fff'; zg.fillRect(0, 0, zc.width, zc.height);
+  try {
+    const vz = page.getViewport({ scale: vp.scale * k, offsetX: -z.x0 * k, offsetY: -z.y0 * k });
+    await page.render({ canvasContext: zg, viewport: vz }).promise;
+  } catch (e) { zg.drawImage(p.toile, z.x0, z.y0, z.x1 - z.x0, z.y1 - z.y0, 0, 0, zc.width, zc.height); }
+  const lireMorceau = async (bz, b) => {
+    const t = fwToileBarre(zc, bz); if (!t) return null;
+    let r; try { r = await trOcrLire(t.c, 'eng', '7'); } catch (e) { return null; }
+    const kk = k * t.k, res = [];
+    r.mots.forEach(m => { const s = String(m.t || '').trim(); if (!s || m.c < 30) return;
+      res.push({ s, x0: z.x0 + (t.x0 + (m.b.x0 - t.m) / t.k) / k, y0: z.y0 + (t.y0 + (m.b.y0 - t.m) / t.k) / k, x1: z.x0 + (t.x0 + (m.b.x1 - t.m) / t.k) / k,
+        y1: z.y0 + (t.y0 + (m.b.y1 - t.m) / t.k) / k, h: (m.b.y1 - m.b.y0) / kk, c: m.c, barre: b }); });
+    return { texte: r.texte.trim(), mots: res };
+  };
+  for (const b of barres) {
+    const bz = { x0: (b.x0 - z.x0) * k, y0: (b.y0 - z.y0) * k, x1: (b.x1 - z.x0) * k, y1: (b.y1 - z.y0) * k, L: b.L };
+    const r = await lireMorceau(bz, b); if (!r) continue;
+    b.texte = r.texte;
+    // Une rangée « ITEM NO » coupée en cases : chaque case est relue seule (les références y sont petites).
+    const cases = /ITEM|MODEL|型号|货号/i.test(r.texte) ? fwCasesDeBarre(zc, bz) : [];
+    if (cases.length >= 2) {
+      const lues = [];
+      for (const cz of cases) { const rc = await lireMorceau(Object.assign({}, cz, { L: b.L }), b); if (rc) lues.push(...rc.mots); }
+      if (lues.length) { b.texte = r.texte.match(/ITEM\s*NO|MODEL/i) ? (r.texte.match(/ITEM\s*NO|MODEL/i)[0] + ' ' + lues.map(m => m.s).join(' ')) : b.texte; mots.push(...lues); continue; }
+    }
+    mots.push(...r.mots);
+  }
+  zc.width = zc.height = 1;
+  p.motsOcr = mots.filter(m => m.barre || !barres.some(b => b.texte && (m.x0 + m.x1) / 2 > b.x0 && (m.x0 + m.x1) / 2 < b.x1 && (m.y0 + m.y1) / 2 > b.y0 && (m.y0 + m.y1) / 2 < b.y1));
+}
+// Les mots lus → les références (un mot, ou un mot + « (AC) » / « pro » / « EK » collé juste après).
+function fwRefsLues(p) {
+  const mots = p.motsOcr || [], res = [];
+  mots.forEach((m, i) => {
+    let t = fwCorrigerOcr(m.s);
+    const suivant = mots[i + 1];
+    if (suivant && suivant.barre === m.barre && Math.abs(suivant.y0 - m.y0) < m.h * 0.6 && suivant.x0 - m.x1 < m.h * 1.2 && /^\(?(AC|DC)\)?$|^pro$|^EK$/i.test(suivant.s)) t += ' ' + suivant.s;
+    fwRefsDans(t).forEach(r => res.push(Object.assign({ m, page: p }, r)));
+  });
+  return res;
+}
+// Redresser ce que la lecture a mal lu, grâce aux voisins :
+//   - sur une rangée « ITEM NO » : les références partagent leur tête (EC821D-…) ; « 201 » à la fin = « 20L » ;
+//   - dans une grille d'accessoires numérotée (EKF1012, EKF1013, …, EKF1015) : « EKF1074 » entre 1013 et 1015 = 1014.
+function fwRedresser(refs) {
+  const parBarre = new Map();
+  refs.forEach(r => { if (r.m.barre && /ITEM|MODEL|型号|货号/i.test(r.m.barre.texte || '')) { if (!parBarre.has(r.m.barre)) parBarre.set(r.m.barre, []); parBarre.get(r.m.barre).push(r); } });
+  parBarre.forEach(rs => {
+    const parts = rs.map(r => { const i = r.ref.lastIndexOf('-'); return i > 0 ? [r.ref.slice(0, i), r.ref.slice(i + 1)] : [r.ref, '']; });
+    const compte = {}; parts.forEach(([t]) => { compte[t] = (compte[t] || 0) + 1; });
+    const tete = Object.keys(compte).sort((a, b) => compte[b] - compte[a])[0];
+    const lettres = parts.some(([, q]) => /^\d{1,3}[A-Z]$/.test(q));
+    rs.forEach((r, i) => {
+      let [t, q] = parts[i];
+      if (t !== tete && compte[tete] >= 2 && t.length === tete.length && [...t].filter((c, k) => c !== tete[k]).length <= 2) t = tete;
+      if (lettres && /^\d{2}1$/.test(q)) q = q.slice(0, 2) + 'L';
+      if (q) r.ref = t + '-' + q; else r.ref = t;
+      r.prefixe = (r.ref.match(/^[A-Z]+/) || [r.prefixe])[0];
+    });
+  });
+  // Les suites numérotées (une page de grille) : lecture dans l'ordre des rangées.
+  const parPage = new Map();
+  refs.forEach(r => { const m = r.ref.match(/^([A-Z]{2,5})(\d{3,6})$/); if (!m || !r.m.barre) return; const k = r.page; if (!parPage.has(k)) parPage.set(k, []); parPage.get(k).push({ r, p: m[1], n: m[2] }); });
+  parPage.forEach(xs => {
+    const L = xs[0].r.page.l, moitie = (x) => (xs[0].r.page.l > xs[0].r.page.h * 1.15 && (x.r.m.x0 + x.r.m.x1) / 2 > L / 2) ? 1 : 0;
+    xs.sort((a, b) => moitie(a) - moitie(b) || (Math.abs(a.r.m.y0 - b.r.m.y0) < a.r.m.h ? a.r.m.x0 - b.r.m.x0 : a.r.m.y0 - b.r.m.y0));
+    for (let i = 1; i + 1 < xs.length; i++) {
+      const a = xs[i - 1], b = xs[i], c = xs[i + 1];
+      if (a.p !== c.p || a.n.length !== c.n.length) continue;
+      const na = +a.n, nc = +c.n;
+      if (nc === na + 2 && +b.n !== na + 1) { b.n = String(na + 1).padStart(a.n.length, '0'); b.p = a.p; b.r.ref = b.p + b.n; }
+    }
+  });
+  return refs;
+}
+function fwPrefixes(refs) {
+  const compte = {}; refs.forEach(r => { compte[r.prefixe] = (compte[r.prefixe] || 0) + 1; });
+  const CHIFFRE = { B: '8' };            // « 8 » lu « B » (ECB15V → EC815V) ; S, G… sont de vraies lettres (ECS008)
+  refs.forEach(r => {
+    const p = r.prefixe, court = p.slice(0, -1), der = p.slice(-1);
+    if ((compte[p] || 0) <= (compte[court] || 0) * 0.2 && court.length >= 2 && (compte[court] || 0) >= 3 && CHIFFRE[der] && r.ref.startsWith(p)) {
+      r.ref = court + CHIFFRE[der] + r.ref.slice(p.length); r.prefixe = court;
+    }
+  });
+  return refs;
+}
+function fwProduitsDessines(pages) {
+  const toutes = fwRedresser(fwPrefixes(pages.flatMap(fwRefsLues).filter(r => (r.ref.match(/\d/g) || []).length >= 3)));
+  // Un préfixe vu au moins 3 fois (EC…, ECA…, EKF…), ou une étiquette écrite en grand : c'est une référence.
+  const compte = {}; toutes.forEach(r => { compte[r.prefixe] = (compte[r.prefixe] || 0) + 1; });
+  const hs = toutes.map(r => r.m.h).sort((a, b) => a - b), hMed = hs.length ? hs[Math.floor(hs.length / 2)] : 10;
+  const refs = toutes.filter(r => compte[r.prefixe] >= 3 || r.m.h >= hMed * 1.3);
+  const res = [], vus = new Map();
+  let familleAvant = '';
+  pages.forEach(p => {
+    const moities = p.l > p.h * 1.15 ? [[0, p.l / 2], [p.l / 2, p.l]] : [[0, p.l]];
+    moities.forEach(([gx, dx]) => {
+      const dans = (b) => (b.x0 + b.x1) / 2 >= gx && (b.x0 + b.x1) / 2 < dx;
+      // La famille : le titre de la demi-page (les plus grandes lettres, en haut).
+      const haut = (p.motsOcr || []).filter(m => dans(m) && m.y0 < p.h * 0.25 && !m.barre);
+      const hMax = Math.max(0, ...haut.map(m => m.h));
+      const titre = haut.filter(m => m.h >= hMax * 0.7).sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0).map(m => m.s).join(' ');
+      let fa = ctFamille(titre);
+      if (fa && fa[1] === 'Chargeurs et câbles' && !/charg|usb/i.test(titre)) fa = null;
+      if (!fa) { const f2 = ctFamille(haut.map(m => m.s).join(' ')); if (f2 && f2[1] !== 'Chargeurs et câbles') fa = f2; }
+      if (fa && fa[1] === 'Aspirateur' && familleAvant) fa = null;      // trop vague : la famille de la page d'avant
+      const famille = fa ? fa[1] : familleAvant; if (fa) familleAvant = fa[1];
+      const ici = refs.filter(r => r.page === p && dans(r.m));
+      if (!ici.length) return;
+      const photos = (p.images || []).filter(b => dans(b) && !b.double && (b.x1 - b.x0) * (b.y1 - b.y0) >= p.l * p.h * 0.003 && (b.x1 - b.x0) * (b.y1 - b.y0) <= p.l * p.h * 0.4);
+      const ligneItem = (r) => r.m.barre ? /ITEM|MODEL|型号|货号/i.test(r.m.barre.texte || '') : (p.motsOcr || []).some(x => /^ITEM$|^MODEL$/i.test(x.s) && Math.abs(x.y0 - r.m.y0) < r.m.h * 0.8);
+      const etiquettes = ici.filter(r => !ligneItem(r)), tableau = ici.filter(r => ligneItem(r));
+      const prises = new Map();
+      const choisir = (r, liste) => {
+        const cx = (r.m.x0 + r.m.x1) / 2; let meilleur = null, cout = Infinity;
+        const u = p.l / 830, cy = (r.m.y0 + r.m.y1) / 2;
+        liste.forEach(b => {
+          let c;
+          const dedans = cx > b.x0 && cx < b.x1 && cy > b.y0 && cy < b.y1;
+          if (dedans) c = b.detouree ? 5 * u : 80 * u;        // l'étiquette posée sur la photo du produit (détourée) : c'est elle
+          else {
+            const dxx = cx >= b.x0 - 25 * u && cx <= b.x1 + 25 * u ? 0 : Math.min(Math.abs(cx - b.x0), Math.abs(cx - b.x1));
+            const dy = r.m.y0 - b.y1;
+            c = dxx * 2 + (dy < -40 * u ? 200 * u + Math.abs(dy) : Math.abs(dy)) + (b.detouree ? 0 : 30 * u);
+          }
+          c += prises.has(b) ? 60 * u : 0;
+          if (c < cout) { cout = c; meilleur = b; }
+        });
+        return cout < 300 * p.l / 830 ? meilleur : null;
+      };
+      const photoDe = (b) => b.photo || null;
+      const ajouter = (r, photo, comment) => {
+        let cle = ctCleRef(r.ref); if (!cle) return;
+        if (vus.has(cle)) {
+          const d0 = vus.get(cle);
+          if (!d0.photo && photo) { d0.photo = photo; return; }      // la même référence plus loin, avec sa photo (EC858-3 : photo de groupe, puis sa page)
+          if (d0.page !== 'p. ' + String(p.num).padStart(2, '0') || !r.m.barre || !d0.barre || r.m.barre === d0.barre || /ITEM|MODEL/i.test(r.m.barre.texte || '')) return;
+          r = Object.assign({}, r, { ref: r.ref + ' (2)' }); cle = ctCleRef(r.ref); if (vus.has(cle)) return;
+          d0.incertain = 'même référence écrite deux fois dans le catalogue : à confirmer avec le fournisseur';
+        }
+        const d = { ref: r.ref, categorie: famille, caracteristiques: '', page: 'p. ' + String(p.num).padStart(2, '0'),
+          incertain: 'lu sur l\'image de la page (lettres dessinées) : vérifiez la référence', lu_dessin: true };
+        if (photo) d.photo = photo;
+        if (comment) d.a_demander = comment;
+        if (/\(2\)$/.test(r.ref)) d.incertain = 'même référence écrite deux fois dans le catalogue : à confirmer avec le fournisseur';
+        Object.defineProperty(d, 'barre', { value: r.m.barre, enumerable: false });
+        vus.set(cle, d); res.push(d);
+      };
+      // 1) les étiquettes près des photos ; une étiquette seule sur une barre étroite (accessoire) : la case au-dessus.
+      // Une GRILLE (accessoires) : au moins 3 barres pareilles dans la demi-page ; une étiquette seule (EC832(AC)) n'en est pas une.
+      const barresIci = (p.barres || []).filter(dans);
+      const enGrille = (bb) => !!bb && barresIci.filter(x => Math.abs((x.x1 - x.x0) - (bb.x1 - bb.x0)) < (bb.x1 - bb.x0) * 0.12 && Math.abs((x.y1 - x.y0) - (bb.y1 - bb.y0)) < (bb.y1 - bb.y0) * 0.35).length >= 3;
+      etiquettes.sort((a, b) => a.m.y0 - b.m.y0 || a.m.x0 - b.m.x0).forEach(r => {
+        let photo = null;
+        if (r.m.barre && enGrille(r.m.barre) && (r.m.caseAuDessus || (r.m.barre.x1 - r.m.barre.x0) < (dx - gx) * 0.45)) {
+          const bb = r.m.barre, cx = (r.m.x0 + r.m.x1) / 2, lg = r.m.caseAuDessus ? (bb.x1 - bb.x0) / 3 : bb.x1 - bb.x0;
+          const au = photos.filter(b => Math.abs((b.x0 + b.x1) / 2 - cx) < lg * 0.6 && b.y1 <= bb.y0 + 4 && b.y1 > bb.y0 - lg * 1.2);
+          photo = (au.length ? photoDe(au.sort((a, b) => b.y1 - a.y1)[0]) : null) || r.m.caseAuDessus || bb.caseAuDessus || null;
+        } else {
+          const b = choisir(r, photos); if (b) { prises.set(b, (prises.get(b) || 0) + 1); photo = photoDe(b); r.photoBoite = b; }
+        }
+        ajouter(r, photo);
+      });
+      // 2) les références des tableaux (ITEM NO) : la photo de l'étiquette qui les annonce (EC823 → EC823-15L), sinon la plus grande photo.
+      const grande = photos.filter(b => b.detouree).sort((a, b) => (b.x1 - b.x0) * (b.y1 - b.y0) - (a.x1 - a.x0) * (a.y1 - a.y0))[0]
+        || (etiquettes.find(e => e.photoBoite) || {}).photoBoite || null;
+      tableau.sort((a, b) => a.m.x0 - b.m.x0).forEach(r => {
+        const k = ctCleRef(r.ref);
+        const parent = etiquettes.filter(e => e.photoBoite && k.startsWith(ctCleRef(e.ref).replace(/(AC|DC|PRO|EK)$/, ''))).sort((a, b) => ctCleRef(b.ref).length - ctCleRef(a.ref).length)[0];
+        const b = parent ? parent.photoBoite : grande;
+        ajouter(r, b ? photoDe(b) : null);
+      });
+    });
+  });
+  return res;
+}
+function fwRogner(toile, b) {
+  const x0 = Math.max(0, b.x0 - 4), y0 = Math.max(0, b.y0 - 4), x1 = Math.min(toile.width, b.x1 + 4), y1 = Math.min(toile.height, b.y1 + 4);
+  if (x1 - x0 < 20 || y1 - y0 < 20) return null;
+  const e = Math.min(1, 640 / Math.max(x1 - x0, y1 - y0));
+  const c = document.createElement('canvas'); c.width = Math.round((x1 - x0) * e); c.height = Math.round((y1 - y0) * e);
+  c.getContext('2d').drawImage(toile, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.86);
 }
 
 // ---------- Les tableaux de prix (Excel, ou tableau dans un PDF) ----------
@@ -9308,6 +9784,8 @@ function fwApercu() {
       <br>${f ? '🏭 Chez <b>' + E(mkNomFournisseur(f)) + '</b>' : '🆕 Nouveau fournisseur' + (c.societe || c.contact ? ' : <b>' + E([trMarque(c.societe), trPrenom(c.contact)].filter(Boolean).join(' — ') || c.societe) + '</b>' : '')}
       <br>${ps.length ? '📦 ' + ps.length + ' produit(s) trouvé(s) (' + ps.filter(p => deja.has(ctCleRef(p.ref))).length + ' déjà dans le carnet) · ' : ''}💰 ${nbPrixCatalogue} prix${nbNouveauxPrix ? ' (' + nbNouveauxPrix + ' modèle(s) nouveau(x))' : ''}${nbPagesPdf ? ' · 📖 ' + nbPagesPdf + ' page(s) gardée(s)' : ''}${nbPhotos ? ' · 🖼️ ' + nbPhotos + ' photo(s) gardée(s)' : ''}
       ${coord.length ? '<br>📇 Coordonnées : ' + E(coord.map(k => (CT_LIBELLES[k] || k).toLowerCase()).join(', ')) : ''}</div>
+    ${fwEtat.resultats.some(r => r.dessine && !r.scanne) ? `<div class="alerte a-ambre" style="font-size:15px">📐 ${fwEtat.resultats.filter(r => r.dessine && !r.scanne).map(r => E(r.nom)).join(', ')} : les lettres de ce PDF sont DESSINÉES (pas de texte dedans).
+      Le carnet a lu chaque page comme une photo et découpé les produits : vérifiez les références (marquées « à vérifier »). Les caractéristiques restent sur les pages gardées.</div>` : ''}
     ${scannes.length ? `<div class="alerte a-ambre" style="font-size:15px">${scannes.map(r => E(r.nom)).join(', ')} : ce PDF est fait de PHOTOS (pas de texte).
       Les pages sont gardées ; pour les produits : « ✂️ Découper les produits » sur sa fiche, ou envoyez le fichier à Claude.</div>` : ''}
     ${pages.length ? `<div class="fw-pages">${pages.slice(0, 30).map(p => `<img src="${p.mini}" alt="page ${p.num}">`).join('')}</div>` : ''}
@@ -9418,6 +9896,66 @@ async function fwRanger() {
   avertir('✅ ' + (neuf ? 'Nouveau fournisseur ' + mkNomFournisseur(f) + ' · ' : '') + nNeufs + ' produit(s) ajouté(s), ' + nCompletes + ' complété(s), '
     + nPrix + ' prix, ' + nPages + ' page(s) gardée(s).', 7000);
 }
+// ---------- 1.5.1 — « À qui ? » avant d'ouvrir WeChat ----------
+// Riche, 20/10 : le lien ouvre WeChat sur la LISTE des discussions ; les noms y sont en chinois, sans photo :
+// « on ne sait pas qui est qui », risque d'envoyer à la mauvaise personne. WeChat ne permet à aucune application
+// d'ouvrir directement la discussion d'une personne. Donc, avant d'ouvrir WeChat : sa carte en grand (code, nom,
+// nom chinois, photo de sa carte) ; une seule fois, lui donner son code comme nom dans WeChat (Remarque) ;
+// ensuite, dans WeChat : 🔍 → « F05 » → sa discussion.
+function trNomPourWeChat(f) {
+  const marque = trMarque(f.societe) || '', prenom = String(f.contact || '').replace(/[\u4e00-\u9fff]+/g, '').trim();
+  return [f.code, marque, prenom || (marque ? '' : f.nom || '')].filter(Boolean).join(' ').replace(/\s+/g, ' ').slice(0, 40);
+}
+function trAQui(f, suite) {
+  const d = document.getElementById('boite');
+  const hote = d && d.open ? d : document.body;
+  const vieux = document.getElementById('tr_aqui'); if (vieux) vieux.remove();
+  const z = document.createElement('div'); z.id = 'tr_aqui'; z.className = 'tr-aqui'; z.setAttribute('role', 'dialog');
+  const nomWx = trNomPourWeChat(f), code = f.code || '—';
+  const cn = [String(f.contact || '').match(/[\u4e00-\u9fff]+/g), String(f.societe || '').match(/[\u4e00-\u9fff]{4,}/g)].flat().filter(Boolean).join(' · ');
+  const carte = ctDocs(f).find(x => x.type === 'carte');
+  z.innerHTML = `<h3>💬 À qui envoyez-vous ?</h3>
+    <div class="qui"><div class="code">${E(code)}</div><div><div class="nom">${E(mkNomFournisseur(f).replace(/^F\d+\s*·\s*/, ''))}</div>
+      ${cn ? `<div class="cn">${E(cn)}</div>` : ''}
+      <div class="det">${E([f.contact && !/[\u4e00-\u9fff]/.test(f.contact) ? f.contact : '', f.wechat ? 'WeChat : ' + f.wechat : '', f.mobile ? ctTelLisible(f.mobile) : ''].filter(Boolean).join(' · '))}</div></div></div>
+    ${carte || f.qr_photo ? `<img class="carte-img" id="tr_aqui_img" alt="Sa carte" ${f.qr_photo && !carte ? `src="${f.qr_photo}"` : ''}>` : ''}
+    <div class="etape">Dans WeChat : touchez <b>🔍</b> (en haut), tapez <b>${E(code)}</b> → sa discussion s'ouvre.<br>Puis appui long dans la case → <b>Coller</b> → Envoyer.</div>
+    ${f.wechat_renomme ? '' : `<div class="une-fois"><b>Une seule fois</b> : WeChat ne connaît pas encore « ${E(code)} » ? Ouvrez sa discussion → <b>⋯</b> (en haut à droite) → sa photo →
+      <b>Définir la remarque</b> (« Set Remark ») → collez <b>${E(nomWx)}</b>.
+      <button type="button" class="cp" onclick="mkCopier(${E(JSON.stringify(nomWx))}, 'Nom copié : collez-le dans « Remarque » de son profil WeChat, puis revenez ici.')">📋 Copier son nom pour WeChat</button>
+      <button type="button" class="cp" onclick="trAQuiRenomme('${f.id}')">✓ C'est fait : il s'appelle ${E(code)} dans WeChat</button></div>`}
+    <button type="button" class="ok" id="tr_aqui_ok">✅ C'est bien lui — copier le message et ouvrir WeChat</button>
+    <button type="button" class="non" onclick="document.getElementById('tr_aqui').remove()">Annuler</button>`;
+  hote.appendChild(z);
+  z.querySelector('#tr_aqui_ok').onclick = () => { z.remove(); suite(); };
+  if (carte) {
+    const img = z.querySelector('#tr_aqui_img');
+    if (ctMiniCache[carte.id]) img.src = ctMiniCache[carte.id];
+    ctLire(carte.id).then(src => { if (src && img.isConnected) img.src = typeof src === 'string' ? src : URL.createObjectURL(src); }).catch(() => {});
+  }
+}
+function trAQuiRenomme(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  f.wechat_renomme = true; sauverLocal();
+  const b = document.querySelector('#tr_aqui .une-fois'); if (b) b.remove();
+  avertir('Noté : dans WeChat, il suffit maintenant de chercher « ' + (f.code || '') + ' ».');
+}
+// Les deux chemins qui ouvrent WeChat passent par « À qui ? » (le message est copié APRÈS, pour ne pas l'écraser).
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof ctEnvoyer === 'function') {
+    const avant = ctEnvoyer;
+    ctEnvoyer = function (canal) {
+      const f = canal === 'wechat' && typeof ctDemande !== 'undefined' ? mkFournisseur(ctDemande.fid) : null;
+      if (!f) return avant(canal);
+      trAQui(f, () => avant('wechat'));
+    };
+  }
+  if (typeof trVendeurCopier === 'function') {
+    const avantV = trVendeurCopier;
+    trVendeurCopier = function () { const f = mkFournisseur(trVd.fid); if (!f) return avantV(); trAQui(f, () => avantV()); };
+  }
+});
+
 // Les fichiers reçus, sur la fiche : les renvoyer (à Claude, à un collègue), les supprimer.
 function fwFichiersHtml(f) {
   const l = Array.isArray(f.fichiers) ? f.fichiers : [];

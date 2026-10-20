@@ -82,6 +82,15 @@ la photo de son produit. Sa fiche : « Vus au stand : ses prix » (francs et eur
 À la première ouverture, les cartes des fiches incomplètes sont relues (seules les cases vides se remplissent). Rien de retiré.
 ⚠ Même remarque : à reporter dans `KYLO-Achats.html` (module `stand-1.6.0.html` et les retouches de `construire-1.6.0.py`).
 
+Version 1.6.1 — 21/10/2026 : **Envoyer à Claude, mémoire allégée, classement**. « 📤 Envoyer à Claude » (Fournisseurs →
+📋 Où j'en suis) prépare un ou plusieurs fichiers ZIP de moins de 16 Mo : les fiches (fiches.json) et les photos à part
+(cartes face 1 et 2, produits vus au stand, pages, panneaux), un bouton par partie. La mémoire du carnet (5 Mo) ne garde plus
+les images : elles sont rangées dans la réserve des photos du téléphone et reviennent à l'ouverture (« mémoire pleine » réglé,
+rien de perdu ; la sauvegarde garde les images). Le retour de Claude (format kylo-import) peut porter un « classement » :
+catégorie, groupe de produits, note de fiabilité 0–5 avec ses raisons et ses sources ; Fournisseurs « 📂 Par catégorie »
+(du mieux noté au moins bien noté) ; Sa fiche « 🔎 Qui est-ce ? Fiabilité ». Rien de retiré.
+⚠ Même remarque : à reporter dans `KYLO-Achats.html` (module `classement-1.6.1.html` et les retouches de `construire-1.6.1.py`).
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

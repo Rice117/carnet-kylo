@@ -5126,7 +5126,7 @@ function mkListeFournisseursHtml() {
     return normaliserNom([f.code, f.nom, f.societe, f.wechat, f.tel, f.allee, f.marche, f.remarque, offres].join(' ')).includes(q);
   });
   if (!liste.length) return `<div class="carte"><p class="mk-aide" style="font-size:16px">${mkFournisseurs().length
-    ? 'Aucun fournisseur dans ce choix.' : 'Aucun fournisseur pour l\'instant. Touchez <b>📷 Marché</b> devant un stand : photo, prix, et son QR WeChat.'}</p></div>`;
+    ? 'Aucun fournisseur dans ce choix.' : 'Aucun fournisseur pour l\'instant. Touchez <b>📷 Au stand</b> devant un stand : sa carte, son QR, ses produits et ses prix.'}</p></div>`;
   return liste.map(mkCarteFournisseurHtml).join('');
 }
 function mkCarteFournisseurHtml(f) {
@@ -5369,7 +5369,7 @@ function majConvAchat() {
 (function () {
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'mk-fab'; b.id = 'boutonMarche';
-  b.innerHTML = '<span class="ic" aria-hidden="true">📷</span> Marché';
+  b.innerHTML = '<span class="ic" aria-hidden="true">📷</span> Au stand';
   b.setAttribute('aria-label', 'Au stand : sa carte, ses QR, ses produits et ses prix');
   b.onclick = () => (typeof asOuvrir === 'function' ? asOuvrir() : marcheOuvrir());
   document.body.appendChild(b);

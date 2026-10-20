@@ -58,6 +58,17 @@ dans WeChat : 🔍 → code). Un fichier de Claude qui porte le code du fourniss
 ⚠ Même remarque : à reporter dans `KYLO-Achats.html` (modules `terrain-1.5.1.html`, `produits-1.5.1.html`, `vendeur-1.5.1.html`,
 `fichiers-1.5.1.html`, et les retouches de `construire-1.5.1.py`).
 
+Version 1.5.2 — 20/10/2026 : **Une seule fiche, bien rangée**. La photo de la carte (fiche Marché, ✏️ Modifier, Sa fiche)
+remplit les cases sous les yeux (nom affiché, société, contact, portable, WeChat, e-mail ; en vert = à vérifier) et la carte
+est gardée dans la fiche, relisible. Les mêmes cases dans la fiche Marché, ✏️ Modifier et Sa fiche ; le portable est une seule
+case partout. « 🧹 Mettre de l'ordre » (fait seul une fois) : cartes du Marché rangées et relues, portable accordé, nom
+« Marque — Prénom » quand il n'a pas été tapé. Doublons proposés (« Réunir » / « Ce sont deux fournisseurs »). « 📋 Où j'en
+suis » : chaque fournisseur, ce qui est fait et le bouton de la prochaine étape (carte, catalogue, prix). « 📖 Demander son
+catalogue » (chinois puis anglais). « 📤 Envoyer à Claude » : fiches et cartes dans un fichier ; le retour de Claude corrige
+les cases lues par le téléphone, jamais celles tapées. Lecture des cartes : le contact est la personne (pas une fin de nom
+de société), lettres écartées recollées, e-mail coupé recollé. Rien de retiré.
+⚠ Même remarque : à reporter dans `KYLO-Achats.html` (module `fiche-1.5.2.html` et les retouches de `construire-1.5.2.py`).
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

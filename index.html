@@ -892,7 +892,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.5.1';
+window.KYLO_APPLICATION = '1.5.2';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -2223,10 +2223,11 @@ function fournisseursListe() { if (!Array.isArray(C.fournisseurs)) C.fournisseur
 function nouveauFournisseur() {
   const f = { id: idUnique('f'), nom: '', marche: '', batiment: '', allee: '', wechat: '', tel: '',
     qualite: '', remarque: '', le: new Date().toISOString().slice(0, 10) };
-  fournisseursListe().unshift(f); sauverLocal(); boiteFournisseur(f.id);
+  fournisseursListe().unshift(f); mkAssurerCodes(); sauverLocal(); boiteFournisseur(f.id);
 }
 function boiteFournisseur(fid) {
   const f = fournisseursListe().find(x => x.id === fid); if (!f) return;
+  if (typeof ctOuvrirDossier === 'function') { mkAssurerCodes(); ctOuvrirDossier(fid); return; }   // 1.5.2 : une seule fiche
   boite(`<h3>Fiche fournisseur</h3>
     <label>Nom</label><input id="f_nom" value="${E(f.nom)}" placeholder="ex : M. Chen — Yiwu Trading">
     <div class="duo">
@@ -4554,9 +4555,10 @@ function mkFicheNeuve(fid) {
   MB = { photo: '', photo2: '', article: '', prix: '', devise: mkDevise(), moq: '', note: '', fid: fid || '', fourOuvert: !fid };
   MF = mkCopieFournisseur(mkFournisseur(fid));
 }
-const MK_CHAMPS_F = ['nom', 'societe', 'marche', 'allee', 'wechat', 'wechat_lien', 'tel', 'email', 'site', 'qr_photo', 'carte_photo', 'qr_texte'];
+const MK_CHAMPS_F = ['nom', 'societe', 'contact', 'poste', 'marche', 'allee', 'wechat', 'wechat_lien', 'tel', 'mobile', 'tel_fixe', 'email', 'site', 'alibaba', 'adresse', 'whatsapp_lien', 'qr_photo', 'carte_photo', 'qr_texte'];
 function mkCopieFournisseur(f) {
   const o = {}; MK_CHAMPS_F.forEach(k => { o[k] = f ? (f[k] || '') : ''; });
+  if (f && !o.tel) o.tel = f.mobile || f.tel_fixe || '';          // 1.5.2 : le portable, une seule case
   return o;
 }
 
@@ -4736,21 +4738,25 @@ function mkFourDetail() {
 function mkChampsFournisseurHtml(p) {
   const f = MF || {};
   return `<div class="mk-deux">
-      <label class="b vert" for="${p}_qrfile">📷 Photo de son QR WeChat ou de sa carte</label>
+      <label class="b vert" for="${p}_qrfile">📷 Photo de sa carte (ou de son QR) : tout se remplit</label>
       <button type="button" class="b contour" onclick="mkScannerEnDirect('${p}')">🔲 Scanner son QR en direct</button>
     </div>
-    <input type="file" id="${p}_qrfile" accept="image/*" class="champ-cache" onchange="mkLireQrPhoto('${p}', this)">
+    <input type="file" id="${p}_qrfile" accept="image/*" class="champ-cache" onchange="fsCartePhoto('${p}', this)">
     <div id="${p}_qrzone">${mkQrZoneHtml()}</div>
-    <label for="${p}_f_nom">Nom du vendeur ou de la boutique</label>
-    <input id="${p}_f_nom" value="${E(f.nom)}" placeholder="ex : M. Chen — Yiwu Trading" oninput="MF.nom=this.value;mkBrouillonGarder()">
-    <label for="${p}_f_allee">Où est le stand ?</label>
-    <input id="${p}_f_allee" value="${E(f.allee)}" placeholder="ex : Bât. H, allée 23, n° 4512" oninput="MF.allee=this.value;mkBrouillonGarder()">
-    <div class="duo">
-      <div><label for="${p}_f_wechat">WeChat (identifiant)</label>
-        <input id="${p}_f_wechat" value="${E(/^https?:/i.test(f.wechat) ? '' : f.wechat)}" placeholder="ex : chen_yiwu88" autocapitalize="off" oninput="MF.wechat=this.value;mkBrouillonGarder()"></div>
-      <div><label for="${p}_f_tel">Téléphone</label>
-        <input id="${p}_f_tel" inputmode="tel" value="${E(f.tel)}" placeholder="+86…" oninput="MF.tel=this.value;mkBrouillonGarder()"></div>
-    </div>`;
+    <label for="${p}_f_nom">Nom affiché (marque — contact)</label>
+    <input id="${p}_f_nom" value="${E(f.nom)}" placeholder="ex : Star — Lily" oninput="MF.nom=this.value;mkBrouillonGarder()">
+    <label for="${p}_f_societe">Société</label>
+    <input id="${p}_f_societe" value="${E(f.societe)}" placeholder="ex : Guangzhou Star Electronics Co., Ltd" oninput="MF.societe=this.value;mkBrouillonGarder()">
+    <label for="${p}_f_contact">Contact (la personne)</label>
+    <input id="${p}_f_contact" value="${E(f.contact)}" placeholder="ex : 王丽 Lily" oninput="MF.contact=this.value;mkBrouillonGarder()">
+    <label for="${p}_f_tel">Portable</label>
+    <input id="${p}_f_tel" inputmode="tel" value="${E(f.tel || f.mobile)}" placeholder="+86…" oninput="MF.tel=this.value;mkBrouillonGarder()">
+    <label for="${p}_f_wechat">WeChat (identifiant)</label>
+    <input id="${p}_f_wechat" value="${E(/^https?:/i.test(f.wechat) ? '' : f.wechat)}" placeholder="ex : chen_yiwu88" autocapitalize="off" oninput="MF.wechat=this.value;mkBrouillonGarder()">
+    <label for="${p}_f_email">E-mail</label>
+    <input id="${p}_f_email" type="email" value="${E(f.email)}" placeholder="ex : lily@exemple.com" autocapitalize="off" oninput="MF.email=this.value;mkBrouillonGarder()">
+    <label for="${p}_f_allee">Stand (hall, numéro)</label>
+    <input id="${p}_f_allee" value="${E(f.allee)}" placeholder="ex : 11.2 C23" oninput="MF.allee=this.value;mkBrouillonGarder()">`;
 }
 function mkQrZoneHtml() {
   const f = MF || {};
@@ -4774,7 +4780,7 @@ function mkMajQrZone(p) {
 function mkLireChampsFournisseur(p) {
   p = p || 'mk';
   if (!MF) return;
-  [['nom', 'nom'], ['allee', 'allee'], ['wechat', 'wechat'], ['tel', 'tel']].forEach(([k, id]) => {
+  [['nom', 'nom'], ['allee', 'allee'], ['wechat', 'wechat'], ['tel', 'tel'], ['societe', 'societe'], ['contact', 'contact'], ['email', 'email']].forEach(([k, id]) => {
     const ch = document.getElementById(p + '_f_' + id); if (ch) MF[k] = ch.value;
   });
 }
@@ -5022,7 +5028,10 @@ function mkGarder(suite) {
     mkFournisseurs().unshift(f);
   }
   if (f) {
-    if (MB.fourOuvert || !b.fid) MK_CHAMPS_F.forEach(k => { if (MF[k] !== undefined && (String(MF[k]).trim() || f[k] === undefined)) f[k] = String(MF[k]).trim(); });
+    if (MB.fourOuvert || !b.fid) { const nomAvant = f.nom;
+      MK_CHAMPS_F.forEach(k => { if (MF[k] !== undefined && (String(MF[k]).trim() || f[k] === undefined)) f[k] = String(MF[k]).trim(); });
+      if (String(MF.nom || '').trim() && String(MF.nom).trim() !== String(nomAvant || '').trim()) delete f.nom_auto;   // un nom tapé n'est jamais remplacé
+      fsAccorderTel(f, MF.tel); trSynchroNomAuto(f); }
     if (!f.code) f.code = mkProchainCode();
     f.vu_le = maintenant;
   }
@@ -5123,12 +5132,13 @@ function mkCarteFournisseurHtml(f) {
   return `<div class="mk-fiche" id="mkf-${f.id}">
     <div class="mk-fiche-tete">
       ${f.qr_photo ? `<img class="qr" src="${f.qr_photo}" alt="QR WeChat" onclick="mkVoirQR('${f.id}')">`
-        : f.carte_photo ? `<img class="qr" src="${f.carte_photo}" alt="Carte" onclick="mkVoirQR('${f.id}')">` : '<div class="sans" aria-hidden="true">👤</div>'}
+        : f.carte_photo ? `<img class="qr" src="${f.carte_photo}" alt="Carte" onclick="mkVoirQR('${f.id}')">`
+        : ctDocs(f).find(d => d.type === 'carte') ? `<img class="qr ct-mini" data-doc="${E(ctDocs(f).find(d => d.type === 'carte').id)}" alt="Carte" onclick="ctOuvrirDossier('${f.id}')">` : '<div class="sans" aria-hidden="true">👤</div>'}
       <div style="flex:1;min-width:0">
         <div class="nom" style="cursor:pointer" onclick="ctOuvrirDossier('${f.id}')"><span class="mk-code">${E(f.code || '—')}</span> ${E(f.nom || f.societe || '(sans nom)')}</div>
         ${f.societe && f.nom ? `<div class="det">${E(f.societe)}</div>` : ''}
         ${f.allee || f.marche ? `<div class="det">📍 ${E([f.marche, f.allee].filter(Boolean).join(' · '))}</div>` : ''}
-        <div class="det">${aWx ? '💬 WeChat ' + E(f.wechat && !/^https?:/i.test(f.wechat) ? f.wechat : 'gardé') : '<span class="mk-att">pas de WeChat</span>'}${f.tel ? ' · 📞 ' + E(ctTelLisible(f.tel)) : ''}${f.vu_le ? ' · vu le ' + mkJour(f.vu_le) + ' à ' + mkHeure(f.vu_le) : ''}</div>
+        <div class="det">${aWx ? '💬 WeChat ' + E(f.wechat && !/^https?:/i.test(f.wechat) ? f.wechat : 'gardé') : '<span class="mk-att">pas de WeChat</span>'}${fsTel(f) ? ' · 📞 ' + E(ctTelLisible(fsTel(f))) : ''}${f.vu_le ? ' · vu le ' + mkJour(f.vu_le) + ' à ' + mkHeure(f.vu_le) : ''}</div>
         ${ctCompteursHtml(f)}
       </div>
     </div>
@@ -5143,7 +5153,7 @@ function mkCarteFournisseurHtml(f) {
       <button type="button" class="b" style="grid-column:1/-1;min-height:56px;font-size:16px" onclick="ctOuvrirDossier('${f.id}')">📂 Sa fiche : carte, catalogue, prix</button>
       <button type="button" class="b wechat" onclick="mkContact('${f.id}')">💬 L'ajouter sur WeChat</button>
       <button type="button" class="b vert" onclick="marcheOuvrir({fid:'${f.id}'})">📷 Noter un produit</button>
-      ${f.tel ? `<button type="button" class="b contour" onclick="location.href='tel:${E(String(f.tel).replace(/[^\d+]/g, ''))}'">📞 Appeler</button>` : ''}
+      ${fsTel(f) ? `<button type="button" class="b contour" onclick="location.href='tel:${E(fsTel(f).replace(/[^\d+]/g, ''))}'">📞 Appeler</button>` : ''}
       <button type="button" class="b gris" onclick="mkModifierFournisseur('${f.id}')">✏️ Modifier</button>
     </div>
   </div>`;
@@ -5169,6 +5179,7 @@ function ecranRencontres() {
     </div>
     ${trOcrEtatHtml()}
   </div>
+  ${fsDoublonsHtml()}${fsSuiviHtml()}
   ${trARangerHtml()}
   <div class="carte">
     <p class="mk-aide" style="font-size:15px">Chaque fournisseur avec ses produits, ses prix et son WeChat. Le soir, marquez
@@ -5292,12 +5303,10 @@ function mkBoite(html) {
 // ---------- Modifier une fiche fournisseur ----------
 function mkModifierFournisseur(fid) {
   const f = mkFournisseur(fid); if (!f) return;
-  MF = mkCopieFournisseur(f);
+  MF = mkCopieFournisseur(f); fsModifFid = f.id;
   boite(`<div class="mk-dlg">
     <h3>✏️ <span class="mk-code">${E(f.code || '—')}</span> ${E(f.nom || f.societe || 'Fournisseur')}</h3>
     ${mkChampsFournisseurHtml('mm')}
-    <label for="mm_f_societe">Société</label>
-    <input id="mm_f_societe" value="${E(f.societe)}" oninput="MF.societe=this.value">
     <label for="mm_f_marche">Marché / ville</label>
     <input id="mm_f_marche" value="${E(f.marche)}" placeholder="ex : Yiwu, district 2" oninput="MF.marche=this.value">
     <label for="mm_f_remarque">Remarques — dictez avec le micro du clavier 🎙️</label>
@@ -5312,7 +5321,9 @@ function mkEnregistrerFournisseur(fid) {
   const f = mkFournisseur(fid); if (!f || !MF) return;
   mkLireChampsFournisseur('mm');
   const r = document.getElementById('mm_f_remarque'); if (r) f.remarque = r.value;
-  MK_CHAMPS_F.forEach(k => { if (MF[k] !== undefined) f[k] = String(MF[k]).trim(); });
+  const nomAvant = f.nom;
+  MK_CHAMPS_F.forEach(k => { if (MF[k] !== undefined && (String(MF[k]).trim() || ['nom', 'societe', 'contact', 'tel', 'wechat', 'email', 'allee', 'marche'].includes(k))) f[k] = String(MF[k]).trim(); });
+  fsAccorderTel(f, MF.tel); if (String(MF.nom || '').trim() && MF.nom.trim() !== String(nomAvant || '').trim()) delete f.nom_auto; trSynchroNomAuto(f);
   // Le nom affiché dans les offres suit la fiche.
   (C.comparaisons || []).forEach(c => (c.offres || []).forEach(o => { if (o.fournisseur_id === f.id) o.fournisseur = mkNomFournisseur(f); }));
   MF = null; sauverLocal(); fermerBoite(); dessiner();
@@ -5967,7 +5978,7 @@ function ecranDossier() {
 function ctMiniHtml(f, d, n) {
   return `<div class="ct-mini-l"><img class="ct-mini" data-doc="${E(d.id)}" alt="${d.type === 'carte' ? 'Carte' : 'Page ' + (n || '')}" onclick="ctVoirDoc('${f.id}','${d.id}')">${n ? `<span>${n}</span>` : ''}</div>`;
 }
-const CT_CHAMPS = [['nom', 'Nom affiché (marque — contact)', 'ex : Weidasi — Emily'], ['societe', 'Société', ''], ['contact', 'Contact', 'ex : Emily'],
+const CT_CHAMPS = [['nom', 'Nom affiché (marque — contact)', 'ex : Star — Lily'], ['societe', 'Société', ''], ['contact', 'Contact', 'ex : Lily'],
   ['poste', 'Poste', 'ex : Sales Representative'], ['mobile', 'Portable (souvent aussi son WeChat)', '+86…'], ['tel_fixe', 'Téléphone fixe', ''],
   ['email', 'E-mail', ''], ['wechat', 'WeChat (identifiant)', ''], ['site', 'Site', ''], ['alibaba', 'Boutique Alibaba', ''],
   ['allee', 'Stand (hall, numéro)', 'ex : 11.2 C23'], ['adresse', 'Adresse de l\'usine', ''], ['certifications', 'Certifications', 'CE, RoHS…']];
@@ -5989,7 +6000,9 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 function ctMajChamp(fid, champ, val) {
   const f = mkFournisseur(fid); if (!f) return;
   f[champ] = val;
-  if ((champ === 'mobile' || champ === 'tel_fixe') && !String(f.tel || '').trim()) f.tel = val;
+  if (champ === 'mobile') f.tel = val;
+  else if (champ === 'tel_fixe' && !String(f.tel || '').trim()) f.tel = val;
+  if (champ === 'nom') delete f.nom_auto;
   if (String(val).trim()) delete f.ct_neuf;
   ctPlusTard(f);
 }
@@ -6411,7 +6424,8 @@ function ctTrouverFournisseur(x) {
   const em = String(x.email || '').trim().toLowerCase();
   const tels = [x.mobile, x.tel, x.tel_fixe, x.whatsapp].map(ctCleTel).filter(Boolean);
   const so = normaliserNom(x.societe), no = normaliserNom(x.nom);
-  return L.find(f => em && String(f.email || '').trim().toLowerCase() === em)
+  return (x.id && L.find(f => f.id === x.id))
+    || L.find(f => em && String(f.email || '').trim().toLowerCase() === em)
     || L.find(f => tels.length && [f.mobile, f.tel, f.tel_fixe, f.whatsapp].map(ctCleTel).filter(Boolean).some(t => tels.includes(t)))
     || L.find(f => x.wechat_lien && f.wechat_lien === x.wechat_lien)
     || L.find(f => so && normaliserNom(f.societe) === so)
@@ -6434,7 +6448,14 @@ function ctFusion(imp, appliquer) {
       b.code = f.code;
     }
     const cible = f || {};
-    CT_CHAMPS_IMPORT.forEach(k => { if (x[k] && !String(cible[k] || '').trim()) { b.cases++; if (appliquer) f[k] = String(x[k]); } });
+    const corriger = !!(imp.corriger || x.corriger), lus = Array.isArray(cible.lu_auto) ? cible.lu_auto : [];
+    CT_CHAMPS_IMPORT.forEach(k => {
+      const vide = !String(cible[k] || '').trim();
+      const aCorriger = corriger && !vide && String(cible[k]) !== String(x[k]) && (lus.includes(k) || (k === 'nom' && cible.nom_auto));
+      if (x[k] && (vide || aCorriger)) { b.cases++; if (aCorriger) b.corriges = (b.corriges || 0) + 1;
+        if (appliquer) { f[k] = String(x[k]); if (aCorriger) { f.lu_claude = [...new Set([...(f.lu_claude || []), k])]; if (k === 'nom') delete f.nom_auto; } } }
+    });
+    if (appliquer && f && x.mobile) fsAccorderTel(f);
     if (appliquer) {
       if (!f.tel && (x.mobile || x.tel || x.tel_fixe)) f.tel = x.mobile || x.tel || x.tel_fixe;
       if (x.remarque && String(f.remarque || '').indexOf(x.remarque) < 0) f.remarque = [f.remarque, x.remarque].filter(Boolean).join('\n');
@@ -7052,7 +7073,7 @@ async function trLireTousQR(source, fouiller) {
     if (trouves.length >= 2) break;
   }
   // Un petit QR dans une grande photo (carte posée loin, de travers) : on cherche morceau par morceau, agrandi.
-  // (essayé sur la vraie carte de Lisa : seul un morceau d'un quart de la photo, agrandi, la lit)
+  // (essayé sur une vraie carte prise de loin : seul un morceau d'un quart de la photo, agrandi, la lit)
   if (!trouves.length && Z && fouiller !== false) {
     const grand = mkToile(source, 2400), W = grand.width, H = grand.height;
     for (const taille of [0.5, 0.25]) {
@@ -7101,7 +7122,7 @@ function trAppliquerQR(f, qrs) {
 function trNettoyer(texte) {
   return String(texte || '').replace(/\r/g, '').split('\n').map(l => {
     let s = l.replace(/[|¦]/g, ' ').replace(/\s+/g, ' ').trim();
-    s = s.replace(/\b([A-Z])((?: [a-z]{1,2}){2,5})\b/g, (m, a, b) => a + b.replace(/ /g, ''));   // « E m i ly » → « Emily »
+    s = s.replace(/\b([A-Z])((?: [a-z]{1,2}){2,5})\b/g, (m, a, b) => a + b.replace(/ /g, ''));   // « L i l y » → « Lily »
     s = s.replace(/^(?:[^A-Za-z0-9一-鿿+]+|\d{1,2}[-–:.]\d{1,2}\s+(?=[A-Z]{3}))+/, '');
     return s.trim();
   }).filter(s => s.replace(/[^A-Za-z0-9一-鿿]/g, '').length >= 2).join('\n');
@@ -7110,13 +7131,18 @@ const TR_RE_SOC = /([A-Z][A-Za-z0-9&.,'’()\- ]{4,}?\b(?:CO\.?\s*,?\s*LTD\.?|CO
 const TR_RE_SOC_CN = /([一-鿿]{2,}(?:有限公司|公司|工厂|厂|商行))/;
 const TR_MOTS_PAS_NOM = /^(mobile|phone|tel|fax|e-?mail|email|web|website|add|address|wechat|whatsapp|skype|qq|sales|manager|co|ltd|china|the|and|our|www)$/i;
 function trLireTexteCarte(texteBrut) {
-  // Un numéro QQ coupé par le lecteur (« 131 0092080@qq.com ») est recollé.
-  const texte = trNettoyer(texteBrut).replace(/(\d)\s+(?=[\d.]*\d@)/g, '$1');
+  // Un numéro QQ coupé par le lecteur (« 123 4567890@qq.com ») est recollé.
+  const texte = trNettoyer(texteBrut).replace(/(\d)\s+(?=[\d.]*\d@)/g, '$1').replace(/(@[A-Za-z0-9-]+)\s+\.\s*([a-z]{2,4})\b/gi, '$1.$2');
   // Les chiffres d'un e-mail ne sont pas un téléphone : on lit les téléphones SANS les e-mails.
   const RE_MAIL = /[A-Z0-9._%+-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)*\.[A-Z]{2,}/gi;
   const mails = texte.match(RE_MAIL) || [];
   const r = ctLireTexteCarte(texte.replace(RE_MAIL, ' '));   // la lecture de la 1.3.0 (téléphones, site, adresse, poste)
-  if (mails[0]) r.email = mails[0];
+  if (mails[0]) {
+    const dom = m => m.split('@')[1].toLowerCase(), compte = {};
+    const memes = mails.filter(m => dom(m) === dom(mails[0]));
+    memes.forEach(m => { compte[m] = (compte[m] || 0) + 1; });
+    r.email = memes.slice().sort((a, b) => compte[b] - compte[a] || a.length - b.length)[0];
+  }
   // L'e-mail : « E-mail12345678@qq.com » collé → on retire le mot « mail ».
   if (r.email) r.email = r.email.replace(/^(?:e-?mail|email|mail)[:：]?(?=[a-z0-9])/i, '');
   // Un numéro QQ (l'e-mail 12345678@qq.com) lu à part sur une autre ligne n'est pas un téléphone ;
@@ -7137,13 +7163,28 @@ function trLireTexteCarte(texteBrut) {
   texte.split('\n').forEach(l => {
     const m = l.match(TR_RE_SOC); if (m) socs.push(m[1].trim().replace(/^(?:[A-Za-z]{1,2}\s+)+(?=[A-Z]{4,})/, ''));   // « BV HEILONGJIANG… » → « HEILONGJIANG… »
     const c = l.match(TR_RE_SOC_CN); if (c) socs.push(c[1]);
+    if (!m) { const co = l.trim().match(/^([A-Z][A-Za-z0-9&'’\- ]{2,40}\bCo\.?)$/); if (co) socs.push(co[1]); }
   });
   if (socs.length) r.societe = socs.sort((a, b) => b.length - a.length)[0].replace(/\s+/g, ' ');
   else if (r.societe && r.societe.length > 70) delete r.societe;
-  // Le contact : un nom chinois suivi de son prénom anglais (« 王小明 Lucy »), sinon la ligne du poste.
-  const cn = texte.match(/([一-鿿](?:\s?[一-鿿]){1,3})\s+([A-Z][a-z]{2,15})\b/);
-  if (cn && !TR_MOTS_PAS_NOM.test(cn[2])) r.contact = cn[1].replace(/\s/g, '') + ' ' + cn[2];
+  // Le contact : un nom chinois suivi de son prénom anglais (« 王小明 Lily »), sinon la ligne du poste.
+  const cn = texte.match(/([一-鿿](?:[ \t]?[一-鿿]){1,3})[ \t]+([A-Z][a-z]{2,15})\b/);
+  if (cn && !TR_MOTS_PAS_NOM.test(cn[2]) && !/公司|有限|电器|科技|集团|工厂|厂|实业|贸易/.test(cn[1]) && !TR_LIEUX.test(cn[2] + ' '))
+    r.contact = cn[1].replace(/\s/g, '') + ' ' + cn[2];
+  const socEnContact = c => /公司|有限|\bco\.?\s*,?\s*ltd|\blimited\b|\bfactory\b|\bcompany\b/i.test(String(c || ''));
+  if (!r.contact || socEnContact(r.contact)) {
+    delete r.contact;
+    const lignes = texte.split('\n').map(l => l.trim());
+    const iPoste = lignes.findIndex(l => /\b(sales|manager|director|representative|president|ceo|export|marketing|engineer|merchandiser|assistant|boss|owner)\b|经理|总监|业务|销售|主管/i.test(l));
+    for (let i = iPoste - 1; iPoste > 0 && i >= Math.max(0, iPoste - 2); i--) {
+      const m = (lignes[i] || '').replace(/(?<=[A-Za-z])1(?=[a-z])/g, 'l').match(/^(?:[一-鿿]{2,4}\s+)?([A-Z][a-z]{1,15}(?:\s+[A-Z][a-z]{1,15}){0,2})\s*$/);
+      if (m && !TR_LIEUX.test(m[1] + ' ') && !TR_MOTS_PAS_NOM.test(m[1]) && !socEnContact(m[1])) { r.contact = lignes[i].replace(/(?<=[A-Za-z])1(?=[a-z])/g, 'l'); break; }
+    }
+  }
   if (r.contact) {
+    r.contact = r.contact.replace(/(?<=[A-Za-z])1(?=[a-z])/g, 'l').replace(/(?<=[a-z])0(?=[a-z])/g, 'o')
+      .replace(/(?<=[A-Za-z])\s+(?=[a-z])/g, '')    // « Li l y » (lettres écartées sur la carte) → « Lily »
+      .replace(/\b([A-Z][a-z])\s+I([a-z]{1,3})\b/, (t, x, y) => x + 'i' + y);   // un « i » lu « I » majuscule au milieu d'un prénom
     r.contact = r.contact.replace(/[^A-Za-z一-鿿 .'-]/g, ' ').replace(/\s+/g, ' ').trim();
     const mots = r.contact.split(' ').filter(m => m.length >= 2 || /[一-鿿]/.test(m));
     r.contact = mots.slice(0, 4).join(' ');
@@ -7151,11 +7192,14 @@ function trLireTexteCarte(texteBrut) {
   }
   if (r.adresse) {
     r.adresse = r.adresse.split(', ').filter(a => a !== r.societe && !TR_RE_SOC.test(a)).join(', ');
+    const moitie = r.adresse.length / 2, deux = r.adresse.slice(0, Math.floor(moitie - 1));
+    if (r.adresse.length > 20 && r.adresse.indexOf(deux, 1) > 0 && r.adresse.slice(0, r.adresse.indexOf(deux, 1)).replace(/[,\s]+$/, '') === r.adresse.slice(r.adresse.indexOf(deux, 1)).replace(/[,\s]+$/, ''))
+      r.adresse = r.adresse.slice(r.adresse.indexOf(deux, 1)).replace(/[,\s]+$/, '');
     if (!r.adresse) delete r.adresse;
   }
   return r;
 }
-// « HEILONGJIANG EURASIA ELECTRICAL APPLIANCE » → « Eurasia » ; « 广州吉泰电器科技有限公司 » → « 吉泰 ».
+// « ZHEJIANG STAR ELECTRIC APPLIANCE » → « Star » ; « 广州明星电器科技有限公司 » → « 明星 ».
 const TR_LIEUX = /^(?:guangdong|guangzhou|shenzhen|zhejiang|yiwu|ningbo|foshan|dongguan|jieyang|shantou|heilongjiang|jiangsu|fujian|shandong|hebei|henan|hunan|hubei|anhui|jiangxi|sichuan|shanghai|beijing|tianjin|chongqing|wenzhou|taizhou|jinhua|cixi|yuyao|zhongshan|shunde|jiangmen|chaozhou|huizhou|xiamen|quanzhou|hangzhou|suzhou|wuxi|changzhou|nanjing|qingdao|harbin|china|hong\s*kong)\s+/i;
 function trMarque(societe) {
   let s = String(societe || '').trim();
@@ -7282,7 +7326,7 @@ async function trLireDoc(f, d) {
 const TR_CHAMPS_FUSION = ['contact', 'poste', 'societe', 'mobile', 'tel', 'tel_fixe', 'whatsapp', 'whatsapp_lien', 'email', 'site', 'alibaba', 'wechat',
   'wechat_lien', 'adresse', 'allee', 'qr_photo', 'wa_qr'];
 function trFusionnerSiConnu(f) {
-  if (!f || !['stand', 'pile'].includes(f.source) || ctProduits(f).length || mkOffresDe(f).length) return f;
+  if (!f || !['stand', 'pile', 'marche-carte'].includes(f.source) || ctProduits(f).length || mkOffresDe(f).length) return f;
   const tels = [f.mobile, f.tel_fixe, f.whatsapp].map(ctCleTel).filter(Boolean);
   const em = String(f.email || '').trim().toLowerCase();
   const g = fournisseursListe().find(x => x !== f && (
@@ -9996,6 +10040,395 @@ function trChoisirGamme(fid, pid, n) {
   p.gamme_choisie = n; p.prix = g.prix; p.devise = g.devise; p.prix_le = mkMaintenant();
   ctMajOffreDuProduit(f, p); sauverLocal(); trBoitePrix(fid, pid);
 }
+</script>
+<style>
+/* ===================== 1.5.2 — UNE SEULE FICHE, BIEN RANGÉE (20/10/2026) =====================
+   Textes jamais sous 14 px (règle de Riche). Couleurs = variables du carnet (clair et sombre). */
+.fs-lu{background:var(--vert-pale)!important;border-color:var(--vert)!important}
+.fs-etat{font-size:16px;line-height:1.4;padding:10px 12px;border-radius:12px;margin:8px 0;font-weight:700}
+.fs-etat.ok{background:var(--vert-pale);color:var(--vert)}
+.fs-etat.att{background:var(--ambre-pale);color:var(--ambre)}
+.fs-etat.encours{background:var(--bleu-pale);color:var(--bleu)}
+.fs-etat img{display:block;max-width:100%;max-height:150px;border-radius:10px;margin-top:8px;background:#fff}
+.fs-suivi-r{font-size:16px;line-height:1.45}
+.fs-suivi-r b{color:var(--bleu)}
+.fs-ligne{border-top:1px solid var(--gris-clair);padding:10px 0}
+.fs-ligne .t{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.fs-ligne .code{font-size:20px;font-weight:900;color:var(--vert);min-width:52px}
+.fs-ligne .nom{font-size:16px;font-weight:800;flex:1;min-width:0;overflow-wrap:anywhere}
+.fs-pastilles{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.fs-pastilles span{font-size:14px;font-weight:800;border-radius:999px;padding:3px 9px;background:var(--gris-clair);color:var(--texte-note)}
+.fs-pastilles span.ok{background:var(--vert-pale);color:var(--vert)}
+.fs-pastilles span.mi{background:var(--ambre-pale);color:var(--ambre)}
+.fs-ligne button{font:inherit;font-size:15px;font-weight:800;border-radius:12px;min-height:46px;padding:8px 12px;border:2px solid var(--bleu);background:var(--carte);color:var(--bleu);margin:4px 6px 0 0}
+.fs-ligne .souv{font-size:15px;color:var(--gris);margin-top:2px;overflow-wrap:anywhere}
+.fs-ligne button.go{background:var(--vert);border-color:var(--vert);color:#fff}
+.fs-double{border:2px solid var(--ambre);border-radius:14px;padding:10px 12px;margin:10px 0;background:var(--ambre-pale);font-size:16px}
+.fs-double button{font:inherit;font-size:15px;font-weight:800;border-radius:12px;min-height:46px;padding:8px 12px;margin:6px 6px 0 0;border:0;background:var(--vert);color:#fff}
+.fs-double button.non{background:var(--carte);color:var(--texte);border:2px solid var(--lisiere)}
+.fs-filtres{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px}
+.fs-filtres button{font:inherit;font-size:15px;font-weight:800;border-radius:999px;min-height:42px;padding:6px 12px;border:2px solid var(--lisiere);background:var(--carte);color:var(--texte)}
+.fs-filtres button.on{border-color:var(--vert);background:var(--vert-pale);color:var(--vert)}
+</style>
+<script>
+'use strict';
+// ===================== 1.5.2 — UNE SEULE FICHE, BIEN RANGÉE (20/10/2026) =====================
+// Riche, 20/10 au soir, après une journée intense à la Foire : beaucoup plus de fournisseurs enregistrés qu'hier,
+// mais « pas mal d'incohérences » : la photo de la carte ne remplissait pas le nom et les coordonnées ; des cases
+// remplies d'un côté et vides de l'autre ; il a fallu remplir 2 ou 3 fois. Causes trouvées dans le programme :
+//   - « 📷 Photo de son QR WeChat ou de sa carte » (fiche Marché, ✏️ Modifier) ne lisait QUE le QR, et gardait la
+//     photo à part, jamais relue ;
+//   - trois formulaires pour un même fournisseur, avec des cases différentes (« Téléphone » ici, « Portable » là).
+// La 1.5.2 :
+//   - les mêmes cases partout (nom, société, contact, portable, WeChat, e-mail, stand) ;
+//   - la photo de la carte, d'où qu'elle vienne, est rangée chez le fournisseur et LUE en entier (QR + texte),
+//     et les cases se remplissent sous ses yeux ;
+//   - « 🧹 Mettre de l'ordre » : les cartes déjà prises sont relues, les doublons proposés pour être réunis ;
+//   - « 📋 Où j'en suis » : chaque fournisseur, ce qui est fait, et la prochaine étape (dont « demander son catalogue ») ;
+//   - « 📤 Envoyer à Claude » : toutes les fiches et les photos des cartes, en un fichier ; le retour de Claude
+//     corrige seulement les cases LUES par le téléphone, jamais ce que Riche a tapé.
+
+window.KYLO_FICHE = '1.5.2';
+
+// ---------- Le portable : une seule case (« tel » des anciennes fiches = « mobile » des nouvelles) ----------
+function fsAccorderTel(f, tape) {
+  if (!f) return;
+  if (tape !== undefined && String(tape).trim()) { f.mobile = String(tape).trim(); f.tel = f.mobile; return; }
+  if (!String(f.mobile || '').trim() && /\d{6}/.test(String(f.tel || ''))) f.mobile = String(f.tel).trim();
+  if (!String(f.tel || '').trim() && String(f.mobile || '').trim()) f.tel = f.mobile;
+}
+function fsTel(f) { return String((f && (f.mobile || f.tel || f.tel_fixe)) || '').trim(); }
+
+// ---------- La photo de la carte, dans la fiche Marché et dans ✏️ Modifier ----------
+let fsModifFid = '';
+function fsEtat(p, html, genre, mini) {
+  const z = document.getElementById(p + '_qrzone'); if (!z) return;
+  z.innerHTML = `<div class="fs-etat ${genre || 'encours'}" role="status">${html}${mini ? `<img src="${mini}" alt="La carte">` : ''}</div>`;
+}
+function fsFournisseurDuFormulaire(p) {
+  if (p === 'mm') return mkFournisseur(fsModifFid);
+  if (!MB) return null;
+  let f = MB.fid ? mkFournisseur(MB.fid) : null;
+  if (!f) {
+    // Une carte = un fournisseur rencontré : sa fiche existe dès la photo (la carte n'est jamais perdue).
+    f = { id: idUnique('f'), code: mkProchainCode(), nom: '', marche: C.voyage && C.voyage.marche_lieu || '', batiment: '', allee: '', wechat: '', tel: '',
+      qualite: '', remarque: '', le: mkMaintenant().slice(0, 10), vu_le: mkMaintenant(), source: 'marche-carte', decision: '', docs: [], produits: [] };
+    fournisseursListe().unshift(f);
+    MB.fid = f.id; MB.fourOuvert = true;
+  }
+  return f;
+}
+const FS_CHAMPS_FORM = [['nom', 'nom'], ['societe', 'société'], ['contact', 'contact'], ['tel', 'portable'], ['wechat', 'WeChat'], ['email', 'e-mail'], ['allee', 'stand']];
+function fsMajChamps(p, remplis) {
+  FS_CHAMPS_FORM.forEach(([k]) => {
+    const ch = document.getElementById(p + '_f_' + k); if (!ch || !MF) return;
+    const v = k === 'wechat' && /^https?:/i.test(MF[k] || '') ? '' : (MF[k] || '');
+    if (ch.value !== v && document.activeElement !== ch) ch.value = v;
+    if (remplis.includes(k)) ch.classList.add('fs-lu');
+  });
+}
+async function fsCartePhoto(p, input) {
+  const fichier = input && input.files && input.files[0]; if (input) input.value = ''; if (!fichier) return;
+  mkLireChampsFournisseur(p);
+  const mf = MF; if (!mf) return;
+  fsEtat(p, '⏳ Lecture de la carte : QR, nom, société, portable, e-mail…');
+  let img; try { img = await mkLireFichier(fichier); } catch (e) { fsEtat(p, 'Photo illisible : reprenez-la.', 'att'); return; }
+  // 1. Le QR (WeChat, carte de visite) : tout de suite, comme avant.
+  let qr = null;
+  try { qr = await mkLireQR(img, [1200, 800, 1700, 2400]); } catch (e) {}
+  if (qr && MF === mf) { mf.qr_photo = mkDecouperQR(qr.toile, qr.points); mkAppliquerQR(mkAnalyserQR(qr.texte)); }
+  // 2. La carte rangée chez le fournisseur, et lue en entier.
+  let f = fsFournisseurDuFormulaire(p);
+  if (!f) return;
+  const id = idUnique('d'), mini = mkReduire(img, 280, 0.62);
+  try { await ctEcrire(id, mkReduire(img, 1800, 0.82)); await ctEcrire(id + '~m', mini); }
+  catch (e) { fsEtat(p, '⚠ La mémoire du téléphone refuse la photo (pleine ?).', 'att'); return; }
+  ctMiniCache[id] = mini;
+  const d = { id, type: 'carte', le: mkMaintenant(), origine: p === 'mm' ? 'modifier' : 'marche' };
+  if (!Array.isArray(f.docs)) f.docs = [];
+  f.docs.push(d); delete f.ct_neuf; f.vu_le = f.vu_le || mkMaintenant();
+  // Ce qui est déjà tapé dans le formulaire passe d'abord dans la fiche (la lecture ne remplit que le vide).
+  FS_CHAMPS_FORM.forEach(([k]) => { if (String(mf[k] || '').trim() && !String(f[k] || '').trim()) f[k] = mf[k]; });
+  if (mf.tel) fsAccorderTel(f, mf.tel);
+  if (mf.wechat_lien && !f.wechat_lien) f.wechat_lien = mf.wechat_lien;
+  if (mf.qr_photo && !f.qr_photo) f.qr_photo = mf.qr_photo;
+  sauverLocal();
+  if (MF === mf) mf.carte_doc = id;
+  const avant = {}; TR_CHAMPS_LUS.concat(['nom', 'wechat_lien']).forEach(k => { avant[k] = f[k]; });
+  let lue = true;
+  try { await trLireDoc(f, d); } catch (e) { lue = false; }
+  if (!d.lu_qr || !d.lu_ocr) { d.a_lire = true; lue = false; setTimeout(trLancerLectures, 50); }
+  fsAccorderTel(f);
+  // Une carte qui révèle un fournisseur déjà dans le carnet : on le rejoint (pas de doublon).
+  let g = f;
+  if (p === 'mk') { g = trFusionnerSiConnu(f); if (g !== f && MB) { MB.fid = g.id; } }
+  sauverLocal();
+  if (MF !== mf) return;                           // la fiche a été gardée ou fermée pendant la lecture : rien à afficher
+  const remplis = [];
+  const depuis = { nom: g.nom, societe: g.societe, contact: g.contact, tel: fsTel(g), wechat: g.wechat, email: g.email, allee: g.allee };
+  Object.keys(depuis).forEach(k => { if (depuis[k] && !String(mf[k] || '').trim()) { mf[k] = depuis[k]; remplis.push(k); } });
+  ['mobile', 'tel_fixe', 'poste', 'site', 'alibaba', 'adresse', 'wechat_lien', 'whatsapp_lien', 'qr_photo'].forEach(k => { if (g[k] && !mf[k]) mf[k] = g[k]; });
+  mf.carte_lue = true;
+  fsMajChamps(p, remplis);
+  const noms = FS_CHAMPS_FORM.filter(([k]) => remplis.includes(k)).map(([, l]) => l);
+  const deja = g !== f ? `🔁 Déjà dans le carnet : <b>${E(mkNomFournisseur(g))}</b> — la carte rejoint sa fiche.<br>` : '';
+  const sansQr = qr ? '' : ' Aucun QR sur la carte.';
+  if (noms.length) fsEtat(p, `${deja}✅ Lu sur la carte : ${E(noms.join(', '))}. Les cases en vert viennent d'être remplies : vérifiez-les.${sansQr}`, 'ok', mini);
+  else if (!lue && !trOcrEtat.pret) fsEtat(p, `${deja}📇 Carte rangée dans sa fiche${mf.wechat_lien ? ' — ✅ QR WeChat lu et gardé' : ''}.${sansQr}
+    La lecture du texte (nom, portable, e-mail) n'est pas encore prête dans ce téléphone :
+    elle se fera toute seule dès que le carnet aura été ouvert une fois avec Internet (wifi de l'hôtel).`, mf.wechat_lien ? 'ok' : 'att', mini);
+  else fsEtat(p, `${deja}📇 Carte rangée dans sa fiche${mf.wechat_lien ? ' — ✅ QR WeChat lu et gardé' : ''}.${sansQr}
+    ${remplis.length ? '' : 'Le texte de la carte n\'a rien ajouté de nouveau : si des cases restent vides, reprenez la carte bien à plat, de plus près.'}`, mf.wechat_lien ? 'ok' : 'att', mini);
+  mkBrouillonGarder();
+  if (navigator.vibrate) navigator.vibrate(40);
+}
+
+// ---------- 🧹 Mettre de l'ordre ----------
+// Sans rien effacer : les cartes du Marché deviennent de vraies cartes (relues), le portable est le même partout,
+// le nom « Marque — Prénom » se fait tout seul s'il n'a pas été tapé, les cartes mal lues sont relues.
+async function fsMettreOrdre() {
+  const r = { cartes: 0, relues: 0, tel: 0, noms: 0 };
+  for (const f of fournisseursListe()) {
+    const telAvant = f.mobile;
+    fsAccorderTel(f); if (f.mobile !== telAvant) r.tel++;
+    if (typeof f.carte_photo === 'string' && f.carte_photo.startsWith('data:image')) {
+      try {
+        const img = await trImage(f.carte_photo), id = idUnique('d'), mini = mkReduire(img, 280, 0.62);
+        await ctEcrire(id, mkReduire(img, 1800, 0.82)); await ctEcrire(id + '~m', mini); ctMiniCache[id] = mini;
+        if (!Array.isArray(f.docs)) f.docs = [];
+        f.docs.push({ id, type: 'carte', le: f.vu_le || f.le || mkMaintenant(), a_lire: true, origine: 'marche' });
+        delete f.carte_photo; r.cartes++;
+      } catch (e) {}
+    }
+    ctDocs(f).forEach(d => {
+      if (d.type === 'carte' && d.lu_erreur) { delete d.lu_erreur; d.lu_qr = false; d.lu_ocr = false; d.a_lire = true; r.relues++; }
+    });
+    const nomAvant = f.nom; trSynchroNomAuto(f); if (f.nom !== nomAvant) r.noms++;
+  }
+  sauverLocal();
+  setTimeout(trLancerLectures, 50);
+  return r;
+}
+async function fsBoutonOrdre() {
+  const b = document.getElementById('fs_ordre'); if (b) { b.disabled = true; b.textContent = '⏳ Rangement…'; }
+  const r = await fsMettreOrdre();
+  const att = fsCartesEnAttente();
+  avertir('🧹 Rangé : ' + [r.cartes ? r.cartes + ' carte(s) du Marché rangée(s) dans leur fiche' : '', r.relues ? r.relues + ' carte(s) à relire' : '',
+    r.tel ? r.tel + ' portable(s) remis dans la bonne case' : '', r.noms ? r.noms + ' nom(s) refait(s)' : ''].filter(Boolean).join(', ')
+    + (att ? '.\n🔎 ' + att + ' carte(s) en lecture' + (trOcrEtat.pret ? '…' : ' dès que la lecture sera prête (ouvrez le carnet avec Internet).') : '. Tout était déjà en ordre.'), 8000);
+  dessiner();
+}
+function fsCartesEnAttente() { return fournisseursListe().reduce((n, f) => n + ctDocs(f).filter(d => d.type === 'carte' && d.a_lire).length, 0); }
+
+// ---------- Les doublons : la même personne enregistrée deux fois ----------
+function fsCles(f) {
+  const k = [];
+  [f.mobile, f.tel, f.tel_fixe, f.whatsapp].map(ctCleTel).filter(t => t && t.length >= 8).forEach(t => k.push('t:' + t));
+  if (String(f.email || '').includes('@')) k.push('e:' + String(f.email).trim().toLowerCase());
+  if (String(f.wechat || '').trim().length >= 5 && !/^https?:/i.test(f.wechat)) k.push('w:' + String(f.wechat).trim().toLowerCase());
+  if (f.wechat_lien) k.push('l:' + f.wechat_lien);
+  return [...new Set(k)];
+}
+function fsDoublons() {
+  const L = fournisseursListe(), vu = new Map(), paires = [];
+  L.forEach(f => fsCles(f).forEach(k => {
+    const a = vu.get(k);
+    if (a && a !== f && !paires.some(p => (p[0] === a && p[1] === f) || (p[0] === f && p[1] === a))
+      && !(a.pas_double || []).includes(f.id) && !(f.pas_double || []).includes(a.id)) paires.push([a, f, k]);
+    else if (!a) vu.set(k, f);
+  }));
+  return paires;
+}
+function fsNumCode(f) { const m = String(f.code || '').match(/\d+/); return m ? +m[0] : 9999; }
+function fsDoublonsHtml() {
+  const ps = fsDoublons(); if (!ps.length) return '';
+  const pourquoi = (k) => k[0] === 't' ? 'même téléphone' : k[0] === 'e' ? 'même e-mail' : 'même WeChat';
+  return `<div class="carte"><h2 style="font-size:18px">🔁 La même personne, deux fois ? (${ps.length})</h2>
+    ${ps.slice(0, 8).map(([a, b, k]) => {
+      const [x, y] = fsNumCode(a) <= fsNumCode(b) ? [a, b] : [b, a];
+      return `<div class="fs-double"><b>${E(x.code || '—')}</b> ${E(x.nom || x.societe || '(sans nom)')} et <b>${E(y.code || '—')}</b> ${E(y.nom || y.societe || '(sans nom)')} : ${pourquoi(k)}.
+        <br><button type="button" onclick="fsReunir('${x.id}','${y.id}')">Réunir dans ${E(x.code || 'la 1re')}</button><button type="button" class="non" onclick="fsPasDouble('${x.id}','${y.id}')">Ce sont deux fournisseurs</button></div>`;
+    }).join('')}</div>`;
+}
+function fsPasDouble(a, b) {
+  const x = mkFournisseur(a), y = mkFournisseur(b); if (!x || !y) return;
+  x.pas_double = [...new Set([...(x.pas_double || []), b])]; y.pas_double = [...new Set([...(y.pas_double || []), a])];
+  sauverLocal(); dessiner();
+}
+// Réunir : la fiche gardée reçoit tout (cartes, pages, produits, fichiers, prix, cases) ; rien n'est perdu.
+function fsReunir(garderId, partirId) {
+  const a = mkFournisseur(garderId), b = mkFournisseur(partirId); if (!a || !b || a === b) return;
+  const sauf = new Set(['id', 'code', 'docs', 'produits', 'fichiers', 'lu_auto', 'remarque', 'reponses', 'pas_double', 'decision', 'nom_auto', 'ct_neuf', 'le', 'vu_le']);
+  Object.keys(b).forEach(k => { if (!sauf.has(k) && b[k] !== undefined && b[k] !== null && String(b[k]).trim() !== '' && !String(a[k] || '').trim()) a[k] = b[k]; });
+  if (b.nom && !b.nom_auto && a.nom_auto) { a.nom = b.nom; delete a.nom_auto; }
+  a.docs = ctDocs(a).concat(ctDocs(b));
+  a.fichiers = (a.fichiers || []).concat(b.fichiers || []);
+  const refs = new Map(ctProduits(a).map(p => [ctCleRef(p.ref), p]));
+  ctProduits(b).forEach(p => {
+    const q = refs.get(ctCleRef(p.ref));
+    if (!q) { if (!Array.isArray(a.produits)) a.produits = []; a.produits.push(p); return; }
+    Object.keys(p).forEach(k => { if (k !== 'id' && (q[k] === undefined || q[k] === '' || q[k] === 0) && p[k]) q[k] = p[k]; });
+  });
+  a.lu_auto = [...new Set([...(a.lu_auto || []), ...(b.lu_auto || [])])].filter(k => String(a[k] || '').trim());
+  if (b.remarque && String(a.remarque || '').indexOf(b.remarque) < 0) a.remarque = [a.remarque, b.remarque].filter(Boolean).join('\n');
+  a.reponses = Object.assign({}, b.reponses || {}, a.reponses || {});
+  if (!a.decision && b.decision) a.decision = b.decision;
+  if (b.vu_le && String(b.vu_le) > String(a.vu_le || '')) a.vu_le = b.vu_le;
+  (C.comparaisons || []).forEach(c => (c.offres || []).forEach(o => { if (o.fournisseur_id === b.id) o.fournisseur_id = a.id; }));
+  C.fournisseurs = fournisseursListe().filter(x => x !== b);
+  fsAccorderTel(a); trSynchroNomAuto(a); ctSynchroNom(a);
+  if (ctDossier === b.id) ctDossier = a.id;
+  sauverLocal(); dessiner();
+  avertir('🔁 ' + (b.code || '') + ' réuni dans ' + mkNomFournisseur(a) + ' : cartes, photos, produits et prix gardés.', 6000);
+}
+
+// ---------- 📋 Où j'en suis ----------
+function fsEtapes(f) {
+  const docs = ctDocs(f);
+  const carte = docs.some(d => d.type === 'carte') || !!f.carte_photo;
+  const coord = !!(fsTel(f) || f.email || f.contact);              // le WeChat seul ne dit pas QUI c'est
+  const wx = !!(f.wechat || f.wechat_lien || f.qr_photo);
+  const cata = docs.some(d => d.type === 'page') || (f.fichiers || []).length > 0 || ctProduits(f).length > 0;
+  const prix = ctNbPrix(f) > 0;                                     // ses prix, reçus pour son catalogue
+  const prixStand = mkOffresDe(f).length > 0;                       // un prix noté au stand (Marché)
+  const lecture = docs.some(d => d.type === 'carte' && d.a_lire);
+  return { carte, coord, wx, cata, cataDemande: !!f.catalogue_demande_le, prixDemandes: !!f.demande_le, prix, prixStand, lecture };
+}
+function fsProchaine(f, e) {
+  if (!e.coord) return [e.carte ? '📇 Reprendre sa carte (de près, à plat)' : '📇 Photo de sa carte', `ctOuvrirDossier('${f.id}')`];
+  if (!e.cata && !e.cataDemande) return ['📖 Demander son catalogue', `fsDemanderCatalogue('${f.id}')`];
+  if (!e.cata) return ['📥 Son catalogue est arrivé', `fwBoite('${f.id}')`];
+  if (!e.prixDemandes && !e.prix) return ['✉️ Demander les prix', `trDemander('${f.id}')`];
+  if (!e.prix) return ['💬 Coller sa réponse', `trBoiteReponse('${f.id}')`];
+  return ['📊 Comparer les prix', `allerA('catalogues')`];
+}
+function fsResume() {
+  const L = fournisseursListe(), r = { n: L.length, cartes: 0, cata: 0, prix: 0, lecture: fsCartesEnAttente() };
+  L.forEach(f => { const e = fsEtapes(f); if (!e.coord && !e.lecture) r.cartes++; if (!e.cata && !e.cataDemande) r.cata++; if (e.cata && !e.prixDemandes && !e.prix) r.prix++; });
+  return r;
+}
+function fsSuiviHtml() {
+  const r = fsResume(); if (!r.n) return '';
+  return `<div class="carte"><h2 style="font-size:18px">📋 Où j'en suis (${r.n} fournisseur${r.n > 1 ? 's' : ''})</h2>
+    <p class="fs-suivi-r">${[r.lecture ? `🔎 <b>${r.lecture}</b> carte(s) en lecture${trOcrEtat.pret ? '' : ' — <b>la lecture n\'est pas prête</b> : ouvrez le carnet avec Internet'}` : '',
+      r.cartes ? `📇 <b>${r.cartes}</b> sans nom ni téléphone : carte à (re)prendre` : '', r.cata ? `📖 <b>${r.cata}</b> catalogue(s) à demander` : '',
+      r.prix ? `✉️ <b>${r.prix}</b> demande(s) de prix à envoyer` : ''].filter(Boolean).join('<br>') || '✅ Tout est à jour.'}</p>
+    <div class="mk-deux">
+      <button class="b vert" onclick="fsOuvrirSuivi()">📋 Voir chaque fournisseur et sa prochaine étape</button>
+      <button class="b contour" id="fs_ordre" onclick="fsBoutonOrdre()">🧹 Mettre de l'ordre</button>
+      <button class="b contour" onclick="fsEnvoyerAClaude(this)">📤 Envoyer à Claude (fiches + cartes)</button>
+    </div></div>`;
+}
+// Pour reconnaître une fiche sans nom : ce qu'on a vu chez lui, et son stand.
+function fsSouvenir(f) {
+  const vus = [...new Set(mkOffresDe(f).map(x => String(x.c.article || '').trim()).filter(Boolean))];
+  ctProduits(f).forEach(p => { const n = String(p.nom || p.ref || '').trim(); if (n && vus.length < 3 && !vus.includes(n)) vus.push(n); });
+  const morceaux = [];
+  if (vus.length) morceaux.push('🛒 ' + vus.slice(0, 3).join(', '));
+  if (String(f.allee || '').trim()) morceaux.push('📍 stand ' + String(f.allee).trim());
+  const le = String(f.le || '').match(/^\d{4}-(\d\d)-(\d\d)/);
+  if (le) morceaux.push('vu le ' + le[2] + '/' + le[1]);
+  return morceaux.join(' · ');
+}
+let fsFiltre = 'tous';
+function fsOuvrirSuivi(filtre) {
+  if (filtre) fsFiltre = filtre;
+  const L = fournisseursListe().slice().sort((a, b) => fsNumCode(a) - fsNumCode(b));
+  const FILTRES = [['tous', 'Tous'], ['carte', '📇 Carte'], ['cata', '📖 Catalogue'], ['prix', '✉️ Prix'], ['fini', '✅ Prix reçus']];
+  const garde = (f) => { const e = fsEtapes(f);
+    return fsFiltre === 'tous' || (fsFiltre === 'carte' && !e.coord) || (fsFiltre === 'cata' && !e.cata) || (fsFiltre === 'prix' && e.cata && !e.prix) || (fsFiltre === 'fini' && e.prix); };
+  const past = (ok, t, mi) => `<span class="${ok ? 'ok' : mi ? 'mi' : ''}">${ok ? '✓' : mi ? '…' : '○'} ${t}</span>`;
+  const lignes = L.filter(garde).map(f => {
+    const e = fsEtapes(f), [t, js] = fsProchaine(f, e);
+    const souv = fsSouvenir(f);
+    return `<div class="fs-ligne" data-id="${E(f.id)}"><div class="t"><span class="code">${E(f.code || '—')}</span><span class="nom">${E(f.nom || f.societe || '(sans nom)')}${f.contact && !(f.nom || '').includes(trPrenom(f.contact)) ? ' · ' + E(f.contact) : ''}</span></div>${souv ? `<div class="souv">${E(souv)}</div>` : ''}
+      <div class="fs-pastilles">${past(e.coord, e.lecture ? 'carte (en lecture)' : e.carte && !e.coord ? 'carte à reprendre' : 'carte', e.lecture || (e.carte && !e.coord))}${past(e.wx, 'WeChat')}${past(e.cata, e.cataDemande && !e.cata ? 'catalogue demandé' : 'catalogue', e.cataDemande && !e.cata)}${e.prixStand ? past(true, 'prix du stand') : ''}${past(e.prixDemandes || e.prix, 'prix demandés')}${past(e.prix, 'prix reçus')}</div>
+      <button type="button" class="go" onclick="fermerBoite();${js}">${t}</button><button type="button" onclick="ctOuvrirDossier('${f.id}')">📂 Sa fiche</button></div>`;
+  });
+  mkBoite(`<div class="mk-dlg"><h3>📋 Où j'en suis</h3>
+    <p class="mk-aide" style="font-size:15px">Chaque fournisseur, ce qui est fait (✓) et le bouton vert pour la prochaine étape.</p>
+    <div class="fs-filtres">${FILTRES.map(([k, l]) => `<button type="button" class="${fsFiltre === k ? 'on' : ''}" onclick="fsOuvrirSuivi('${k}')">${l}</button>`).join('')}</div>
+    ${lignes.join('') || '<p class="mk-aide" style="font-size:15px">Personne dans ce filtre.</p>'}
+    <div class="mk-boutons"><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+}
+
+// ---------- 📖 Demander son catalogue (message prêt, chinois d'abord) ----------
+function fsMessageCatalogue(f) {
+  const qui = String(f.contact || '').trim(), moi = ctSignature().split('–')[0].trim();
+  return [(qui ? qui + ' ' : '') + '您好！',
+    '我是几内亚（西非）KYLO EURGUINE 公司的 ' + moi + '。我们' + ctLieu(f.lieu_rencontre || 'foire', 'cn') + '见过面。',
+    '请把你们的产品目录（PDF）和报价单（Excel，含起订量、每箱数量、外箱尺寸）发给我。如果同一个产品有不同档次，请每个档次分别报价。',
+    '谢谢！', '',
+    'Hello' + (trPrenom(qui) ? ' ' + trPrenom(qui) : '') + ',',
+    'This is ' + moi + ' from KYLO EURGUINE (Guinea, West Africa). We met ' + ctLieu(f.lieu_rencontre || 'foire', 'en') + '.',
+    'Could you please send me your product catalogue (PDF) and your price list (Excel, with MOQ, pcs per carton and carton size)? If a product comes in several quality grades, please quote each grade.',
+    'Thank you!', ctSignature()].join('\n');
+}
+function fsDemanderCatalogue(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  ctToutDeSuite();
+  mkBoite(`<div class="mk-dlg ct-champs"><h3>📖 Demander son catalogue — ${E(mkNomFournisseur(f))}</h3>
+    <p class="mk-aide" style="font-size:15px">En chinois d'abord, l'anglais dessous : catalogue en PDF et prix en Excel. Quand il arrive dans WeChat :
+    « 📥 Fichier reçu sur WeChat » sur sa fiche, tout se remplit seul.</p>
+    <label for="fs_msg">Le message (vous pouvez le modifier)</label>
+    <textarea id="fs_msg" class="ct-message" rows="10">${E(fsMessageCatalogue(f))}</textarea>
+    <div class="mk-boutons">
+      <button class="b" style="background:#1aad19;color:#fff" onclick="fsEnvoyerCatalogue('${f.id}','wechat')">💬 Copier le message et ouvrir WeChat</button>
+      ${f.email ? `<button class="b contour" onclick="fsEnvoyerCatalogue('${f.id}','email')">✉️ Par e-mail (${E(f.email)})</button>` : ''}
+      <button class="b contour" onclick="fsEnvoyerCatalogue('${f.id}','copier')">📋 Copier seulement</button>
+      <button class="b vert" onclick="fsCatalogueDemande('${f.id}')">✅ C'est envoyé — noter la date</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+}
+function fsEnvoyerCatalogue(fid, canal) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const t = (document.getElementById('fs_msg') || {}).value || fsMessageCatalogue(f);
+  if (canal === 'email') { ctAller('mailto:' + encodeURIComponent(f.email) + '?subject=' + encodeURIComponent('Catalogue & price list – KYLO EURGUINE (Guinea) / 产品目录和报价单') + '&body=' + encodeURIComponent(t)); return; }
+  if (canal === 'copier') { mkCopier(t, 'Message copié.'); return; }
+  trAQui(f, () => { mkCopier(t, 'Message copié. Dans WeChat : sa discussion → appui long → Coller → Envoyer.'); setTimeout(() => ctAller('weixin://'), 600); });
+}
+function fsCatalogueDemande(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  f.catalogue_demande_le = mkMaintenant(); sauverLocal(); fermerBoite(); dessiner();
+  avertir('📖 Catalogue demandé à ' + mkNomFournisseur(f) + ' le ' + mkJour(f.catalogue_demande_le) + '.');
+}
+
+// ---------- 📤 Envoyer à Claude : les fiches et les photos des cartes, en un seul fichier ----------
+const FS_CHAMPS_ENVOI = ['id', 'code', 'nom', 'nom_auto', 'societe', 'contact', 'poste', 'mobile', 'tel', 'tel_fixe', 'whatsapp', 'whatsapp_lien', 'email', 'site', 'alibaba',
+  'wechat', 'wechat_lien', 'adresse', 'marche', 'allee', 'decision', 'remarque', 'lu_auto', 'source', 'le', 'vu_le', 'demande_le', 'catalogue_demande_le'];
+async function fsEnvoyerAClaude(bouton) {
+  if (bouton) { bouton.disabled = true; bouton.textContent = '⏳ Préparation du fichier…'; }
+  const out = { format: 'kylo-pour-claude', version: 1, le: mkMaintenant(), application: window.KYLO_APPLICATION, fournisseurs: [] };
+  let nCartes = 0;
+  try {
+    for (const f of fournisseursListe()) {
+      const x = {}; FS_CHAMPS_ENVOI.forEach(k => { if (f[k] !== undefined && f[k] !== '') x[k] = f[k]; });
+      x.nb_produits = ctProduits(f).length; x.nb_pages = ctDocs(f).filter(d => d.type === 'page').length; x.cartes = [];
+      for (const d of ctDocs(f).filter(d => d.type === 'carte')) {
+        try { const src = await ctLire(d.id); if (!src) continue; const img = await trImage(typeof src === 'string' ? src : URL.createObjectURL(src));
+          x.cartes.push({ id: d.id, photo: mkReduire(img, 1400, 0.8) }); nCartes++; } catch (e) {}
+      }
+      if (f.carte_photo) { x.cartes.push({ id: 'marche', photo: f.carte_photo }); nCartes++; }
+      if (f.qr_photo && !x.cartes.length) x.qr_photo = f.qr_photo;
+      out.fournisseurs.push(x);
+    }
+    const nom = 'carnet-pour-Claude-' + mkMaintenant().slice(0, 10) + '.json';
+    const voie = await remettreFichier(new Blob([JSON.stringify(out)], { type: 'application/json' }), nom);
+    if (voie !== 'erreur' && voie !== 'annule') avertir('📤 ' + out.fournisseurs.length + ' fiche(s) et ' + nCartes + ' carte(s) prêtes pour Claude (' + nom + ').\nEnvoyez ce fichier à Claude dans la conversation.', 8000);
+  } catch (e) { avertir('⚠ Le fichier n\'a pas pu être préparé : ' + (e && e.message || e), 7000); }
+  if (bouton) { bouton.disabled = false; bouton.textContent = '📤 Envoyer à Claude (fiches + cartes)'; }
+}
+
+// ---------- Au démarrage de la 1.5.2 : une fois, sans rien effacer ----------
+window.addEventListener('load', () => setTimeout(async () => {
+  try {
+    if (C.ordre_152) return;
+    const r = await fsMettreOrdre();
+    C.ordre_152 = mkMaintenant(); sauverLocal();
+    if (r.cartes || r.tel) avertir('🧹 Carnet 1.5.2 : ' + [r.cartes ? r.cartes + ' carte(s) prise(s) au Marché rangée(s) dans leur fiche et relue(s)' : '',
+      r.tel ? r.tel + ' portable(s) remis dans la bonne case' : ''].filter(Boolean).join(', ') + '.', 8000);
+    if (ongletActif === 'rencontres' || ongletActif === 'dossier') dessiner();
+  } catch (e) {}
+}, 1500));
 </script>
 <script>
 

@@ -941,7 +941,9 @@ function contenuCarteApplication() {
   if (kyloInstallee()) {
     return '<div class="alerte a-vert carte-installee"><b>Application installée</b> (version ' + window.KYLO_APPLICATION + '). ' + etat
       + '<br>Elle s\'ouvre depuis son icône, marche en Chine sans réseau, et garde vos achats dans cet appareil. '
-      + 'Touchez « Enregistrer » de temps en temps : le fichier est votre sauvegarde.</div>';
+      + 'Touchez « Enregistrer » de temps en temps : le fichier est votre sauvegarde.'
+      + '<div style="height:8px"></div><button type="button" class="b contour" style="min-height:52px;font-size:16px" onclick="kyloChercherMaj(this)">🔄 Chercher une mise à jour</button>'
+      + '<div id="kylo_maj_etat" role="status" style="font-size:15px;margin-top:6px"></div></div>';
   }
   var ap = kyloAppareil(), etapes;
   if (ap === 'ios') {
@@ -1009,6 +1011,39 @@ function kyloNouvelleVersion() {
   } else {
     avertir('Une nouvelle version du carnet est prête. Elle s\'ouvrira la prochaine fois que vous ouvrirez l\'application.', 7000);
   }
+}
+function kyloChercherMaj(bouton) {
+  var z = document.getElementById('kylo_maj_etat');
+  var dire = function (t) { if (z) z.textContent = t; };
+  if (!('serviceWorker' in navigator) || !navigator.onLine) { dire('Pas d\'Internet pour l\'instant : réessayez quand le réseau revient.'); return; }
+  if (bouton) bouton.disabled = true;
+  dire('⏳ Vérification sur Internet…');
+  fetch('sw.js?maj=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (t) {
+    var m = t.match(/VERSION = 'carnet-kylo-([0-9.]+)-/);
+    var enLigne = m ? m[1] : '';
+    return navigator.serviceWorker.getRegistration().then(function (reg) {
+      if (!reg) { dire('Le hors-ligne n\'est pas installé ici : rechargez la page.'); return; }
+      var fini = false;
+      var attendre = function () {
+        var w = reg.installing || reg.waiting;
+        if (!w) return;
+        w.addEventListener('statechange', function () {
+          if (w.state === 'activated') { fini = true; dire('✅ Version ' + enLigne + ' prête : le carnet se rouvre.'); setTimeout(function () { location.reload(); }, 800); }
+          if (w.state === 'redundant') { fini = true; dire('⚠ La nouvelle version n\'a pas pu être rangée (fichiers en retard chez l\'hébergeur) : réessayez dans une minute.'); }
+        });
+      };
+      reg.addEventListener('updatefound', attendre);
+      return reg.update().then(function () {
+        attendre();
+        setTimeout(function () {
+          if (fini) return;
+          if (reg.installing || reg.waiting) dire('⏳ Version ' + enLigne + ' en cours de rangement…');
+          else if (enLigne && enLigne !== window.KYLO_APPLICATION) dire('La version ' + enLigne + ' est en ligne mais ce téléphone garde la ' + window.KYLO_APPLICATION + ' : fermez complètement l\'application (balayez-la vers le haut), puis rouvrez-la avec Internet.');
+          else dire('✓ Vous avez la dernière version (' + window.KYLO_APPLICATION + ').');
+        }, 4000);
+      });
+    });
+  }).catch(function (e) { dire('Impossible de vérifier : ' + (e && e.message || e)); }).then(function () { if (bouton) bouton.disabled = false; });
 }
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   window.addEventListener('load', function () {

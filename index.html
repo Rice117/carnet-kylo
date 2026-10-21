@@ -678,6 +678,27 @@ function ksVider() {
 }
 
 // Remplace l'ancien « try { localStorage.setItem(...) } catch (e) {} » qui ne disait rien.
+// 1.7.0 : les cases vides d'un produit (remises par completerCarnet à l'ouverture).
+// « ~ » garde la liste exacte des cases laissées de côté (un nombre : 1 bit par case) : à l'ouverture, seules elles reviennent.
+function kyloProduitVide() { return { colisage: 0, dim_l: 0, dim_la: 0, dim_h: 0, poids_kg: '', interesse: false, prix: 0, moq: 0, prix_le: '', note: '', nouveau: false, incertain: '', a_demander: '', photo_doc: '' }; }
+function kyloAlleger(cle, v) {
+  if (this === C && cle === 'fournisseurs' && Array.isArray(v)) {
+    var vide = kyloProduitVide(), cles = Object.keys(vide);
+    v = v.map(function (f) {
+      if (!f || !Array.isArray(f.produits) || !f.produits.length) return f;
+      var g = Object.assign({}, f);
+      g.produits = f.produits.map(function (p) {
+        if (!p || typeof p !== 'object' || ('~' in p)) return p;
+        var r = {}, m = 0;
+        for (var k in p) { var i = cles.indexOf(k); if (i >= 0 && p[k] === vide[k]) { m |= (1 << i); continue; } r[k] = p[k]; }
+        if (m) r['~'] = m;
+        return r;
+      });
+      return g;
+    });
+  }
+  return typeof asRemplacant === 'function' ? asRemplacant.call(this, cle, v) : v;
+}
 function kyloGarderCarnet() {
   if (!kyloReserveLue) { kyloEcritureDifferee = true; return false; }   // ouverture : on attend la reserve
   // La reserve n'a pas pu etre lue : on n'ecrit NI dans la memoire NI dans la reserve, pour ne
@@ -687,7 +708,7 @@ function kyloGarderCarnet() {
   // Le numero vient de CET appareil (memoire et reserve lues a l'ouverture), jamais d'un fichier.
   kyloRang = kyloRangSur(kyloRang) + 1;
   C.rang_enregistrement = kyloRang;
-  try { texte = JSON.stringify(C, typeof asRemplacant === 'function' ? asRemplacant : undefined); } catch (e) { kyloMemoire('perdu'); return false; }
+  try { texte = JSON.stringify(C, kyloAlleger); } catch (e) { kyloMemoire('perdu'); return false; }
   try {
     localStorage.setItem(CLE, texte);
   } catch (e) {
@@ -892,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.6.1';
+window.KYLO_APPLICATION = '1.7.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -1274,6 +1295,13 @@ function completerCarnet(c) {
   if (!Array.isArray(c.negociations)) c.negociations = [];
   for (const k of ['duels', 'fournisseurs', 'acomptes', 'poches', 'bagages'])
     if (!Array.isArray(c[k])) c[k] = [];
+  // 1.7.0 : les cases vides des produits, non écrites dans la mémoire du téléphone, reviennent.
+  const vide = kyloProduitVide(), cles = Object.keys(vide);
+  c.fournisseurs.forEach(f => { if (f && Array.isArray(f.produits)) f.produits.forEach(p => {
+    if (!p || !('~' in p)) return;
+    const m = Number(p['~']) || 0; delete p['~'];
+    cles.forEach((k, i) => { if ((m & (1 << i)) && !(k in p)) p[k] = vide[k]; });
+  }); });
   if (!Array.isArray(c.depenses_type)) c.depenses_type = [];
   // v3.82 : le radar des produits (cases ajoutees sans toucher a ce qui est ecrit).
   if (c.radar) c.radar = radarCompleter(c.radar);
@@ -1661,7 +1689,7 @@ function coutRenduPrevisionnel(c, o) {
   const q = Math.max(1, num(c.quantite) || 1);
   const devise = o.devise || C.voyage.devise;
   const marchandise = enGnf(num(o.prix) * q, devise);
-  const frais = marchandise * fraisPourcent() / 100;
+  const frais = typeof pxRenduGnf === 'function' ? pxRenduGnf(c, o, marchandise / q) * q - marchandise : marchandise * fraisPourcent() / 100;
   const total = marchandise + frais;
   return { quantite: q, devise, marchandise, frais, total, unitaire: q ? total / q : 0 };
 }
@@ -1870,14 +1898,17 @@ function retirerNegociation(nid) {
   sauverLocal(); dessiner();
 }
 // Le plafond secret. La chaine du carnet a l'envers :
-//   prix detail = cout rendu x (1 + marge)   et   cout rendu = achat x (1 + frais)
-//   donc  achat maximum = prix de vente vise / (1 + marge) / (1 + frais)
+//   1.7.0 : la marge se compte sur le prix de vente, comme Comparer, Objectif et le radar (« marge brute ») :
+//   cout rendu maximum = prix de vente vise x (1 - marge)   et   cout rendu = achat x (1 + frais)
+//   donc  achat maximum = prix de vente vise x (1 - marge) / (1 + frais)
 function plafondNego(n) {
   const vente = Number(n.prix_vente_gnf) || 0;
   if (vente <= 0 || n.marge_pct === '' || n.marge_pct === null) return null;
   const marge = num(n.marge_pct), frais = num(n.frais_pct);
   if (marge < 0 || frais < 0) return null;
-  const achatMaxGnf = vente / (1 + marge / 100) / (1 + frais / 100);
+  if (marge >= 100) return null;
+  const md = n.px && typeof pxModeleNego === 'function' ? pxModeleNego(n) : null;
+  const achatMaxGnf = md ? Math.max(0, (vente * (1 - marge / 100) - md.F * (1 + md.d)) / (1 + md.d + md.local)) : vente * (1 - marge / 100) / (1 + frais / 100);
   const t = tauxDe(C.voyage.devise);
   return { gnf: achatMaxGnf, enDevise: t > 0 ? achatMaxGnf / t : null };
 }
@@ -3055,15 +3086,17 @@ function ecranNegocier() {
   <div class="carte" id="arme-1"><h2>Arme 1 — Le plafond secret</h2>
     <label>Produit</label>
     <input id="n_produit" value="${E(n.produit)}" placeholder="ex : Thermos 1 L" oninput="majNego()">
+    ${n.note ? `<div class="px-cible">🎯 ${E(n.note)}</div>` : ''}
     <div class="duo">
       <div><label>Prix de vente visé au magasin (GNF)</label>
         <input id="n_vente" inputmode="numeric" value="${E(n.prix_vente_gnf || '')}" oninput="majNego()"></div>
-      <div><label>Marge voulue (%)</label>
+      <div><label>Marge sur le prix de vente (%)</label>
         <input id="n_marge" inputmode="decimal" value="${E(n.marge_pct)}" placeholder="à vous de la décider" oninput="majNego()"></div>
     </div>
-    <label>Frais du voyage estimés (%)</label>
-    <input id="n_frais" inputmode="decimal" value="${E(n.frais_pct)}" oninput="majNego()">
-    <p class="muet">Proposé d'après ${totalFraisGnf() > 0 ? 'les frais déjà notés de CE voyage' : "l'écran Voyage"} — corrigez-le si vous savez mieux.</p>
+    ${n.px && typeof pxModeleNego === 'function' && pxModeleNego(n) ? `<label>Frais jusqu'au magasin (pour ce produit)</label><div class="px-cible">🚢 ${E(pxTexteFrais({ md: pxModeleNego(n) }))}</div>
+    <input id="n_frais" type="hidden" value="${E(n.frais_pct)}">` : `<label>Frais du voyage estimés (%)</label>
+    <input id="n_frais" inputmode="decimal" value="${E(n.frais_pct)}" oninput="majNego()">`}
+    <p class="muet">${n.frais_source === 'claude' ? 'Estimé par Claude pour ce produit (douane, bateau, transitaire)' : 'Proposé d\'après ' + (totalFraisGnf() > 0 ? 'les frais déjà notés de CE voyage' : "l'écran Voyage")} — corrigez-le si vous savez mieux.</p>
     <div id="zonePlafond"></div>
   </div>
   <div class="carte" id="arme-26"><h2>Arme 26 — L'escalier des quantités <span class="muet" style="font-size:13px">(votre idée)</span></h2>
@@ -3136,6 +3169,7 @@ function ecranComparer() {
       <label>Prix de vente visé au magasin (GNF, facultatif)</label>
       <input inputmode="numeric" value="${E(vise || '')}" placeholder="500000"
         onchange="majComparaison('${c.id}','prix_vente_vise_gnf',this.value)">
+      ${pxArticleHtml(c)}
       ${classees.length ? `<div class="glisse"><table class="recap" style="margin-top:10px;min-width:520px">
         <tr><th>Fournisseur</th><th>Prix</th><th>Rendu magasin</th><th>Écart</th><th>Marge</th><th></th></tr>
         ${classees.map(o => {
@@ -3159,6 +3193,7 @@ function ecranComparer() {
       ${c.motif ? `<div class="alerte a-info">Choix : ${E(c.motif)}</div>` : ''}
       ${(c.offres || []).map(o => `<div class="carte" style="margin:8px 0;background:#f7f9fb">
         ${mkOffrePhotos(c, o)}
+        ${pxOffreHtml(c, o)}
         <div class="duo">
           <div><label>Fournisseur</label><input value="${E(o.fournisseur)}" placeholder="Nom de l'usine"
             onchange="majOffre('${c.id}','${o.id}','fournisseur',this.value)"></div>
@@ -4495,6 +4530,7 @@ function mkConversionHtml(prix, devise, compact) {
   const g = p * t;
   const eur = tauxDe('EUR'), cny = tauxDe('CNY');
   const autres = [];
+  if (d !== 'USD' && tauxDe('USD') > 0) autres.push('≈ ' + nf(g / tauxDe('USD'), 2) + ' $');
   if (d !== 'EUR' && eur > 0) autres.push('≈ ' + nf(g / eur, 2) + ' €');
   if (d !== 'CNY' && cny > 0) autres.push('≈ ' + nf(g / cny, 2) + ' ¥');
   const rendu = g * (1 + fraisPourcent() / 100);
@@ -4507,7 +4543,7 @@ function mkPrixCourt(o) {
   const p = num(o.prix); if (!(p > 0)) return 'prix ?';
   const d = o.devise || C.voyage.devise || 'GNF';
   const g = enGnf(p, d);
-  return nf(p, 2) + ' ' + mkSym(d) + (d !== 'GNF' && g > 0 ? ' = ' + gnfStrict(g) : '') + (d !== 'EUR' && g > 0 && tauxDe('EUR') > 0 ? ' ≈ ' + nf(g / tauxDe('EUR'), 2) + ' €' : '');
+  return nf(p, 2) + ' ' + mkSym(d) + (d !== 'GNF' && g > 0 ? ' = ' + gnfStrict(g) : '') + (d !== 'USD' && g > 0 && tauxDe('USD') > 0 ? ' ≈ ' + nf(g / tauxDe('USD'), 2) + ' $' : '') + (d !== 'EUR' && g > 0 && tauxDe('EUR') > 0 ? ' ≈ ' + nf(g / tauxDe('EUR'), 2) + ' €' : '');
 }
 
 // ---------- Les photos : allégées, mais nettes ----------
@@ -5141,7 +5177,7 @@ function mkCarteFournisseurHtml(f) {
         ${f.allee || f.marche ? `<div class="det">📍 ${E([f.marche, f.allee].filter(Boolean).join(' · '))}</div>` : ''}
         <div class="det">${aWx ? '💬 WeChat ' + E(f.wechat && !/^https?:/i.test(f.wechat) ? f.wechat : 'gardé') : '<span class="mk-att">pas de WeChat</span>'}${fsTel(f) ? ' · 📞 ' + E(ctTelLisible(fsTel(f))) : ''}${f.vu_le ? ' · vu le ' + mkJour(f.vu_le) + ' à ' + mkHeure(f.vu_le) : ''}</div>
         ${ctCompteursHtml(f)}
-        ${f.classement && f.classement.categorie ? `<div class="det">📂 ${E(f.classement.categorie)}${f.classement.sous_categorie ? ' · ' + E(f.classement.sous_categorie) : ''}</div>` : ''}${clNoteHtml(f)}
+        ${f.classement && f.classement.categorie ? `<div class="det">📂 ${E(f.classement.categorie)}${f.classement.sous_categorie ? ' · ' + E(f.classement.sous_categorie) : ''}</div>` : ''}${clNoteHtml(f)}${pxEtatListeHtml(f)}
       </div>
     </div>
     <div class="mk-decision">${MK_DECISIONS.map(([k, t]) => `<button type="button" class="${f.decision === k ? 'on-' + k : ''}" onclick="mkDecider('${f.id}','${k}')">${t}</button>`).join('')}</div>
@@ -5153,7 +5189,7 @@ function mkCarteFournisseurHtml(f) {
     ${f.remarque ? `<p class="mk-aide" style="font-size:15px">📝 ${E(f.remarque)}</p>` : ''}
     <div class="mk-actions">
       <button type="button" class="b" style="grid-column:1/-1;min-height:56px;font-size:16px" onclick="ctOuvrirDossier('${f.id}')">📂 Sa fiche : carte, catalogue, prix</button>
-      <button type="button" class="b wechat" onclick="mkContact('${f.id}')">💬 L'ajouter sur WeChat</button>
+      <button type="button" class="b wechat" onclick="mkContact('${f.id}')">${wxLibelle(f)}</button>
       <button type="button" class="b vert" onclick="trStandOuvrir('${f.id}')">📷 Au stand : produit, prix</button>
       ${fsTel(f) ? `<button type="button" class="b contour" onclick="location.href='tel:${E(fsTel(f).replace(/[^\d+]/g, ''))}'">📞 Appeler</button>` : ''}
       <button type="button" class="b gris" onclick="mkModifierFournisseur('${f.id}')">✏️ Modifier</button>
@@ -5181,7 +5217,7 @@ function ecranRencontres() {
     </div>
     ${trOcrEtatHtml()}
   </div>
-  ${fsDoublonsHtml()}${fsSuiviHtml()}
+  ${pxResumeAchatsHtml()}${fsDoublonsHtml()}${fsSuiviHtml()}
   ${trARangerHtml()}
   <div class="carte">
     <p class="mk-aide" style="font-size:15px">Chaque fournisseur avec ses produits, ses prix et son WeChat. Le soir, marquez
@@ -5568,7 +5604,7 @@ function ctPrixHtml(p) {
   const d = p.devise || 'USD', t = tauxDe(d);
   if (!(t > 0)) return `<span class="mk-att">Taux du ${E(d)} à remplir (Voyage → Taux de change)</span>`;
   const g = prix * t;
-  return `= ${gnfStrict(g)}${d !== 'EUR' && tauxDe('EUR') > 0 ? ' ≈ ' + nf(g / tauxDe('EUR'), 2) + ' €' : ''} <span class="rendu">· arrivé au magasin ≈ ${gnfStrict(g * (1 + fraisPourcent() / 100))}</span>`;
+  return `= ${gnfStrict(g)}${d !== 'USD' && tauxDe('USD') > 0 ? ' ≈ ' + nf(g / tauxDe('USD'), 2) + ' $' : ''}${d !== 'EUR' && tauxDe('EUR') > 0 ? ' ≈ ' + nf(g / tauxDe('EUR'), 2) + ' €' : ''} <span class="rendu">· arrivé au magasin ≈ ${gnfStrict(g * (1 + fraisPourcent() / 100))}</span>`;
 }
 function ctPrixGnf(p) { const prix = num(p.prix), t = tauxDe(p.devise || 'USD'); return prix > 0 && t > 0 ? prix * t : 0; }
 
@@ -5919,12 +5955,12 @@ function ecranDossier() {
     ${trLuAutoHtml(f)}${trEnLecture(f) ? '<div class="ct-statut">⏳ Le carnet lit sa carte…</div>' : ''}
     <div class="ct-entree">
       <button class="b vert" onclick="trStandOuvrir('${f.id}')">📷 Au stand : sa carte, ses QR, ses produits et ses prix</button>
-      <button class="b vert" onclick="trDemander('${f.id}')">✉️ ${f.demande_le ? 'Redemander' : 'Demander'} les prix (WeChat, e-mail)</button>
+      <button class="b vert" onclick="pxBoiteDemande('${f.id}')">💰 ${f.demande_le ? 'Redemander' : 'Demander'} ses prix : ¥, quantités, 3 qualités</button>
       ${ctProduits(f).length ? `<button class="b contour" onclick="trBoiteReponse('${f.id}')">💬 Coller sa réponse : les prix se placent seuls</button>` : ''}
       ${f.demande_le && ctNbPrix(f) < Math.max(1, ctProduits(f).length) ? `<button class="b contour" onclick="ctBoiteDemande('${f.id}', true)">🔔 Relancer</button>` : ''}
     </div>
     <div class="ct-liens">
-      <button class="b wechat" onclick="mkContact('${f.id}')">💬 ${aWx ? 'Son WeChat' : 'WeChat'}</button>
+      <button class="b wechat" onclick="mkContact('${f.id}')">${wxLibelle(f)}</button>
       ${f.whatsapp_lien || f.whatsapp ? `<button class="b tr-wa" onclick="trOuvrirWhatsApp('${f.id}')">🟢 WhatsApp</button>` : ''}
       ${tel ? `<button class="b contour" onclick="location.href='tel:${E(tel)}'">📞 Appeler</button>` : ''}
       ${f.email ? `<button class="b contour" onclick="ctEcrireMail('${f.id}')">✉️ E-mail</button>` : ''}
@@ -5966,7 +6002,7 @@ function ecranDossier() {
       <button class="b contour" style="min-height:52px;font-size:16px" onclick="ctBoiteImport()">🤖 Ajouter ce que Claude a lu</button></div>
   </details>
 
-  ${asVusAuStandHtml(f)}
+  ${pxSectionHtml(f)}
   <details class="ct-section" open><summary>📦 Ses produits (${ctProduits(f).length}) · 💰 ${ctNbPrix(f)} prix</summary>
     ${ctListeProduitsDossier(f)}
     <div class="mk-deux" style="margin-top:10px">
@@ -10312,7 +10348,7 @@ function fsProchaine(f, e) {
   if (!e.coord) return [e.carte ? '📇 Reprendre sa carte (de près, à plat)' : '📇 Photo de sa carte', `trStandOuvrir('${f.id}')`];
   if (!e.cata && !e.cataDemande) return ['📖 Demander son catalogue', `fsDemanderCatalogue('${f.id}')`];
   if (!e.cata) return ['📥 Son catalogue est arrivé', `fwBoite('${f.id}')`];
-  if (!e.prixDemandes && !e.prix) return ['✉️ Demander les prix', `trDemander('${f.id}')`];
+  if (!e.prixDemandes && !e.prix) return ['💰 Demander ses prix', `pxBoiteDemande('${f.id}')`];
   if (!e.prix) return ['💬 Coller sa réponse', `trBoiteReponse('${f.id}')`];
   return ['📊 Comparer les prix', `allerA('catalogues')`];
 }
@@ -10325,7 +10361,7 @@ function fsSuiviHtml() {
   const r = fsResume(); if (!r.n) return '';
   return `<div class="carte"><h2 style="font-size:18px">📋 Où j'en suis (${r.n} fournisseur${r.n > 1 ? 's' : ''})</h2>
     <p class="fs-suivi-r">${[r.lecture ? `🔎 <b>${r.lecture}</b> carte(s) en lecture${trOcrEtat.pret ? '' : ' — <b>la lecture n\'est pas prête</b> : ouvrez le carnet avec Internet'}` : '',
-      r.cartes ? `📇 <b>${r.cartes}</b> sans nom ni téléphone : carte à (re)prendre` : '', r.cata ? `📖 <b>${r.cata}</b> catalogue(s) à demander` : '',
+      r.cartes ? `📇 <b>${r.cartes}</b> sans nom ni téléphone : carte à (re)prendre` : '', wxResumeHtml(), r.cata ? `📖 <b>${r.cata}</b> catalogue(s) à demander` : '',
       r.prix ? `✉️ <b>${r.prix}</b> demande(s) de prix à envoyer` : ''].filter(Boolean).join('<br>') || '✅ Tout est à jour.'}</p>
     <div class="mk-deux">
       <button class="b vert" onclick="fsOuvrirSuivi()">📋 Voir chaque fournisseur et sa prochaine étape</button>
@@ -10348,15 +10384,15 @@ let fsFiltre = 'tous';
 function fsOuvrirSuivi(filtre) {
   if (filtre) fsFiltre = filtre;
   const L = fournisseursListe().slice().sort((a, b) => fsNumCode(a) - fsNumCode(b));
-  const FILTRES = [['tous', 'Tous'], ['carte', '📇 Carte'], ['cata', '📖 Catalogue'], ['prix', '✉️ Prix'], ['fini', '✅ Prix reçus']];
+  const FILTRES = [['tous', 'Tous'], ['carte', '📇 Carte'], ['wx', '💬 WeChat'], ['cata', '📖 Catalogue'], ['prix', '✉️ Prix'], ['fini', '✅ Prix reçus']];
   const garde = (f) => { const e = fsEtapes(f);
-    return fsFiltre === 'tous' || (fsFiltre === 'carte' && !e.coord) || (fsFiltre === 'cata' && !e.cata) || (fsFiltre === 'prix' && e.cata && !e.prix) || (fsFiltre === 'fini' && e.prix); };
+    return fsFiltre === 'tous' || (fsFiltre === 'carte' && !e.coord) || (fsFiltre === 'wx' && wxAFaire(f, e)) || (fsFiltre === 'cata' && !e.cata) || (fsFiltre === 'prix' && e.cata && !e.prix) || (fsFiltre === 'fini' && e.prix); };
   const past = (ok, t, mi) => `<span class="${ok ? 'ok' : mi ? 'mi' : ''}">${ok ? '✓' : mi ? '…' : '○'} ${t}</span>`;
   const lignes = L.filter(garde).map(f => {
     const e = fsEtapes(f), [t, js] = fsProchaine(f, e);
     const souv = fsSouvenir(f);
     return `<div class="fs-ligne" data-id="${E(f.id)}"><div class="t"><span class="code">${E(f.code || '—')}</span><span class="nom">${E(f.nom || f.societe || '(sans nom)')}${f.contact && !(f.nom || '').includes(trPrenom(f.contact)) ? ' · ' + E(f.contact) : ''}</span></div>${souv ? `<div class="souv">${E(souv)}</div>` : ''}
-      <div class="fs-pastilles">${past(e.coord, e.lecture ? 'carte (en lecture)' : e.carte && !e.coord ? 'carte à reprendre' : 'carte', e.lecture || (e.carte && !e.coord))}${past(e.wx, 'WeChat')}${past(e.cata, e.cataDemande && !e.cata ? 'catalogue demandé' : 'catalogue', e.cataDemande && !e.cata)}${e.prixStand ? past(true, 'prix du stand') : ''}${past(e.prixDemandes || e.prix, 'prix demandés')}${past(e.prix, 'prix reçus')}</div>
+      <div class="fs-pastilles">${past(e.coord, e.lecture ? 'carte (en lecture)' : e.carte && !e.coord ? 'carte à reprendre' : 'carte', e.lecture || (e.carte && !e.coord))}${wxPastille(f, e, past)}${past(e.cata, e.cataDemande && !e.cata ? 'catalogue demandé' : 'catalogue', e.cataDemande && !e.cata)}${e.prixStand ? past(true, 'prix du stand') : ''}${past(e.prixDemandes || e.prix, 'prix demandés')}${past(e.prix, 'prix reçus')}</div>
       <button type="button" class="go" onclick="fermerBoite();${js}">${t}</button><button type="button" onclick="ctOuvrirDossier('${f.id}')">📂 Sa fiche</button></div>`;
   });
   mkBoite(`<div class="mk-dlg"><h3>📋 Où j'en suis</h3>
@@ -11745,13 +11781,15 @@ async function fsEnvoyerAClaude(bouton) {
       });
       if (typeof f.carte_photo === 'string' && f.carte_photo.length > 100) { const nom = `cartes/${code}-marche.jpg`; x.cartes.push({ fichier: nom, face: null }); photos.push({ nom, src: f.carte_photo, ordre: 0 }); }
       mkOffresDe(f).forEach(({ c, o }, k) => {
-        const p = { article: c.article, prix: num(o.prix) || 0, devise: o.devise || '', moq: num(o.moq) || 0, note: o.note || '', vu_le: o.vu_le || '' };
+        const p = { cle: 'o:' + o.id, article: c.article, modele: o.modele || '', prix: num(o.prix) || 0, devise: o.devise || '', moq: num(o.moq) || 0, note: o.note || '', vu_le: o.vu_le || '',
+          qualites: Array.isArray(o.qualites) ? o.qualites : [], achete: !!o.achat_id, prix_vente_vise_gnf: num(c.prix_vente_vise_gnf) || 0 };
         ['photo', 'photo2'].forEach((ch, j) => { if (o[ch]) { const nom = `produits/${code}-${k + 1}${j ? '-etiquette' : ''}-${clNomFichier(c.article)}.jpg`; p[ch] = nom; photos.push({ nom, src: o[ch], ordre: 1 }); } });
         x.produits_vus.push(p);
       });
-      ctProduits(f).forEach(p => x.produits_catalogue.push({ ref: p.ref || '', categorie: p.categorie || '', caracteristiques: p.caracteristiques || '',
+      ctProduits(f).forEach(p => x.produits_catalogue.push({ cle: 'p:' + p.id, ref: p.ref || '', categorie: p.categorie || '', caracteristiques: p.caracteristiques || '',
         prix: num(p.prix) || 0, devise: p.devise || '', moq: num(p.moq) || 0 }));
       x.fichiers = (f.fichiers || []).map(z => z.nom || z.name || z.titre || '').filter(Boolean);
+      if (f.px_demande) x.prix_demandes = f.px_demande;
       fiches.push(x);
     }
     // Les photos : d'abord les cartes (le plus important), puis les produits, puis les pages de catalogue.
@@ -11856,6 +11894,1768 @@ function clFiabiliteHtml(f) {
     ${k.le ? `<p class="mk-aide" style="font-size:14px">Vérifié par Claude le ${E(mkJour(k.le))}.</p>` : ''}
   </div></details>`;
 }
+</script>
+<style>
+/* ===================== 1.7.0 — DES PRIX À L'ACHAT (21/10/2026) =====================
+   Demande de prix en yuans, quantité minimum, prix par quantité, 3 qualités ; sa réponse rangée ;
+   le prix du marché guinéen et le prix à ne pas dépasser ; « J'achète » et le total.
+   Textes jamais sous 14 px (règle de Riche). Couleurs = variables du carnet (clair et sombre). */
+.px-aide{font-size:15px;line-height:1.45;color:var(--texte-note);margin:6px 0}
+.px-titre{font-size:17px;font-weight:900;color:var(--bleu);margin:16px 0 6px}
+.px-liste{display:flex;flex-direction:column;gap:6px;max-height:46vh;overflow-y:auto;border:1px solid var(--lisiere);border-radius:12px;padding:6px}
+.px-l{display:flex;gap:10px;align-items:center;font-size:16px;line-height:1.3;padding:6px;border-radius:10px;background:var(--carte);min-height:56px;flex:none}
+.px-l input{width:26px;height:26px;flex:none}
+.px-l img,.px-l .px-vide{width:52px;height:52px;flex:none;border-radius:8px;object-fit:cover;background:var(--bleu-pale);display:flex;align-items:center;justify-content:center;font-size:24px}
+.px-l small{font-size:14px;color:var(--gris)}
+.px-ajout{display:flex;gap:8px;margin-top:8px}
+.px-ajout input{flex:1;min-width:0;font-size:16px}
+.px-ajout .b{width:auto;flex:none;min-height:48px;font-size:15px;padding:0 12px}
+.px-voir{font-size:15px;font-weight:700;min-height:40px;display:flex;align-items:center}
+.px-offre{margin-top:8px}
+.px-tab-z{overflow-x:auto;margin:6px 0}
+.px-tab{border-collapse:collapse;width:100%;font-size:15px}
+.px-tab th{font-size:15px;text-align:left;color:var(--noir);font-weight:800;padding:4px 5px;border-bottom:2px solid var(--lisiere);white-space:nowrap}
+.px-tab td{padding:5px;border-bottom:1px solid var(--lisiere);vertical-align:top;white-space:nowrap}
+.px-tab td span,.px-tab td small{font-size:14px;color:var(--gris);font-weight:700}
+.px-tab .on{background:var(--vert-pale)}
+.px-tab th span{font-weight:700}
+.px-diff,.px-info{font-size:15px;line-height:1.4;margin:4px 0;color:var(--texte-note)}
+.px-cible{font-size:16px;line-height:1.45;background:var(--ambre-pale);color:var(--noir);border-radius:12px;padding:10px 12px;margin:8px 0}
+.px-cible span{font-size:14px;color:var(--texte-note)}
+.px-achete{font-size:16px;line-height:1.45;background:var(--vert-pale);color:var(--vert);border-radius:12px;padding:10px 12px;margin:8px 0}
+.px-boutons{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.px-boutons .b{width:auto;flex:1 1 140px;min-height:50px;font-size:15px}
+.px-marche{font-size:16px;line-height:1.45;background:var(--bleu-pale);border-radius:12px;padding:10px 12px;margin:10px 0}
+.px-marche a{font-size:15px;color:var(--bleu);font-weight:700}
+.px-marche span{font-size:14px;color:var(--texte-note)}
+.px-plafond{margin-top:6px}
+.px-p{border-top:1px solid var(--lisiere);padding:10px 0}
+.px-p .t{display:flex;gap:10px;align-items:flex-start}
+.px-p .t img,.px-p .t .px-vide{width:72px;height:72px;flex:none;border-radius:10px;object-fit:cover;background:var(--bleu-pale);display:flex;align-items:center;justify-content:center;font-size:30px}
+.px-p .t .n{font-size:17px;font-weight:900;line-height:1.3}
+.px-p .t .v{font-size:15px;color:var(--texte-note);line-height:1.4}
+.px-etat{font-size:16px;line-height:1.45;padding:10px 12px;border-radius:12px;background:var(--gris-clair);margin:8px 0}
+.px-etat.ok{background:var(--vert-pale);color:var(--vert)}
+.px-etat.att{background:var(--ambre-pale);color:var(--ambre)}
+.px-resume .px-gros{font-size:17px;line-height:1.45;margin:4px 0}
+.px-jauge{height:14px;border-radius:999px;background:var(--gris-clair);overflow:hidden;margin:8px 0}
+.px-jauge i{display:block;height:100%;background:var(--vert)}
+.px-jauge.trop i{background:var(--rouge)}
+.px-resume p{font-size:16px}
+.px-calc{font-size:16px;line-height:1.5;background:var(--bleu-pale);border-radius:12px;padding:10px 12px;margin:10px 0}
+.px-calc .gros{font-size:22px;font-weight:900;color:var(--bleu)}
+.px-calc .att{color:var(--ambre);font-weight:800}
+.px-calc .ko{color:var(--rouge);font-weight:800}
+.px-calc .ok{color:var(--vert);font-weight:800}
+.px-saisie{border:1px solid var(--lisiere);border-radius:12px;padding:8px 10px;margin:8px 0}
+.px-saisie h4{margin:2px 0 6px;font-size:17px}
+.px-saisie .px-g{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.px-saisie label{font-size:15px;margin-top:4px}
+.px-liste-etat{font-size:15px;font-weight:800;color:var(--vert);margin-top:4px}
+.px-fam{border-top:1px solid var(--lisiere);padding:4px 0}
+.px-pourquoi{font-size:15px;line-height:1.4;background:#eef5ff;color:#1e3a5f;border-radius:10px;padding:6px 8px;margin-top:6px}
+.px-fam>summary{font-size:17px;font-weight:900;min-height:48px;display:flex;align-items:center;cursor:pointer;color:var(--bleu)}
+.px-cat{margin-top:8px}
+/* 1.7.0 — le plancher de 14 px partout (règle de Riche : « jamais sous 14 px ») : les écritures des premiers écrans
+   du carnet (Voyage, Achats, Comparer, Négocier, Radar…) qui étaient encore à 10–13 px passent à 14 px. */
+header .voyage,label,.muet,.article .det,.pastille,.stat .l,.pied,.bq-l,.bq-dev,.bq-note,.gr-etiq,.gr-leg,.dep-gnf,.base-code .bc-l,
+.plafond .pl-l,.plafond .pl-s,.fil-arme button.b,.fam-titre,.arme26 .a-ouvrir,.q-m-quoi,.q-m-n,.q-en,.rd-chip,.rd-score small,.rd-conf,.rd-sg i,.rd-prov,.note-ecran .txt{font-size:14px}
+[style*="font-size:13px"],[style*="font-size:12px"],[style*="font-size:11px"]{font-size:14px!important}
+</style>
+<script>
+// =====================================================================================================
+//  CARNET 1.7.0 — « Des prix à l'achat » (21/10/2026, Foire de Canton)
+//  Riche, 21/10 à 5 h 32 : « tu prépares la liste… noter le prix de chaque produit en yuan… ça commence à
+//  telle quantité… combien de qualités : haute qualité, moins bon et le bas… tu vas extirper ces informations
+//  et remplir nos carnets… tu vas faire partie de ces négociations… me supposer des prix… le marché guinéen…
+//  côté achat : mettre la quantité du produit validée. »
+//   1. 💰 Demander ses prix : les produits vus au stand + ceux de son catalogue, numérotés avec leur photo ;
+//      prix en ¥, quantité minimum, prix pour 2 ou 3 quantités, en 3 qualités (高档 / 中档 / 低档) et leur
+//      différence ; en chinois. Trois façons d'envoyer : les photos numérotées, le tableau Excel à remplir,
+//      le message. « C'est envoyé » garde la liste (le n° 3 de sa réponse = le bon produit).
+//   2. Sa réponse : le tableau Excel rempli (« 📥 Fichier reçu sur WeChat » le reconnaît et range tout),
+//      le retour de Claude (format kylo-import : « offres » et « marche »), ou à la main (✏️ Noter ses prix).
+//   3. Sur chaque produit : ses 3 qualités et ses prix par quantité, en ¥ et en francs ; le prix du marché
+//      en Guinée ; « ⛔ Ne payez pas plus de » (prix de vente × (1 − marge) ÷ (1 + frais)) ; « 🎯 Proposez ».
+//   4. 🛒 J'achète : la qualité, la quantité → le bon prix (celui de la quantité), le total en ¥, en francs,
+//      en euros, ce qu'il reste du budget ; l'achat va dans Achats (le total du voyage suit).
+//   5. 🤝 Négocier : la négociation s'ouvre remplie (produit, prix de vente, marge, frais, l'escalier des prix).
+//  Une offre (C.comparaisons[].offres[]) garde : qualites [{ niveau, nom, moq, prix, paliers [{ qte, prix }], diff }],
+//  devise, niveau (la qualité retenue), cible { prix, devise, raison }, cotation_le, cotation_source, achat_id.
+// =====================================================================================================
+window.KYLO_PRIX = '1.7.0';
+const PX_NIV = [
+  { k: 'haute', fr: 'Haute qualité', court: 'Haute', cn: '高档', en: 'High' },
+  { k: 'moyenne', fr: 'Qualité moyenne', court: 'Moyenne', cn: '中档', en: 'Medium' },
+  { k: 'basse', fr: 'Basse qualité (économique)', court: 'Basse', cn: '低档', en: 'Low' }];
+const PX_PALIERS_CHOIX = [100, 200, 300, 500, 1000, 2000, 3000, 5000, 10000];
+const pxNiv = (k) => PX_NIV.find(n => n.k === k) || { k: k || '', fr: k || 'Qualité', court: k || 'Qualité', cn: '', en: '' };
+function pxNiveauDe(t) {
+  const s = String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  if (!s) return '';
+  if (/^(haute|moyenne|basse)$/.test(s)) return s;
+  if (/高|high|haut|top|豪华|一档|1档|\bgrade\s*a\b|^a$/.test(s)) return 'haute';
+  if (/中|med|moy|标准|标配|二档|2档|\bgrade\s*b\b|^b$/.test(s)) return 'moyenne';
+  if (/低|low|bas|eco|普通|经济|三档|3档|\bgrade\s*c\b|^c$/.test(s)) return 'basse';
+  return '';
+}
+// Un nombre écrit par le vendeur : « ¥45 », « 45元 », « 1,000 », « 4,5 », « 40-45 » (le premier), « 约42 ».
+function pxNombre(v) {
+  if (typeof v === 'number') return Number.isFinite(v) && v > 0 ? v : 0;
+  let s = String(v === null || v === undefined ? '' : v).replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/\s+/g, '');
+  const m = s.match(/\d[\d,.]*/); if (!m) return 0;
+  s = m[0].replace(/[.,]$/, '');
+  if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) s = s.replace(/,/g, '');
+  else s = s.replace(',', '.');
+  const n = Number(s); return Number.isFinite(n) && n > 0 ? n : 0;
+}
+// Les noms français → chinois, pour que le vendeur sache de quoi on parle (la photo aide aussi).
+const PX_CN = [[/cuiseur|rice\s*cooker/, '电饭煲'], [/autocuiseur|cocotte|pression/, '电压力锅'], [/bouilloire|kettle/, '电热水壶'], [/blender|mixeur|smoothie/, '搅拌机'],
+  [/hachoir|hache-viande/, '绞肉机'], [/presse|extracteur|jus/, '榨汁机'], [/fer a repasser|repasser|defroisseur/, '电熨斗'], [/ventilateur.*(recharg|batterie)/, '充电风扇'],
+  [/ventilateur.*pied/, '落地扇'], [/ventilateur.*(table|bureau)/, '台扇'], [/ventilateur|fan\b/, '电风扇'], [/climatiseur|clim\b/, '空调'], [/refrigerateur|frigo/, '冰箱'],
+  [/congelateur/, '冰柜'], [/micro-?ondes/, '微波炉'], [/friteuse|air\s*fryer/, '空气炸锅'], [/four\b|grille-pain|toaster/, '烤箱'], [/plaque|induction/, '电磁炉'],
+  [/rechaud|gaz/, '燃气灶'], [/machine a laver|lave-linge/, '洗衣机'], [/aspirateur/, '吸尘器'], [/seche-cheveux/, '吹风机'], [/tondeuse|barber/, '理发器'],
+  [/rasoir/, '剃须刀'], [/projecteur|spot/, '投光灯'], [/panneau solaire/, '太阳能板'], [/kit solaire/, '太阳能系统'], [/solaire/, '太阳能灯'], [/ampoule/, '灯泡'],
+  [/lampe torche|torche/, '手电筒'], [/lampe|lumiere|eclairage/, '灯'], [/batterie externe|power\s*bank/, '充电宝'], [/chargeur/, '充电器'], [/cable/, '数据线'],
+  [/ecouteur|casque/, '耳机'], [/enceinte|haut-parleur/, '音箱'], [/television|tele\b|tv\b/, '电视'], [/multiprise|rallonge/, '插线板'], [/stabilisateur|regulateur/, '稳压器'],
+  [/thermos|isotherme/, '保温壶'], [/bouteille|gourde/, '保温杯'], [/poele/, '煎锅'], [/casserole|marmite/, '锅'], [/tapette|moustique/, '电蚊拍'], [/balance/, '电子秤'],
+  [/machine a cafe|cafe/, '咖啡机'], [/batteur|fouet/, '打蛋器'], [/robot/, '料理机']];
+function pxNomChinois(nom) {
+  const s = normaliserNom(nom);
+  const t = PX_CN.find(([re]) => re.test(s));
+  return t ? t[1] : '';
+}
+function pxNomPourVendeur(l) {
+  const cn = pxNomChinois(l.nom), pg = l.p && String(l.p.page || '').match(/\d+/);
+  return (cn ? cn + ' / ' : '') + l.nom + (pg ? '（目录第' + pg[0] + '页 / catalogue p. ' + pg[0] + '）' : '');
+}
+
+// ---------- 1. Les produits d'un fournisseur (vus au stand + son catalogue) ----------
+// Toujours dans le même ordre (le n° 1 reste le n° 1) : ce qu'on a vu au stand, du premier au dernier ; puis son catalogue ;
+// puis les produits ajoutés à la demande.
+function pxOffresOrdonnees(f) {
+  const rang = (o) => o.source === 'demande' ? 2 : (o.produit_id || o.source === 'catalogue') ? 1 : 0;
+  return mkOffresDe(f).slice().sort((a, b) => rang(a.o) - rang(b.o) || String(a.o.vu_le || '').localeCompare(String(b.o.vu_le || '')));
+}
+function pxLignesDe(f) {
+  const L = [], liees = new Set(), demandes = [];
+  pxOffresOrdonnees(f).forEach(({ c, o }) => {
+    if (o.produit_id) liees.add(o.produit_id);
+    (o.source === 'demande' ? demandes : L).push({ cle: 'o:' + o.id, nom: c.article + (o.modele && normaliserNom(c.article).indexOf(normaliserNom(o.modele)) < 0 ? ' ' + o.modele : ''), photo: o.photo || '', doc: o.photo_doc || '', c, o });
+  });
+  ctProduits(f).forEach(p => {
+    if (liees.has(p.id)) return;
+    L.push({ cle: 'p:' + p.id, nom: [p.ref, p.categorie].filter(Boolean).join(' · ') || 'Modèle', photo: '', doc: p.photo_doc || '', p, interesse: !!p.interesse });
+  });
+  return L.concat(demandes);
+}
+function pxTrouverLigne(f, cle) {
+  if (!cle) return null;
+  const l = pxLignesDe(f).find(x => x.cle === cle);
+  if (l) return l;
+  if (cle.startsWith('o:')) {        // une offre déjà reliée à un modèle du catalogue
+    for (const c of (C.comparaisons || [])) { const o = (c.offres || []).find(x => x.id === cle.slice(2)); if (o) return { cle, nom: c.article, c, o }; }
+  }
+  if (cle.startsWith('p:')) { const p = ctProduit(f, cle.slice(2)); if (p) return { cle, nom: p.ref || p.categorie, p }; }
+  return null;
+}
+function pxComparaison(article, source) {
+  C.comparaisons = C.comparaisons || [];
+  const a = String(article || '').trim() || 'Produit';
+  let c = C.comparaisons.find(x => normaliserNom(x.article) === normaliserNom(a));
+  if (!c) { c = { id: idUnique('c'), article: a, quantite: 100, prix_vente_vise_gnf: 0, offres: [], choisi: null, motif: '', note: '', source: source || 'prix' }; C.comparaisons.push(c); }
+  c.offres = c.offres || [];
+  return c;
+}
+// Le modèle du catalogue entre dans « Comparer » (une offre reliée) quand ses prix arrivent.
+function pxOffrePour(f, l) {
+  if (l.o) return { c: l.c, o: l.o };
+  const p = l.p;
+  for (const c of (C.comparaisons || [])) { const o = (c.offres || []).find(x => x.produit_id === p.id && x.fournisseur_id === f.id); if (o) return { c, o }; }
+  const c = pxComparaison(p.categorie || p.ref, 'catalogue');
+  const o = { id: idUnique('o'), fournisseur: mkNomFournisseur(f), fournisseur_id: f.id, produit_id: p.id, modele: p.ref || '', prix: num(p.prix), devise: p.devise || 'CNY',
+    moq: num(p.moq), delai: 0, qualite: 0, note: '', photo: '', photo_doc: p.photo_doc || '', qte_carton: num(p.colisage), dim_l: num(p.dim_l) || '', dim_la: num(p.dim_la) || '',
+    dim_h: num(p.dim_h) || '', source: 'catalogue' };
+  c.offres.push(o);
+  return { c, o };
+}
+// Un produit qu'on lui demande sans l'avoir noté (« ventilateur 16 pouces ») : une offre vide chez lui.
+function pxNouvelleLigne(f, nom, modele) {
+  const propre = String(nom || '').split(' / ').pop().trim() || 'Produit';
+  const c = pxComparaison(propre, 'demande');
+  let o = c.offres.find(x => x.fournisseur_id === f.id && (!modele || normaliserNom(x.modele) === normaliserNom(modele)));
+  if (!o) {
+    o = { id: idUnique('o'), fournisseur: mkNomFournisseur(f), fournisseur_id: f.id, modele: modele || '', prix: 0, devise: 'CNY', moq: 0, delai: 0, qualite: 0, note: '', photo: '', source: 'demande', vu_le: mkMaintenant() };
+    c.offres.push(o);
+  }
+  return { cle: 'o:' + o.id, nom: c.article, c, o };
+}
+
+// ---------- 2. Les prix : 3 qualités, par quantité ----------
+function pxQualites(o) {
+  const qs = Array.isArray(o && o.qualites) ? o.qualites.filter(q => q && (num(q.prix) > 0 || (q.paliers || []).some(p => num(p.prix) > 0))) : [];
+  const rang = (q) => { const i = PX_NIV.findIndex(n => n.k === q.niveau); return i < 0 ? 9 : i; };
+  return qs.slice().sort((a, b) => rang(a) - rang(b));
+}
+function pxTiers(q) {
+  const t = [];
+  if (num(q.prix) > 0) t.push({ qte: num(q.moq) || 1, prix: num(q.prix) });
+  (q.paliers || []).forEach(p => { if (num(p.prix) > 0 && num(p.qte) > 0) t.push({ qte: num(p.qte), prix: num(p.prix) }); });
+  t.sort((a, b) => a.qte - b.qte);
+  return t.filter((x, i) => !t[i + 1] || t[i + 1].qte !== x.qte);
+}
+// Le prix pour CETTE quantité : celui du plus grand palier atteint (sous le minimum : le prix du minimum, signalé).
+function pxPrixPour(o, niveau, qte) {
+  const qs = pxQualites(o);
+  const q = qs.find(x => x.niveau === niveau) || qs[0];
+  if (!q) return num(o.prix) > 0 ? { prix: num(o.prix), palier: num(o.moq), moq: num(o.moq), sousMoq: num(o.moq) > 0 && qte < num(o.moq), niveau: '', devise: o.devise || 'CNY' } : null;
+  const t = pxTiers(q); if (!t.length) return null;
+  let choisi = t[0];
+  t.forEach(x => { if (qte >= x.qte) choisi = x; });
+  const moq = num(q.moq) || t[0].qte;
+  return { prix: choisi.prix, palier: choisi.qte, moq, sousMoq: qte > 0 && qte < moq, niveau: q.niveau, devise: o.devise || 'CNY', q };
+}
+function pxNormaliserQualites(liste) {
+  const vues = new Set(), res = [];
+  (Array.isArray(liste) ? liste : []).forEach((q, i) => {
+    if (!q) return;
+    let k = pxNiveauDe(q.niveau) || pxNiveauDe(q.nom) || (PX_NIV[i] || {}).k || '';
+    if (vues.has(k)) return; vues.add(k);
+    const paliers = (Array.isArray(q.paliers) ? q.paliers : []).map(p => ({ qte: pxNombre(p.qte), prix: pxNombre(p.prix) })).filter(p => p.qte > 0 && p.prix > 0);
+    const x = { niveau: k, nom: String(q.nom || '').trim(), moq: pxNombre(q.moq), prix: pxNombre(q.prix), paliers, diff: String(q.diff || '').trim() };
+    if (x.prix > 0 || paliers.length) res.push(x);
+  });
+  return res;
+}
+// Ranger une réponse (tableau, Claude, à la main) sur le produit — et sur le modèle du catalogue s'il en vient.
+function pxAppliquer(f, l, cot, source) {
+  const { c, o } = pxOffrePour(f, l);
+  const qs = pxNormaliserQualites(cot.qualites);
+  const maintenant = mkMaintenant();
+  if (qs.length) {
+    if (pxQualites(o).length && JSON.stringify(o.qualites) !== JSON.stringify(qs)) {
+      o.cotations_avant = (o.cotations_avant || []).concat([{ qualites: o.qualites, devise: o.devise, le: o.cotation_le, source: o.cotation_source }]).slice(-5);
+    }
+    o.qualites = qs; o.devise = cot.devise || o.devise || 'CNY';
+    if (!o.niveau || !qs.some(q => q.niveau === o.niveau)) o.niveau = (qs.find(q => q.niveau === 'moyenne') || qs[0]).niveau;
+    const r = pxPrixPour(o, o.niveau, num(c.quantite) || 0);
+    if (r) { o.prix = r.prix; o.moq = r.moq; }
+    o.cotation_le = maintenant; o.cotation_source = source;
+  }
+  const k = cot.carton || {};
+  if (pxNombre(k.pcs)) o.qte_carton = pxNombre(k.pcs);
+  ['l', 'la', 'h'].forEach(d => { if (pxNombre(k[d])) o['dim_' + d] = pxNombre(k[d]); });
+  if (pxNombre(k.kg)) o.poids_kg = pxNombre(k.kg);
+  if (pxNombre(cot.delai)) o.delai = pxNombre(cot.delai);
+  if (cot.cible && pxNombre(cot.cible.prix)) o.cible = { prix: pxNombre(cot.cible.prix), devise: cot.cible.devise || o.devise || 'CNY', raison: String(cot.cible.raison || '').trim(), le: maintenant };
+  if (cot.note && String(o.note || '').indexOf(cot.note) < 0) o.note = [o.note, cot.note].filter(Boolean).join(' · ');
+  if (l.p && qs.length) {            // le modèle du catalogue suit (ses « gammes » d'avant = les 3 qualités)
+    const p = l.p, q = qs.find(x => x.niveau === o.niveau) || qs[0];
+    p.gammes = qs.map(x => ({ nom: pxNiv(x.niveau).cn + ' ' + pxNiv(x.niveau).fr, prix: x.prix || (pxTiers(x)[0] || {}).prix || 0, devise: o.devise }));
+    p.gamme_choisie = qs.indexOf(q) + 1;
+    p.paliers = pxTiers(q).map(t => ({ qte: t.qte, prix: t.prix, devise: o.devise }));
+    const d = qs.filter(x => x.diff).map(x => pxNiv(x.niveau).court + ' : ' + x.diff).join(' · ');
+    if (d) p.gammes_diff = d;
+    p.prix = o.prix; p.devise = o.devise; p.moq = o.moq; p.prix_le = maintenant;
+    if (o.qte_carton && !num(p.colisage)) p.colisage = o.qte_carton;
+  }
+  if (qs.length) f.prix_recus_le = maintenant;
+  delete f.ct_neuf;
+  return { c, o, n: qs.length };
+}
+function pxAchatDe(o) {
+  if (!o || !o.achat_id) return null;
+  const a = (C.achats || []).find(x => x.id === o.achat_id);
+  if (!a) delete o.achat_id;
+  return a || null;
+}
+// Le prix du marché en Guinée (Claude), rangé sur l'article ou dans la liste générale.
+function pxMemeArticle(m, article) {
+  const a = normaliserNom(article);
+  return !!a && [m.article].concat(Array.isArray(m.autres_noms) ? m.autres_noms : []).some(n => normaliserNom(n) === a);
+}
+function pxMarcheDe(c) {
+  if (c.marche) return c.marche;
+  return (Array.isArray(C.marche_guinee) ? C.marche_guinee : []).find(m => pxMemeArticle(m, c.article)) || null;
+}
+function pxPoserMarche(m) {
+  if (!m || !m.article) return 0;
+  const p = m.prix_vente_gnf || {};
+  const x = { article: String(m.article), autres_noms: Array.isArray(m.autres_noms) ? m.autres_noms : [], min: pxNombre(p.min), max: pxNombre(p.max), conseille: pxNombre(p.conseille),
+    gros: m.gros_gnf ? { min: pxNombre(m.gros_gnf.min), max: pxNombre(m.gros_gnf.max) } : null, note: String(m.note || ''), fiabilite: String(m.fiabilite || ''),
+    frais_pct: pxNombre(m.frais_pct), douane_pct: pxNombre(m.douane_pct), volume_m3: Number(m.volume_m3) > 0 ? Number(m.volume_m3) : 0,
+    sources: (Array.isArray(m.sources) ? m.sources : []).filter(s => s && /^https?:\/\//.test(String(s.url || ''))).slice(0, 5).map(s => ({ titre: String(s.titre || ''), url: String(s.url) })),
+    le: m.le || mkMaintenant().slice(0, 10) };
+  C.marche_guinee = (Array.isArray(C.marche_guinee) ? C.marche_guinee : []).filter(y => normaliserNom(y.article) !== normaliserNom(x.article)).concat([x]);
+  let n = 0;
+  (C.comparaisons || []).forEach(c => {
+    if (!pxMemeArticle(x, c.article)) return;
+    c.marche = x; n++;
+    if (!(num(c.prix_vente_vise_gnf) > 0) && x.conseille > 0) { c.prix_vente_vise_gnf = x.conseille; c.vise_source = 'claude'; }
+  });
+  return n;
+}
+function pxFourchette(m) {
+  const parts = [];
+  if (m.min > 0 && m.max > 0 && m.max !== m.min) parts.push(nf(m.min) + ' à ' + nf(m.max) + ' GNF');
+  else if (m.min > 0 || m.max > 0) parts.push(nf(m.min || m.max) + ' GNF');
+  if (m.conseille > 0) parts.push('<b>vendre ' + nf(m.conseille) + ' GNF</b>');
+  return parts.join(' · ') || 'prix non trouvé';
+}
+// Le prix d'achat à ne jamais dépasser : la même règle que Comparer et Objectif (marge sur le prix de vente).
+//   coût rendu maximum = prix de vente × (1 − marge)   ;   prix d'achat maximum = coût rendu maximum ÷ (1 + frais)
+// Les frais jusqu'au magasin : ceux que Claude a estimés pour CE genre de produit (douane, bateau, transitaire), sinon le
+// pourcentage du voyage (Comparer → Mes dépenses de voyage).
+function pxFrais(c) {
+  const m = c ? pxMarcheDe(c) : null;
+  return m && num(m.frais_pct) > 0 ? { pct: num(m.frais_pct), source: 'claude', douane: num(m.douane_pct) } : { pct: fraisPourcent(), source: 'voyage', douane: 0 };
+}
+// Les frais comme ils se passent vraiment (quand Claude connaît la douane de ce produit et son volume) :
+//   le bateau se paie au VOLUME (m³ par pièce × prix du m³), la douane guinéenne en % de la valeur arrivée
+//   (marchandise + bateau), le transitaire et le transport jusqu'au magasin ≈ 5 % :
+//   coût rendu = (prix + bateau) × (1 + douane) + 5 % × prix
+//   prix maximum = (prix de vente × (1 − marge) − bateau × (1 + douane)) ÷ (1 + douane + 5 %)
+// Un produit encombrant (ventilateur, cuiseur) paie beaucoup de bateau pour peu de valeur : son prix maximum baisse.
+// Sinon : le pourcentage estimé par Claude pour ce genre de produit, ou celui du voyage.
+function pxFretM3() { const v = num(C.voyage && C.voyage.px_fret_m3_usd); const usd = v > 0 ? v : 250; return { usd, gnf: usd * (tauxDe('USD') || 8800) }; }
+function pxVolumePiece(c, o) {
+  if (o && num(o.qte_carton) > 0 && num(o.dim_l) > 0 && num(o.dim_la) > 0 && num(o.dim_h) > 0) return { m3: num(o.dim_l) * num(o.dim_la) * num(o.dim_h) / 1e6 / num(o.qte_carton), source: 'carton' };
+  const m = c ? pxMarcheDe(c) : null;
+  return m && num(m.volume_m3) > 0 ? { m3: num(m.volume_m3), source: 'typique' } : null;
+}
+function pxModele(c, o) {
+  const m = c ? pxMarcheDe(c) : null, v = pxVolumePiece(c, o);
+  if (m && num(m.douane_pct) > 0 && v) { const f = pxFretM3(); return { type: 'volume', d: num(m.douane_pct) / 100, F: v.m3 * f.gnf, m3: v.m3, vsrc: v.source, local: 0.05, fretUsd: f.usd }; }
+  const fr = pxFrais(c); return { type: 'pct', pct: fr.pct, source: fr.source, douane: fr.douane };
+}
+function pxRenduGnf(c, o, prixGnf) {
+  const md = pxModele(c, o);
+  return md.type === 'volume' ? (prixGnf + md.F) * (1 + md.d) + md.local * prixGnf : prixGnf * (1 + md.pct / 100);
+}
+function pxPlafond(c, o) {
+  const vente = num(c.prix_vente_vise_gnf);
+  if (!(vente > 0)) return null;
+  const regle = margeMinimum() > 0, m = regle ? margeMinimum() : 35, md = pxModele(c, o), t = tauxDe('CNY');
+  const gnf = md.type === 'volume' ? Math.max(0, (vente * (1 - m / 100) - md.F * (1 + md.d)) / (1 + md.d + md.local)) : vente * (1 - m / 100) / (1 + md.pct / 100);
+  return { vente, marge: m, margeDefaut: !regle, md, gnf, cny: t > 0 ? gnf / t : 0,
+    fraisEquivalent: gnf > 0 ? (vente * (1 - m / 100) / gnf - 1) * 100 : 0 };
+}
+function pxTexteFrais(pl) {
+  const md = pl.md, t = tauxDe('CNY');
+  if (md.type === 'volume') return 'bateau ≈ ' + nf(md.m3, 3) + ' m³ par pièce' + (md.vsrc === 'carton' ? ' (son carton)' : ' (taille habituelle)') + ' ≈ '
+    + (t > 0 ? nf(md.F / t, 1) + ' ¥' : gnfStrict(md.F)) + ' à ' + nf(md.fretUsd, 0) + ' $ le m³, douane ≈ ' + nf(md.d * 100, 0) + ' %, transitaire ≈ 5 %';
+  return md.source === 'claude' ? nf(md.pct, 0) + ' % de frais jusqu\'au magasin (estimés par Claude' + (md.douane ? ' : douane ≈ ' + nf(md.douane, 0) + ' %, bateau, transitaire' : '') + ')'
+    : nf(md.pct, 0) + ' % de frais de voyage';
+}
+function pxModeleNego(n) {
+  const c = n.px && trouverComparaison(n.px.cid), o = c && (c.offres || []).find(x => x.id === n.px.oid);
+  if (!o) return null;
+  const md = pxModele(c, o); return md.type === 'volume' ? md : null;
+}
+function pxBoiteFret() {
+  const f = pxFretM3();
+  mkBoite(`<div class="mk-dlg ct-champs"><h3>🚢 Le prix du bateau</h3>
+    <p class="px-aide">Combien coûte 1 m³ de marchandise de la Chine jusqu'à Conakry (groupage), sans la douane ? Demandez à votre transitaire.
+      Le carnet s'en sert pour le prix à ne pas dépasser : un produit qui prend de la place paie plus de bateau.</p>
+    <label for="px_fret">Dollars par m³</label><input id="px_fret" inputmode="decimal" value="${f.usd}">
+    <p class="px-aide">Repères (octobre 2026) : groupage annoncé à Conakry ≈ 540 $/m³ tout compris ; transitaires internationaux 100–300 $/m³ hors douane ;
+      un conteneur 40 pieds ≈ 5 150 $ (≈ 90 $/m³ s'il est plein).</p>
+    <div class="mk-boutons"><button class="b vert" onclick="C.voyage.px_fret_m3_usd=num(document.getElementById('px_fret').value);sauverLocal();fermerBoite();dessiner()">✅ Garder</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+}
+
+// ---------- 3. L'affichage : sur chaque produit, dans Comparer et dans Sa fiche ----------
+function pxPrixCellule(prix, devise, court) {
+  const d = devise || 'CNY', g = enGnf(prix, d), u = tauxDe('USD');
+  return `<b>${E(nf(prix, 2) + ' ' + mkSym(d))}</b>${d !== 'GNF' && g > 0 ? '<br><small>' + E(nf(Math.round(g))) + (court ? '' : ' GNF') + '</small>' : ''}${d !== 'USD' && g > 0 && u > 0 ? '<br><small>' + E(nf(g / u, 2)) + ' $</small>' : ''}`;
+}
+// Un montant en francs, et à côté en dollars et en euros (Riche : « ici ils comptent beaucoup en dollars »).
+function pxEnDevises(gnf) {
+  const u = tauxDe('USD'), e = tauxDe('EUR');
+  return (u > 0 ? ' ≈ ' + nf(gnf / u, 0) + ' $' : '') + (e > 0 ? ' ≈ ' + nf(gnf / e, 0) + ' €' : '');
+}
+// Le tableau des prix : les quantités de haut en bas, les qualités de gauche à droite (tient dans la largeur du téléphone).
+function pxTableHtml(o, retenue) {
+  const qs = pxQualites(o); if (!qs.length) return '';
+  const choisie = retenue || o.niveau;
+  const tiers = [...new Set(qs.flatMap(q => (q.paliers || []).map(p => num(p.qte))).filter(Boolean))].sort((a, b) => a - b).slice(0, 4);
+  const cl = (q) => choisie === q.niveau ? ' class="on"' : '';
+  return `<div class="px-tab-z"><table class="px-tab">
+    <tr><th><span>¥<br>GNF<br>$</span></th>${qs.map(q => `<th${cl(q)}>${E(pxNiv(q.niveau).court)}${pxNiv(q.niveau).cn ? '<br><span>' + E(pxNiv(q.niveau).cn) + '</span>' : ''}</th>`).join('')}</tr>
+    <tr><td><span>Minimum</span></td>${qs.map(q => `<td${cl(q)}>${num(q.moq) ? E(nf(q.moq)) + ' pcs' : '—'}</td>`).join('')}</tr>
+    <tr><td><span>Prix</span></td>${qs.map(q => `<td${cl(q)}>${num(q.prix) > 0 ? pxPrixCellule(q.prix, o.devise, true) : '—'}</td>`).join('')}</tr>
+    ${tiers.map(t => `<tr><td><span>${E(nf(t))} pcs</span></td>${qs.map(q => { const p = (q.paliers || []).find(x => num(x.qte) === t); return `<td${cl(q)}>${p ? pxPrixCellule(p.prix, o.devise, true) : '—'}</td>`; }).join('')}</tr>`).join('')}
+  </table></div>
+  ${qs.filter(q => q.diff).map(q => `<div class="px-diff"><b>${E(pxNiv(q.niveau).court)} :</b> ${E(q.diff)}</div>`).join('')}`;
+}
+const PX_SOURCES = { tableau: 'son tableau Excel', claude: 'lu par Claude', main: 'noté à la main' };
+function pxOffreHtml(c, o) {
+  const qs = pxQualites(o), a = pxAchatDe(o), pl = pxPlafond(c, o), cible = o.cible && num(o.cible.prix) > 0 ? o.cible : null;
+  const infos = [num(o.qte_carton) ? nf(o.qte_carton) + ' pièces par carton' : '', num(o.delai) ? 'livré en ' + nf(o.delai) + ' jours' : '',
+    o.cotation_le ? 'prix reçus le ' + mkJour(o.cotation_le) + (PX_SOURCES[o.cotation_source] ? ' (' + PX_SOURCES[o.cotation_source] + ')' : '') : ''].filter(Boolean);
+  const r = qs.length ? pxPrixPour(o, o.niveau, num(c.quantite) || 0) : null;
+  const auDessus = pl && pl.cny > 0 && r && (o.devise || 'CNY') === 'CNY' && r.prix > pl.cny;
+  return `<div class="px-offre">
+    ${pxTableHtml(o)}
+    ${infos.length ? `<div class="px-info">${E(infos.join(' · '))}</div>` : ''}
+    ${cible || (pl && pl.cny > 0) ? `<div class="px-cible">${cible ? `🎯 <b>Proposez ${E(nf(cible.prix, 2) + ' ' + mkSym(cible.devise || 'CNY'))}</b>${cible.raison ? ' — ' + E(cible.raison) : ''}${pl && pl.cny > 0 ? '<br>' : ''}` : ''}
+      ${pl && pl.cny > 0 ? `⛔ Ne payez pas plus de <b>${E(nf(pl.cny, 2))} ¥</b>${auDessus ? ' — <b>son prix est au-dessus</b>' : ''}<br><span>(vendu ${E(gnfStrict(pl.vente))} en Guinée, marge ${E(nf(pl.marge, 0))} %, ${E(pxTexteFrais(pl))})</span>${pl.md.type === 'volume' ? ' <button type="button" class="mk-lien" style="font-size:15px" onclick="pxBoiteFret()">🚢 prix du bateau</button>' : ''}` : ''}</div>` : ''}
+    ${a ? `<div class="px-achete">🛒 <b>Acheté : ${E(nf(a.quantite))} × ${E(nf(a.prix_unitaire, 2) + ' ' + mkSym(deviseDe(a)))}</b>${a.px && a.px.niveau ? ' · ' + E(pxNiv(a.px.niveau).court) : ''}<br>= ${E(nf(coutAchat(a), 2) + ' ' + mkSym(deviseDe(a)))} = <b>${E(gnfStrict(coutAchatGnf(a)))}</b></div>` : ''}
+    <div class="px-boutons">
+      <button type="button" class="b vert" onclick="pxBoiteAchat('${c.id}','${o.id}')">🛒 ${a ? 'Modifier l\'achat' : 'J\'achète'}</button>
+      <button type="button" class="b contour" onclick="pxBoiteSaisie('${c.id}','${o.id}')">✏️ ${qs.length ? 'Corriger ses prix' : 'Noter ses prix (3 qualités)'}</button>
+      <button type="button" class="b contour" onclick="pxNegocier('${c.id}','${o.id}')">🤝 Négocier</button>
+    </div></div>`;
+}
+// Comparer : en haut de chaque article, le marché en Guinée et le prix d'achat maximum.
+function pxArticleHtml(c) {
+  const m = pxMarcheDe(c), pl = pxPlafond(c);
+  if (!m && !(pl && pl.cny > 0)) return '';
+  return `<div class="px-marche">
+    ${m ? `🇬🇳 <b>Au marché en Guinée</b> : ${pxFourchette(m)}${m.gros && (m.gros.min || m.gros.max) ? '<br><span>en gros : ' + E(nf(m.gros.min || m.gros.max) + (m.gros.max && m.gros.min && m.gros.max !== m.gros.min ? ' à ' + nf(m.gros.max) : '') + ' GNF') + '</span>' : ''}
+      ${m.note ? '<br><span>' + E(m.note) + '</span>' : ''}
+      ${m.sources.length ? '<br>' + m.sources.slice(0, 3).map(s => `<a href="${E(s.url)}" target="_blank" rel="noopener">${E(s.titre || 'source')}</a>`).join(' · ') : ''}
+      <br><span>Recherches de Claude${m.le ? ' du ' + E(mkJour(m.le) || m.le) : ''}${m.fiabilite ? ' · fiabilité ' + E(m.fiabilite) : ''}</span>` : ''}
+    ${pl && pl.cny > 0 ? `<div class="px-plafond">⛔ Prix d'achat maximum${pl.md.type === 'volume' ? ' (produit de taille habituelle)' : ''} : <b>${E(nf(pl.cny, 2))} ¥</b> la pièce<br><span>pour le vendre ${E(gnfStrict(pl.vente))} avec ${E(nf(pl.marge, 0))} % de marge${pl.margeDefaut ? ' (votre marge minimum n\'est pas réglée dans Objectif : 35 %, comme le radar)' : ''} et ${E(pxTexteFrais(pl))}</span></div>` : ''}
+  </div>`;
+}
+// Sa fiche : « 🛒 Ses produits et ses prix » (remplace « Vus au stand », avec les mêmes produits).
+function pxEtatDemandeHtml(f) {
+  const d = f.px_demande;
+  if (!d && !f.prix_recus_le) return '';
+  const ok = f.prix_recus_le && (!d || f.prix_recus_le >= d.le);
+  return `<div class="px-etat ${ok ? 'ok' : 'att'}">${d ? '✉️ Prix demandés le ' + E(mkJour(d.le)) + ' : ' + d.lignes.length + ' produit(s), 3 qualités, ' + E(d.paliers.map(q => nf(q)).join(' / ')) + ' pièces' : ''}
+    ${ok ? (d ? '<br>' : '') + '✅ Ses prix sont arrivés le ' + E(mkJour(f.prix_recus_le)) : '<br>⏳ Pas encore de réponse : relancez-le sur WeChat, ou envoyez sa réponse à Claude'}</div>`;
+}
+function pxSectionHtml(f) {
+  const L = pxOffresOrdonnees(f);
+  const achats = L.map(x => pxAchatDe(x.o)).filter(Boolean);
+  return `<details class="ct-section" open><summary>🛒 Ses produits et ses prix (${L.length})</summary>
+    ${pxEtatDemandeHtml(f)}
+    <div class="px-boutons">
+      <button type="button" class="b vert" onclick="pxBoiteDemande('${f.id}')">💰 ${f.px_demande ? 'Redemander' : 'Demander'} ses prix : ¥, quantités, 3 qualités</button>
+      <button type="button" class="b contour" onclick="fwBoite('${f.id}')">📥 Sa réponse (fichier Excel)</button>
+      <button type="button" class="b contour" onclick="ctBoiteImport()">🤖 Ajouter ce que Claude a lu</button>
+    </div>
+    ${achats.length ? `<div class="px-achete">🛒 Chez lui : ${achats.length} achat(s) = <b>${E(gnfStrict(achats.reduce((s, a) => s + coutAchatGnf(a), 0)))}</b>${E(pxEnDevises(achats.reduce((s, a) => s + coutAchatGnf(a), 0)))}</div>` : ''}
+    ${typeof ctrEtatHtml === 'function' ? ctrEtatHtml(f) : ''}
+    ${L.length ? L.map(({ c, o }) => `<div class="px-p"><div class="t">
+        ${o.photo ? `<img src="${o.photo}" alt="" onclick="mkVoirOffre('${c.id}','${o.id}')">` : o.photo_doc ? `<img class="ct-mini" data-doc="${E(o.photo_doc)}" alt="">` : '<div class="px-vide" aria-hidden="true">📦</div>'}
+        <div><div class="n">${E(c.article)}${o.modele ? ' · ' + E(o.modele) : ''}</div>
+          <div class="v">${num(o.prix) > 0 ? E(mkPrixCourt(o)) + (pxQualites(o).length && o.niveau ? ' (' + E(pxNiv(o.niveau).court.toLowerCase()) + ', pour ' + E(nf(num(c.quantite) || num(o.moq))) + ' pcs)' : '') : 'prix pas encore reçu'}${num(o.moq) ? ' · min. ' + E(nf(o.moq)) + ' pièces' : ''}${o.vu_le && o.source !== 'demande' ? '<br>vu au stand le ' + E(mkJour(o.vu_le)) : ''}${o.note ? '<br>' + E(String(o.note).slice(0, 90)) : ''}</div></div></div>
+        ${pxOffreHtml(c, o)}</div>`).join('')
+      : '<p class="px-aide">Aucun produit noté chez lui. « 💰 Demander ses prix » : ajoutez les produits que vous voulez.</p>'}
+    <button type="button" class="b contour" style="min-height:52px;font-size:16px;margin-top:8px" onclick="trStandOuvrir('${f.id}')">📷 Noter un produit et son prix (Au stand)</button>
+  </details>`;
+}
+// Sa fiche, « 📦 Ses produits » : un grand catalogue (des centaines de modèles) replié par famille, avec une recherche ;
+// on ouvre une famille, on touche ☆ pour ceux qui intéressent (ils seront cochés dans « 💰 Demander ses prix »).
+// Replié au-delà de 100 modèles en ☰ Détails, de 150 en 🖼 Photos (un catalogue moyen se parcourt d'un coup d'œil).
+const PX_GRAND = 100, PX_GRAND_PHOTOS = 150, pxFamillesOuvertes = {};
+const pxListeProduitsAvant = ctListeProduitsDossier;
+// En photos (🖼) comme en détails (☰) : une famille n'est dessinée que quand on l'ouvre (un grand catalogue : plus de mille photos).
+function pxRendreProduits(f, L) {
+  return trVueGrille(f) ? `<div class="tr-grille">${L.map(p => trCarteProduit(f, p)).join('')}</div>` : L.map(p => ctLigneProduitDossier(f, p)).join('');
+}
+function pxGroupes(f) { const g = {}; ctProduits(f).forEach(p => { const k = ctNomFamille(p.categorie); (g[k] = g[k] || []).push(p); }); return g; }
+ctListeProduitsDossier = function (f) {
+  const ps = ctProduits(f);
+  if (ps.length <= (trVueGrille(f) ? PX_GRAND_PHOTOS : PX_GRAND)) return pxListeProduitsAvant(f);
+  const groupes = pxGroupes(f), fams = Object.keys(groupes), nbInt = ps.filter(p => p.interesse).length, grille = trVueGrille(f);
+  return `${trBasculeVue(f)}<p class="mk-aide" style="font-size:15px">Son catalogue : ${ps.length} modèles en ${fams.length} familles. Ouvrez une famille${grille ? ' : touchez une photo pour la voir en grand' : ''},
+      touchez ☆ pour ceux qui vous intéressent : ils seront cochés dans « 💰 Demander ses prix ».</p>
+    ${nbInt ? `<p class="ct-sous"><b>⭐ ${nbInt} modèle(s) m'intéressent.</b></p>` : ''}
+    <input class="px-cherche" placeholder="🔎 Chercher un modèle (référence, mot, puissance…)" oninput="pxChercherFiche('${f.id}', this.value)" style="font-size:16px;margin:6px 0">
+    <div id="pxf_res"></div>
+    ${fams.map((k, i) => { const ouvert = pxFamillesOuvertes[f.id + '|' + k] || groupes[k].some(p => p.interesse);
+      return `<details class="px-fam"${ouvert ? ' open' : ''} ontoggle="pxOuvrirFamille('${f.id}', ${i}, this)"><summary>${ctEmoji(k)} ${E(k)} (${groupes[k].length})${groupes[k].some(p => p.interesse) ? ' · ⭐ ' + groupes[k].filter(p => p.interesse).length : ''}</summary>
+        <div class="px-fam-l">${ouvert ? pxRendreProduits(f, groupes[k]) : ''}</div></details>`; }).join('')}`;
+};
+function pxOuvrirFamille(fid, i, el) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const groupes = pxGroupes(f), k = Object.keys(groupes)[i]; if (!k) return;
+  pxFamillesOuvertes[fid + '|' + k] = el.open;
+  const z = el.querySelector('.px-fam-l');
+  if (el.open && z && !z.innerHTML.trim()) { z.innerHTML = pxRendreProduits(f, groupes[k]); if (typeof ctRemplirMinis === 'function') ctRemplirMinis(); }
+}
+function pxChercherFiche(fid, texte) {
+  const f = mkFournisseur(fid), z = document.getElementById('pxf_res'); if (!f || !z) return;
+  const mots = normaliserNom(texte).split(' ').filter(Boolean);
+  if (!mots.length) { z.innerHTML = ''; return; }
+  const R = ctProduits(f).filter(p => mots.every(m => normaliserNom([p.ref, p.categorie, p.caracteristiques, p.page].join(' ')).includes(m)));
+  z.innerHTML = R.length ? pxRendreProduits(f, R.slice(0, 30)) + (R.length > 30 ? `<p class="mk-aide" style="font-size:15px">… et ${R.length - 30} autres : précisez.</p>` : '')
+    : '<p class="mk-aide" style="font-size:15px">Aucun modèle ne correspond.</p>';
+  if (typeof ctRemplirMinis === 'function') ctRemplirMinis();
+}
+
+// 📊 Comparer par produit : avec les catalogues entiers (des milliers de modèles, chacun sa photo), chaque famille est
+// repliée et ne se dessine qu'ouverte, 60 lignes à la fois (« Montrer les suivants »). Une recherche ou une famille choisie
+// l'ouvre directement.
+const PX_CAT_LIGNES = 60, pxCatOuvertes = {}, pxCatPlus = {};
+const pxListeCataloguesAvant = ctListeCataloguesHtml;
+function pxTrierLignes(L) {
+  return L.sort((a, b) => {
+    const ga = ctPrixGnf(a.p), gb = ctPrixGnf(b.p);
+    if (ga && gb) return ga - gb;
+    if (ga || gb) return ga ? -1 : 1;
+    return (b.p.interesse ? 1 : 0) - (a.p.interesse ? 1 : 0) || String(a.p.ref).localeCompare(String(b.p.ref), 'fr', { numeric: true });
+  });
+}
+function pxLignesCatHtml(k, lignes) {
+  const n = pxCatPlus[k] || PX_CAT_LIGNES, min = lignes.find(x => ctPrixGnf(x.p));
+  return lignes.slice(0, n).map(x => ctLigneCatalogue(x, min)).join('')
+    + (lignes.length > n ? `<button type="button" class="b contour" style="min-height:52px;font-size:16px;margin-top:8px" onclick="pxCatSuite(${E(JSON.stringify(k))})">⬇️ Montrer les ${Math.min(PX_CAT_LIGNES, lignes.length - n)} suivants (encore ${lignes.length - n})</button>` : '');
+}
+ctListeCataloguesHtml = function (familles, noms, filtre) {
+  const choix = noms.filter(k => !ctFiltreCat || ctFiltreCat === k).map(k => [k, familles[k].filter(filtre)]).filter(([, L]) => L.length);
+  const total = choix.reduce((s, [, L]) => s + L.length, 0);
+  if (total <= 2 * PX_CAT_LIGNES) return pxListeCataloguesAvant(familles, noms, filtre);
+  return choix.map(([k, L]) => {
+    const ouvert = ctFiltreCat === k || choix.length === 1 || pxCatOuvertes[k];
+    const nPrix = L.filter(x => ctPrixGnf(x.p)).length, nInt = L.filter(x => x.p.interesse).length;
+    return `<details class="carte px-catf"${ouvert ? ' open' : ''} ontoggle="pxOuvrirCat(${E(JSON.stringify(k))}, this)">
+      <summary style="font-size:18px;font-weight:900;min-height:48px;cursor:pointer">${ctEmoji(k)} ${E(k)} <span class="muet" style="font-size:15px">(${L.length}${nPrix ? ' · ' + nPrix + ' prix' : ''}${nInt ? ' · ⭐ ' + nInt : ''})</span></summary>
+      <div class="px-catf-l">${ouvert ? pxLignesCatHtml(k, pxTrierLignes(L)) : ''}</div></details>`;
+  }).join('') || '<div class="carte"><p class="mk-aide" style="font-size:16px">Aucun modèle dans ce choix.</p></div>';
+};
+function pxOuvrirCat(k, el) {
+  pxCatOuvertes[k] = el.open;
+  const z = el.querySelector('.px-catf-l'); if (!el.open || !z || z.innerHTML.trim()) return;
+  const { familles, filtre } = ctDonneesCatalogues();
+  z.innerHTML = pxLignesCatHtml(k, pxTrierLignes((familles[k] || []).filter(filtre)));
+  ctRemplirMinis();
+}
+function pxCatSuite(k) {
+  pxCatPlus[k] = (pxCatPlus[k] || PX_CAT_LIGNES) + PX_CAT_LIGNES; pxCatOuvertes[k] = true;
+  const y = window.scrollY; ctMajListeCatalogues(); window.scrollTo(0, y);
+}
+
+// Les ⭐ conseillés par Claude : sa raison (et le prix d'usine à viser) sous le produit, en Détails comme en Photos.
+function pxPourquoiHtml(p) { return p && p.pourquoi ? `<div class="px-pourquoi">🤖 <b>Claude :</b> ${E(p.pourquoi)}</div>` : ''; }
+const pxLigneProduitAvant = ctLigneProduitDossier;
+ctLigneProduitDossier = function (f, p) { const h = pxLigneProduitAvant(f, p); return p && p.pourquoi ? h.replace(/<\/div>\s*$/, pxPourquoiHtml(p) + '</div>') : h; };
+const pxCarteProduitAvant = trCarteProduit;
+trCarteProduit = function (f, p) { const h = pxCarteProduitAvant(f, p); return p && p.pourquoi ? h.replace(/<\/div>\s*$/, pxPourquoiHtml(p) + '</div>') : h; };
+
+// La liste des fournisseurs : où en sont ses prix, et ce qui est acheté chez lui.
+function pxEtatListeHtml(f) {
+  const L = mkOffresDe(f), nq = L.filter(x => pxQualites(x.o).length).length, na = L.filter(x => pxAchatDe(x.o)).length;
+  const t = [nq ? '💰 ' + nq + ' produit(s) en 3 qualités' : (f.px_demande ? '✉️ prix demandés le ' + mkJour(f.px_demande.le) : ''), na ? '🛒 ' + na + ' acheté(s)' : ''].filter(Boolean);
+  return t.length ? `<div class="px-liste-etat">${E(t.join(' · '))}</div>` : '';
+}
+// Fournisseurs : le total de ce que j'ai décidé d'acheter, et le budget.
+function pxResumeAchatsHtml() {
+  const A = (C.achats || []).filter(a => num(a.quantite) > 0 && num(a.prix_unitaire) > 0);
+  if (!A.length) return '';
+  const parDevise = {};
+  A.forEach(a => { const d = deviseDe(a); parDevise[d] = (parDevise[d] || 0) + coutAchat(a); });
+  const tot = A.reduce((s, a) => s + coutAchatGnf(a), 0), budget = budgetMarchandiseGnf();
+  const fours = new Set(A.map(a => a.fournisseur_id || normaliserNom(a.fournisseur) || a.id)).size;
+  return `<div class="carte px-resume"><h2 style="font-size:19px">🛒 Mes achats décidés</h2>
+    <p class="px-gros">${A.length} produit(s) chez ${fours} fournisseur(s)</p>
+    <p class="px-gros">${E(Object.entries(parDevise).map(([d, v]) => nf(v, d === 'GNF' ? 0 : 2) + ' ' + mkSym(d)).join(' + '))} = <b>${E(gnfStrict(tot))}</b>${E(pxEnDevises(tot))}</p>
+    ${pxObjectifHtml(A, tot, budget)}
+    ${budget > 0 ? `<div class="px-jauge${tot > budget ? ' trop' : ''}"><i style="width:${Math.min(100, Math.round(tot / budget * 100))}%"></i></div>
+      <p>${tot <= budget ? 'Il reste <b>' + E(gnfStrict(budget - tot)) + '</b> sur ' + E(gnfStrict(budget)) : '⚠ <b>' + E(gnfStrict(tot - budget)) + ' au-dessus</b> du budget de ' + E(gnfStrict(budget))}</p>`
+      : '<p class="px-aide">Donnez votre budget marchandise (Comparer → Mes dépenses de voyage) pour voir ce qu\'il reste.</p>'}
+    <button type="button" class="b contour" style="min-height:50px;font-size:16px" onclick="allerA('achats')">🧾 Voir la liste de mes achats</button></div>`;
+}
+
+// Riche, 21/10 : « j'ai besoin de 30 à 35 produits différents, c'est ma première fois dans le marché : je dois tester ».
+function pxObjectif() { const o = (C.voyage && C.voyage.px_objectif) || {}; return { min: num(o.min) || 30, max: num(o.max) || 35 }; }
+function pxProduitsDifferents(A) { return new Set(A.map(a => normaliserNom(String(a.nom || '').split(' — ')[0]))).size; }
+function pxObjectifHtml(A, tot, budget) {
+  const o = pxObjectif(), n = pxProduitsDifferents(A), reste = Math.max(0, o.min - n);
+  const parProduit = budget > 0 && reste > 0 && budget > tot ? (budget - tot) / reste : 0;
+  return `<div class="px-etat ${n >= o.min ? 'ok' : 'att'}">🎯 <b>${n} produit(s) différent(s)</b> sur ${o.min} à ${o.max} à tester${reste ? ' : encore <b>' + reste + '</b> au moins' : ' : objectif atteint'}
+    ${parProduit > 0 ? '<br>≈ ' + E(gnfStrict(parProduit)) + E(pxEnDevises(parProduit)) + ' par produit qui reste' : ''}
+    <br><button type="button" class="mk-lien" style="font-size:15px" onclick="pxBoiteObjectif()">✏️ Changer l'objectif</button></div>`;
+}
+function pxBoiteObjectif() {
+  const o = pxObjectif();
+  mkBoite(`<div class="mk-dlg ct-champs"><h3>🎯 Combien de produits différents ?</h3>
+    <p class="px-aide">Pour un premier achat, tester plusieurs produits en petite quantité : on voit ce qui se vend avant d'en commander beaucoup.</p>
+    <div class="duo"><div><label for="pxo_min">Au moins</label><input id="pxo_min" inputmode="numeric" value="${o.min}"></div>
+      <div><label for="pxo_max">Au plus</label><input id="pxo_max" inputmode="numeric" value="${o.max}"></div></div>
+    <div class="mk-boutons"><button class="b vert" onclick="C.voyage.px_objectif={min:num(document.getElementById('pxo_min').value),max:num(document.getElementById('pxo_max').value)};sauverLocal();fermerBoite();dessiner()">✅ Garder</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+}
+
+// ---------- 4. 💰 Demander ses prix ----------
+let pxD = null;
+function pxBoiteDemande(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  if (typeof ctToutDeSuite === 'function') ctToutDeSuite();
+  const L = pxLignesDe(f);
+  if (!pxD || pxD.fid !== fid) {
+    const choix = L.filter(l => l.o || l.interesse).map(l => l.cle);      // ce qu'il a vu au stand + les ⭐ (pas tout le catalogue d'un coup)
+    const pal = (f.px_demande && f.px_demande.paliers) || (C.voyage && C.voyage.px_paliers) || [500, 1000, 3000];
+    pxD = { fid, choix: new Set(choix), paliers: pal.slice(0, 3), images: [], jeton: 0, minuterie: null };
+  }
+  pxDessinerDemande();
+}
+function pxChoisies(f) { return pxLignesDe(f).filter(l => pxD.choix.has(l.cle)); }
+function pxDessinerDemande() {
+  const f = mkFournisseur(pxD.fid); if (!f) return;
+  const L = pxLignesDe(f), ch = L.filter(l => pxD.choix.has(l.cle));
+  ctDemande = { fid: f.id, portee: 'tous', lieu: f.lieu_rencontre || 'foire', relance: false };      // « Copier et ouvrir WeChat » (1.3.0)
+  mkBoite(`<div class="mk-dlg ct-champs px-dlg">
+    <h3>💰 Demander ses prix — ${E(mkNomFournisseur(f))}</h3>
+    <p class="px-aide">Pour chaque produit : le prix en <b>yuans (¥)</b>, la <b>quantité minimum</b>, le prix selon la quantité, en <b>3 qualités</b>
+      (haute, moyenne, basse) et ce qui les différencie. Tout part <b>en chinois</b> (avec l'anglais).</p>
+    <div class="px-titre">1. Les produits (<span id="px_n">${ch.length}</span> choisi(s))</div>
+    <div class="px-liste" id="px_liste">${pxLignesDemandeHtml(L.filter(l => l.o || l.interesse || pxD.choix.has(l.cle)))
+      || '<p class="px-aide" style="padding:6px">Aucun produit vu au stand ni ⭐ chez lui : cherchez dans son catalogue ci-dessous, ou écrivez le produit.</p>'}</div>
+    ${L.some(l => l.p) ? `<details class="px-cat"${L.some(l => l.o || l.interesse) ? '' : ' open'}><summary class="px-voir">📚 Choisir dans son catalogue (${L.filter(l => l.p).length} modèles)</summary>
+      <input id="px_cat_q" placeholder="🔎 Référence ou mot (ex. 2200 W, blender, AB-123…)" oninput="pxChercherCatalogue()" style="font-size:16px;margin:6px 0">
+      <div class="mk-puces" id="px_cat_fam">${[...new Set(L.filter(l => l.p).map(l => ctNomFamille(l.p.categorie)))].map((k, i) => `<button type="button" class="mk-puce" onclick="pxD.famille=${i};pxChercherCatalogue()">${E(k)}</button>`).join('')}</div>
+      <div class="px-liste" id="px_cat_res"><p class="px-aide" style="padding:6px">Tapez un mot ou touchez une famille.</p></div></details>` : ''}
+    <div class="px-ajout"><input id="px_nouveau" placeholder="Un autre produit (ex : ventilateur 16 pouces)" onkeydown="if(event.key==='Enter'){event.preventDefault();pxAjouterProduitDemande()}">
+      <button type="button" class="b contour" onclick="pxAjouterProduitDemande()">➕ Ajouter</button></div>
+    <div class="px-titre">2. Les quantités (un prix pour chacune)</div>
+    <div class="mk-puces" id="px_paliers">${pxPuchesPaliers()}</div>
+    <p class="px-aide" id="px_paliers_t">${pxTextePaliers()}</p>
+    <div class="px-titre">3. Envoyer sur WeChat (dans sa discussion)</div>
+    <div class="tr-etape"><span class="n">1</span><div class="c">
+      <button class="b" style="background:#1aad19;color:#fff" id="px_b_img" onclick="pxEnvoyerImages()">🖼️ Les photos numérotées</button>
+      <div id="px_images" class="tr-planches"></div></div></div>
+    <div class="tr-etape"><span class="n">2</span><div class="c">
+      <button class="b" style="background:#1aad19;color:#fff" onclick="pxEnvoyerClasseur()">📊 Le tableau à remplir (Excel)</button>
+      <p class="px-aide">Il le remplit et vous le renvoie : « 📥 Sa réponse » range ses prix tout seul.</p></div></div>
+    <div class="tr-etape"><span class="n">3</span><div class="c">
+      <button class="b" style="background:#1aad19;color:#fff" onclick="ctEnvoyer('wechat')">💬 Copier le message et ouvrir WeChat</button>
+      ${f.email || ctTelPropre(f.whatsapp || f.mobile || '') ? `<div class="px-boutons">${f.email ? `<button class="b contour" onclick="ctEnvoyer('email')">✉️ Par e-mail</button>` : ''}${ctTelPropre(f.whatsapp || f.mobile || '') ? `<button class="b contour" onclick="ctEnvoyer('whatsapp')">🟢 WhatsApp</button>` : ''}</div>` : ''}
+      <details style="margin-top:6px"><summary class="px-voir">Voir / modifier le message</summary>
+      <textarea id="ct_msg" class="ct-message" rows="14">${E(pxMessage(f, ch, pxD.paliers))}</textarea></details></div></div>
+    <div class="tr-etape"><span class="n">4</span><div class="c">
+      <button class="b vert" onclick="pxMarquerEnvoye()">✅ C'est envoyé — noter la date et la liste</button></div></div>
+    <div class="mk-boutons">
+      <button class="b contour" onclick="trDemander('${f.id}')">Autre façon : l'ancienne demande (photos du catalogue, questions, en dollars)</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+  if (typeof ctRemplirMinis === 'function') ctRemplirMinis();
+  pxPreparerImages();
+}
+function pxLignesDemandeHtml(L) {
+  return L.map(l => `<label class="px-l"><input type="checkbox" ${pxD.choix.has(l.cle) ? 'checked' : ''} onchange="pxCocher('${l.cle}',this.checked)">
+      ${l.photo ? `<img src="${l.photo}" alt="">` : l.doc ? `<img class="ct-mini" data-doc="${E(l.doc)}" alt="">` : '<span class="px-vide" aria-hidden="true">📦</span>'}
+      <span>${E(l.nom)}${l.o && num(l.o.prix) > 0 ? '<br><small>vu : ' + E(mkPrixCourt(l.o)) + '</small>' : l.p ? '<br><small>son catalogue' + (l.p.page ? ' · ' + E(l.p.page) : '') + (l.interesse ? ' · ⭐' : '') + (l.p.pourquoi ? '<br>🤖 ' + E(l.p.pourquoi) : '') + (l.p.caracteristiques ? '<br>' + E(String(l.p.caracteristiques).slice(0, 60)) : '') + '</small>' : ''}</span></label>`).join('');
+}
+// Son catalogue (des centaines de modèles) : on cherche, on coche ; seuls les modèles cochés partent dans la demande.
+function pxChercherCatalogue() {
+  const f = mkFournisseur(pxD && pxD.fid); if (!f) return;
+  const q = normaliserNom((document.getElementById('px_cat_q') || {}).value || '');
+  const fams = [...new Set(pxLignesDe(f).filter(l => l.p).map(l => ctNomFamille(l.p.categorie)))];
+  const fam = Number.isInteger(pxD.famille) ? fams[pxD.famille] : '';
+  document.querySelectorAll('#px_cat_fam .mk-puce').forEach((b, i) => b.classList.toggle('on', i === pxD.famille));
+  const mots = q.split(' ').filter(Boolean);
+  const R = pxLignesDe(f).filter(l => l.p && (!fam || ctNomFamille(l.p.categorie) === fam)
+    && mots.every(m => normaliserNom([l.p.ref, l.p.categorie, l.p.caracteristiques].join(' ')).includes(m)));
+  const z = document.getElementById('px_cat_res'); if (!z) return;
+  z.innerHTML = (q || fam) ? (R.length ? pxLignesDemandeHtml(R.slice(0, 40)) + (R.length > 40 ? `<p class="px-aide" style="padding:6px">… et ${R.length - 40} autres : précisez la recherche.</p>` : '')
+    : '<p class="px-aide" style="padding:6px">Aucun modèle ne correspond.</p>') : '<p class="px-aide" style="padding:6px">Tapez un mot ou touchez une famille.</p>';
+  if (typeof ctRemplirMinis === 'function') ctRemplirMinis();
+}
+function pxPuchesPaliers() {
+  return PX_PALIERS_CHOIX.map(q => `<button type="button" class="mk-puce${pxD.paliers.includes(q) ? ' on' : ''}" onclick="pxPalier(${q})">${E(nf(q))}</button>`).join('');
+}
+function pxTextePaliers() {
+  return pxD.paliers.length ? 'Prix demandés pour ' + pxD.paliers.map(q => nf(q)).join(' · ') + ' pièces (3 au plus), en plus de son minimum.' : 'Seulement son minimum (touchez des quantités pour en demander plus).';
+}
+// Cocher un produit ne redessine pas la boîte (elle remonterait en haut) : seuls le compte, le message et les images changent.
+function pxMajDemande() {
+  const f = mkFournisseur(pxD.fid); if (!f) return;
+  const ch = pxChoisies(f);
+  const n = document.getElementById('px_n'); if (n) n.textContent = ch.length;
+  const t = document.getElementById('ct_msg'); if (t) t.value = pxMessage(f, ch, pxD.paliers);
+  const z = document.getElementById('px_paliers'); if (z) z.innerHTML = pxPuchesPaliers();
+  const zt = document.getElementById('px_paliers_t'); if (zt) zt.textContent = pxTextePaliers();
+  pxD.images = []; pxD.jeton++;              // les anciennes images ne partent plus : elles ne disent plus la même chose
+  clearTimeout(pxD.minuterie); pxD.minuterie = setTimeout(pxPreparerImages, 350);
+}
+function pxCocher(cle, oui) {
+  if (oui) pxD.choix.add(cle); else pxD.choix.delete(cle);
+  document.querySelectorAll('.px-l input').forEach(i => { const m = String(i.getAttribute('onchange') || '').match(/pxCocher\('([^']+)'/); if (m && m[1] === cle) i.checked = !!oui; });
+  const f = mkFournisseur(pxD.fid), z = document.getElementById('px_liste');
+  if (f && z && oui && !z.querySelector(`input[onchange*="'${cle}'"]`)) { const l = pxLignesDe(f).find(x => x.cle === cle); if (l) { z.insertAdjacentHTML('beforeend', pxLignesDemandeHtml([l])); if (typeof ctRemplirMinis === 'function') ctRemplirMinis(); } }
+  pxMajDemande();
+}
+function pxPalier(q) {
+  const i = pxD.paliers.indexOf(q);
+  if (i >= 0) pxD.paliers.splice(i, 1);
+  else { if (pxD.paliers.length >= 3) { avertir('3 quantités au plus : touchez-en une pour l\'enlever.'); return; } pxD.paliers.push(q); }
+  pxD.paliers.sort((a, b) => a - b);
+  pxMajDemande();
+}
+function pxAjouterProduitDemande() {
+  const f = mkFournisseur(pxD.fid), i = document.getElementById('px_nouveau'); if (!f || !i) return;
+  const nom = i.value.trim(); if (!nom) { avertir('Écrivez le nom du produit.'); return; }
+  const l = pxNouvelleLigne(f, nom);
+  pxD.choix.add(l.cle); sauverLocal();
+  pxDessinerDemande();
+}
+function pxMessage(f, lignes, paliers) {
+  const contact = String(f.contact || '').trim(), sig = ctSignature(), qui = sig.split('–')[0].trim();
+  const pal = paliers.map(q => String(q));
+  const ex = '1 高档：起订' + (paliers[0] || 500) + '个 ¥45' + pal.slice(1).map((q, i) => '；' + q + '个 ¥' + (42 - 2 * i)).join('');
+  const cn = [(contact ? contact + ' ' : '') + '您好！',
+    '我是西非几内亚 KYLO EURGUINE 公司的 ' + qui + '。我们' + ctLieu(f.lieu_rencontre || 'foire', 'cn') + '见过面，谢谢！',
+    '请帮我报价以下 ' + lignes.length + ' 个产品（编号和图片一致）：',
+    ...lignes.map((l, i) => (i + 1) + '. ' + pxNomPourVendeur(l)),
+    '每个产品请按三个档次分别报价：高档、中档、低档，并注明：',
+    '1. 人民币单价（出厂价）',
+    '2. 起订量',
+    pal.length ? '3. ' + pal.join('个、') + '个的单价' : '3. 数量多的价格',
+    '4. 每箱数量、外箱尺寸、毛重',
+    '5. 交期',
+    '6. 三个档次的区别（材料、功率、配件、包装）',
+    '这是我们第一次合作，先试单，数量可能不大；请告诉我最少可以订多少。以后卖得好会长期返单。',
+    '可以直接填写我发的 Excel 表格，或者这样回复：',
+    ex,
+    '谢谢！', sig].join('\n');
+  const en = ['Hello' + (contact ? ' ' + contact : '') + ', this is ' + qui + ' from KYLO EURGUINE (Conakry, Guinea).',
+    'Please quote these ' + lignes.length + ' products (numbers as in the pictures) in 3 quality grades (high / medium / low): unit price in RMB, MOQ'
+    + (pal.length ? ', price for ' + pal.join(' / ') + ' pcs' : '') + ', pcs per carton, carton size, gross weight, lead time, and the difference between the grades.',
+    'This is our first order (a trial order): please tell me the smallest quantity you can accept. If it sells well, we will reorder regularly.',
+    'You can fill in the Excel table I sent. Thank you!'].join('\n');
+  return cn + '\n\n' + en;
+}
+async function pxImageDe(l) {
+  try {
+    if (l.photo) return await trImage(l.photo);
+    if (l.doc) { const src = await ctLire(l.doc); if (src) return await trImage(src); }
+  } catch (e) {}
+  return null;
+}
+// Les photos numérotées : 4 produits par image ; pour chacun, la grille qu'on attend (3 qualités × minimum, prix, quantités).
+async function pxImages(f, lignes, paliers) {
+  const PAR = 4, W = 1080, HAUT = 190, BLOC = 410, BAS = 190;
+  const res = [], pages = Math.ceil(lignes.length / PAR) || 1;
+  const qui = [trMarque(f.societe) || f.nom || f.societe, f.contact].filter(Boolean).join(' — ');
+  const jour = new Date().toLocaleDateString('fr-CA');
+  const cols = ['档次 Grade', '起订量 MOQ', '单价 ¥'].concat(paliers.map(q => q + '个 ¥'));
+  for (let pg = 0; pg < pages; pg++) {
+    const lot = lignes.slice(pg * PAR, pg * PAR + PAR);
+    const c = document.createElement('canvas'); c.width = W; c.height = HAUT + lot.length * BLOC + BAS;
+    const g = c.getContext('2d');
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = '#0d3f85'; g.fillRect(0, 0, W, HAUT - 16);
+    g.fillStyle = '#ffffff'; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+    trTexteAjuste(g, '报价请求 · 三个档次 · Price request (3 grades)', 36, 66, W - 72, 44, true);
+    trTexteAjuste(g, qui, 36, 116, W - 72, 34, true);
+    trTexteAjuste(g, 'KYLO EURGUINE · 几内亚 Guinée · ' + jour + ' · 第 ' + (pg + 1) + '/' + pages + ' 张', 36, 160, W - 72, 26, false);
+    for (let i = 0; i < lot.length; i++) {
+      const l = lot[i], n = pg * PAR + i + 1, y0 = HAUT + i * BLOC;
+      g.strokeStyle = '#d7e1f0'; g.lineWidth = 2; g.strokeRect(8, y0 + 6, W - 16, BLOC - 12);
+      const img = await pxImageDe(l);
+      if (img) {
+        const e = Math.min(300 / img.width, 300 / img.height), lw = img.width * e, lh = img.height * e;
+        g.drawImage(img, 24 + (300 - lw) / 2, y0 + 50 + (300 - lh) / 2, lw, lh);
+      } else { g.fillStyle = '#e8effb'; g.fillRect(24, y0 + 50, 300, 300); g.fillStyle = '#5a6b85'; g.textAlign = 'center'; trTexteAjuste(g, '(pas de photo)', 174, y0 + 205, 260, 26, false); g.textAlign = 'left'; }
+      g.fillStyle = '#d32f2f'; g.beginPath(); g.arc(60, y0 + 50, 34, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#ffffff'; g.textAlign = 'center'; trTexteAjuste(g, String(n), 60, y0 + 62, 60, n > 99 ? 28 : 36, true); g.textAlign = 'left';
+      const cn = pxNomChinois(l.nom);
+      g.fillStyle = '#16233a'; trTexteAjuste(g, (cn ? cn + '  ' : '') + l.nom, 350, y0 + 56, W - 380, 32, true);
+      // La grille : 4 lignes (en-tête + 3 qualités)
+      const gx = 350, gy = y0 + 84, gw = W - 374, rh = 72, cw = [130].concat(Array(cols.length - 1).fill((gw - 130) / (cols.length - 1)));
+      g.fillStyle = '#e8effb'; g.fillRect(gx, gy, gw, rh);
+      g.strokeStyle = '#9fb3d1'; g.lineWidth = 2;
+      for (let r = 0; r <= 4; r++) { g.beginPath(); g.moveTo(gx, gy + r * rh); g.lineTo(gx + gw, gy + r * rh); g.stroke(); }
+      let x = gx;
+      for (let k = 0; k <= cols.length; k++) { g.beginPath(); g.moveTo(x, gy); g.lineTo(x, gy + 4 * rh); g.stroke(); if (k < cols.length) x += cw[k]; }
+      x = gx; g.fillStyle = '#16233a'; g.textAlign = 'center';
+      cols.forEach((t, k) => { trTexteAjuste(g, t, x + cw[k] / 2, gy + 45, cw[k] - 10, 22, true); x += cw[k]; });
+      PX_NIV.forEach((nv, r) => { trTexteAjuste(g, nv.cn + ' ' + nv.en, gx + cw[0] / 2, gy + (r + 1) * rh + 45, cw[0] - 10, 24, true); });
+      g.textAlign = 'left';
+    }
+    const yb = HAUT + lot.length * BLOC;
+    g.fillStyle = '#fbf1de'; g.fillRect(0, yb + 8, W, BAS - 8);
+    g.fillStyle = '#16233a'; g.textAlign = 'center';
+    trTexteAjuste(g, '请按编号和档次报价，例如：', W / 2, yb + 56, W - 60, 30, true);
+    trTexteAjuste(g, '1 高档：起订' + (paliers[0] || 500) + '个 ¥45' + paliers.slice(1).map((q, i) => '；' + q + '个 ¥' + (42 - 2 * i)).join(''), W / 2, yb + 104, W - 60, 30, false);
+    trTexteAjuste(g, '也可以填写我们发的 Excel 表格。谢谢！', W / 2, yb + 152, W - 60, 28, false);
+    g.textAlign = 'left';
+    res.push(c.toDataURL('image/jpeg', 0.86));
+  }
+  return res;
+}
+async function pxPreparerImages() {
+  const f = mkFournisseur(pxD && pxD.fid); if (!f) return;
+  const jeton = ++pxD.jeton, ch = pxChoisies(f);
+  pxD.images = [];
+  const b = document.getElementById('px_b_img');
+  if (b) { b.disabled = !ch.length; b.textContent = '🖼️ Les photos numérotées' + (ch.length ? ' (' + Math.ceil(ch.length / 4) + ' image' + (ch.length > 4 ? 's' : '') + ')' : ''); }
+  const z = document.getElementById('px_images');
+  if (!ch.length) { pxD.images = []; if (z) z.innerHTML = ''; return; }
+  if (z) z.innerHTML = '<p class="px-aide">⏳ Préparation des images…</p>';
+  const imgs = await pxImages(f, ch, pxD.paliers);
+  if (!pxD || jeton !== pxD.jeton) return;
+  pxD.images = imgs;
+  const z2 = document.getElementById('px_images');
+  if (z2) z2.innerHTML = imgs.map((src, i) => `<img src="${src}" alt="Image ${i + 1}" onclick="mkApercu(pxD.images[${i}], 'Image ${i + 1} sur ${imgs.length}')">`).join('');
+}
+function pxNomFichier(f, ext) { return 'KYLO-报价-' + (f.code || 'F') + '-' + ((trMarque(f.societe) || f.nom || 'prix').replace(/[^\w一-鿿-]+/g, '') || 'prix') + ext; }
+function pxEnvoyerImages() {
+  const f = mkFournisseur(pxD && pxD.fid); if (!f) return;
+  if (!pxD.images.length) { avertir('Les images se préparent encore, une seconde…'); return; }
+  ctPartagerFichiers(pxD.images.map((src, i) => ({ nom: pxNomFichier(f, '-' + (i + 1) + '.jpg'), src })), mkNomFournisseur(f) + ' — demande de prix');
+}
+// Le tableau Excel à remplir : une ligne par produit et par qualité ; la feuille cachée « kylo » dit au carnet
+// à quel fournisseur et à quels produits il répond (le n° 3 = le bon produit, même si son tableau est trié).
+async function pxClasseur(f, lignes, paliers) {
+  const X = await fwScript('ocr/xlsx.full.min.js', 'XLSX');
+  const jour = new Date().toLocaleDateString('fr-CA');
+  const entete = ['序号 No.', '产品 Product', '档次 Grade', '起订量 MOQ (pcs)', '起订量单价 ¥ Unit price at MOQ']
+    .concat(paliers.map(q => q + '个单价 ¥ Price for ' + q + ' pcs'))
+    .concat(['每箱数量 Pcs/carton', '外箱尺寸 cm Carton size (L×W×H)', '毛重 kg Gross weight', '交期(天) Lead time (days)', '档次区别 / 备注 Difference / remarks']);
+  const rows = [['KYLO EURGUINE — 报价表 / Price list request'],
+    ['供应商 Supplier : ' + [f.code, f.societe || f.nom, f.contact].filter(Boolean).join(' · ')],
+    ['日期 Date : ' + jour + ' · 币种 Currency : 人民币 RMB ¥ · 请填写空白格 Please fill in the blank cells'], [], entete];
+  lignes.forEach((l, i) => PX_NIV.forEach(n => rows.push([i + 1, pxNomPourVendeur(l), n.cn + ' ' + n.en].concat(Array(entete.length - 3).fill('')))));
+  const ws = X.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{ wch: 8 }, { wch: 36 }, { wch: 12 }, { wch: 14 }, { wch: 18 }].concat(paliers.map(() => ({ wch: 16 }))).concat([{ wch: 14 }, { wch: 22 }, { wch: 12 }, { wch: 14 }, { wch: 40 }]);
+  ws['!merges'] = [0, 1, 2].map(r => ({ s: { r, c: 0 }, e: { r, c: entete.length - 1 } }));
+  const meta = X.utils.aoa_to_sheet([[JSON.stringify({ format: 'kylo-cotation', v: 1, fid: f.id, code: f.code || '', le: mkMaintenant(), paliers,
+    lignes: lignes.map((l, i) => ({ n: i + 1, cle: l.cle, nom: l.nom })) })]]);
+  const wb = X.utils.book_new();
+  X.utils.book_append_sheet(wb, ws, '报价 Quotation');
+  X.utils.book_append_sheet(wb, meta, 'kylo');
+  wb.Workbook = { Sheets: [{ Hidden: 0 }, { Hidden: 1 }] };
+  const tab = X.write(wb, { bookType: 'xlsx', type: 'array' });
+  return new Blob([tab], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+async function pxEnvoyerClasseur() {
+  const f = mkFournisseur(pxD && pxD.fid); if (!f) return;
+  const ch = pxChoisies(f); if (!ch.length) { avertir('Choisissez au moins un produit.'); return; }
+  try { const b = await pxClasseur(f, ch, pxD.paliers); await remettreFichier(b, pxNomFichier(f, '.xlsx')); }
+  catch (e) { avertir('Le tableau n\'a pas pu être préparé : ' + (e.message || e) + '. Ouvrez le carnet une fois avec Internet.', 7000); }
+}
+function pxMarquerEnvoye() {
+  const f = mkFournisseur(pxD && pxD.fid); if (!f) return;
+  const ch = pxChoisies(f); if (!ch.length) { avertir('Choisissez au moins un produit.'); return; }
+  const maintenant = mkMaintenant();
+  f.px_demande = { le: maintenant, paliers: pxD.paliers.slice(), lignes: ch.map((l, i) => ({ n: i + 1, cle: l.cle, nom: l.nom })) };
+  f.demande_le = maintenant; f.demande_canal = f.demande_canal || 'wechat';
+  C.voyage.px_paliers = pxD.paliers.slice();
+  delete f.relance_le; delete f.ct_neuf;
+  sauverLocal(); fermerBoite(); dessiner();
+  avertir('✅ Noté : prix demandés le ' + mkJour(maintenant) + ' (' + ch.length + ' produits, 3 qualités).\nSa réponse : « 📥 Sa réponse (fichier Excel) » dans sa fiche, ou envoyez-la à Claude.', 6500);
+}
+
+// ---------- 5. Sa réponse : le tableau Excel rempli ----------
+function pxLireClasseur(wb, X) {
+  let meta = null;
+  const sk = wb.Sheets && (wb.Sheets.kylo || wb.Sheets.KYLO);
+  if (sk) { try { meta = JSON.parse(String((sk.A1 || {}).v || '')); } catch (e) { meta = null; } if (!meta || meta.format !== 'kylo-cotation') meta = null; }
+  for (const nom of wb.SheetNames) {
+    if (/^kylo$/i.test(nom)) continue;
+    const g = X.utils.sheet_to_json(wb.Sheets[nom], { header: 1, raw: true, defval: '' });
+    const estKylo = meta || g.slice(0, 4).some(l => l.some(v => /KYLO EURGUINE/.test(String(v)) && /报价/.test(String(v))));
+    if (!estKylo) continue;
+    const iEnt = g.findIndex(l => l.some(v => /序号/.test(String(v))) && l.some(v => /档次|grade/i.test(String(v))));
+    if (iEnt < 0) continue;
+    const ent = g[iEnt].map(v => String(v));
+    const col = (ok) => ent.findIndex(ok);
+    const cN = col(t => /序号|^no\.?$/i.test(t)), cNom = col(t => /产品|product/i.test(t)), cG = col(t => /档次|grade/i.test(t) && !/区别|diff/i.test(t));
+    const cMoq = col(t => /起订量|moq/i.test(t) && !/单价|price/i.test(t)), cPrix = col(t => /单价|unit price/i.test(t) && !/\d\s*个/.test(t));
+    const cPcs = col(t => /每箱|pcs\s*\/\s*carton/i.test(t)), cDim = col(t => /外箱|carton size/i.test(t)), cKg = col(t => /毛重|weight/i.test(t));
+    const cDel = col(t => /交期|lead/i.test(t)), cDiff = col(t => /区别|备注|remark|diff/i.test(t));
+    const cPal = ent.map((t, i) => { const m = t.match(/(\d[\d,]*)\s*个/); return m && i !== cMoq && i !== cPrix ? { i, qte: pxNombre(m[1]) } : null; }).filter(Boolean);
+    const produits = new Map();
+    let n = 0, nomPrec = '';
+    g.slice(iEnt + 1).forEach(l => {
+      if (!l || !l.some(v => String(v).trim())) return;
+      const nv = pxNombre(l[cN]); if (nv) n = Math.round(nv);
+      const nomL = String(cNom >= 0 ? l[cNom] : '').trim(); if (nomL) nomPrec = nomL;
+      if (!n) return;
+      if (!produits.has(n)) produits.set(n, { n, nom: nomPrec, qualites: [], carton: {}, delai: 0, diffs: [] });
+      const p = produits.get(n);
+      const niveau = pxNiveauDe(cG >= 0 ? l[cG] : '') || (PX_NIV[p.qualites.length] || {}).k;
+      const q = { niveau, nom: String(cG >= 0 ? l[cG] : '').trim(), moq: cMoq >= 0 ? pxNombre(l[cMoq]) : 0, prix: cPrix >= 0 ? pxNombre(l[cPrix]) : 0,
+        paliers: cPal.map(c => ({ qte: c.qte, prix: pxNombre(l[c.i]) })).filter(x => x.prix > 0), diff: cDiff >= 0 ? String(l[cDiff] || '').trim() : '' };
+      if (q.prix > 0 || q.paliers.length) p.qualites.push(q);
+      if (cPcs >= 0 && pxNombre(l[cPcs]) && !p.carton.pcs) p.carton.pcs = pxNombre(l[cPcs]);
+      if (cDim >= 0 && !p.carton.l) { const d = String(l[cDim] || '').match(/(\d+(?:[.,]\d+)?)\D+(\d+(?:[.,]\d+)?)\D+(\d+(?:[.,]\d+)?)/); if (d) { p.carton.l = pxNombre(d[1]); p.carton.la = pxNombre(d[2]); p.carton.h = pxNombre(d[3]); } }
+      if (cKg >= 0 && pxNombre(l[cKg]) && !p.carton.kg) p.carton.kg = pxNombre(l[cKg]);
+      if (cDel >= 0 && pxNombre(l[cDel]) && !p.delai) p.delai = pxNombre(l[cDel]);
+    });
+    const liste = [...produits.values()].filter(p => p.qualites.length);
+    return { fid: meta ? meta.fid : '', code: meta ? meta.code : '', lignes: meta ? meta.lignes : [], produits: liste, total: produits.size };
+  }
+  return null;
+}
+function pxRangerClasseur(f, k) {
+  let n = 0;
+  const lignes = (k.lignes && k.lignes.length ? k.lignes : (f.px_demande && f.px_demande.lignes) || []);
+  k.produits.forEach(p => {
+    const ref = lignes.find(x => x.n === p.n);
+    let l = ref ? pxTrouverLigne(f, ref.cle) : null;
+    if (!l) l = pxNouvelleLigne(f, p.nom || ('Produit ' + p.n));
+    const r = pxAppliquer(f, l, { qualites: p.qualites, devise: 'CNY', carton: p.carton, delai: p.delai }, 'tableau');
+    n += r.n;
+  });
+  return n;
+}
+const pxLireTableurAvant = fwLireTableur;
+fwLireTableur = async function (fichier) {
+  const r = await pxLireTableurAvant(fichier);
+  try {
+    const X = await fwScript('ocr/xlsx.full.min.js', 'XLSX');
+    const k = pxLireClasseur(X.read(new Uint8Array(await fichier.arrayBuffer()), { type: 'array' }), X);
+    if (k) { r.kylo = k; r.prix = []; }
+  } catch (e) {}
+  return r;
+};
+const pxCibleAvant = fwFournisseurCible;
+fwFournisseurCible = function () {
+  const sel = document.getElementById('fw_four');
+  if (!fwEtat.fid && !(sel && sel.value)) {
+    for (const r of fwEtat.resultats) {
+      if (!r.kylo) continue;
+      const f = mkFournisseur(r.kylo.fid) || fournisseursListe().find(x => r.kylo.code && x.code === r.kylo.code);
+      if (f) return f;
+    }
+  }
+  return pxCibleAvant();
+};
+const pxApercuAvant = fwApercu;
+fwApercu = function () {
+  pxApercuAvant.apply(this, arguments);
+  const K = fwEtat.resultats.filter(r => r.kylo); if (!K.length) return;
+  const z = document.getElementById('fw_res'), ok = document.getElementById('fw_ok'), f = fwFournisseurCible();
+  const ps = K.flatMap(r => r.kylo.produits).sort((a, b) => a.n - b.n);
+  const nPrix = ps.reduce((s, p) => s + p.qualites.length, 0);
+  if (z) z.insertAdjacentHTML('afterbegin', `<div class="fw-bilan">📊 <b>Son tableau de prix KYLO</b>${f ? ' — ' + E(mkNomFournisseur(f)) : ''} : ${ps.length} produit(s), ${nPrix} prix en qualités
+    <ul class="tr-rep">${ps.map(p => `<li><b>${p.n}. ${E(String(p.nom).split(' / ').pop())}</b> : ${p.qualites.map(q => E(pxNiv(q.niveau).court + ' ' + (q.prix ? nf(q.prix, 2) + ' ¥' : '') + (q.moq ? ' dès ' + nf(q.moq) : '') + (q.paliers.length ? ' · ' + q.paliers.map(x => nf(x.qte) + ' → ' + nf(x.prix, 2) + ' ¥').join(' · ') : ''))).join(' | ')}</li>`).join('')}</ul></div>`);
+  if (z) z.querySelectorAll('.fw-bilan').forEach((d, i) => { if (i === 0) return; d.classList.remove('att'); d.innerHTML = d.innerHTML.replace(/💰 0 prix/, '💰 ' + nPrix + ' prix (son tableau, ci-dessus)'); });
+  if (ok && ps.length) { ok.disabled = false; ok.style.display = ''; ok.textContent = '✅ Ranger ses prix' + (f ? ' chez ' + (f.nom || f.societe || f.code) : ''); }
+};
+const pxRangerAvant = fwRanger;
+fwRanger = async function () {
+  const f = fwFournisseurCible();
+  let n = 0;
+  if (f) fwEtat.resultats.filter(r => r.kylo).forEach(r => { n += pxRangerClasseur(f, r.kylo); });
+  if (n) sauverLocal();
+  const res = await pxRangerAvant.apply(this, arguments);
+  if (n) avertir('✅ ' + n + ' prix rangés chez ' + mkNomFournisseur(f) + ' (3 qualités, par quantité).\nOuvrez sa fiche : « 🛒 Ses produits et ses prix ».', 6500);
+  return res;
+};
+
+// ---------- 6. Le retour de Claude : ses prix lus, le marché guinéen, les prix à proposer ----------
+// fournisseurs[].offres : [{ cle?, article, modele?, devise, qualites: [{ niveau, nom, moq, prix, paliers: [{ qte, prix }], diff }],
+//   carton: { pcs, l, la, h, kg }, delai, cible: { prix, devise, raison }, note }]
+// marche : [{ article, autres_noms?, prix_vente_gnf: { min, max, conseille }, gros_gnf?, sources: [{ titre, url }], note, fiabilite, le }]
+const pxFusionAvant = ctFusion;
+ctFusion = function (imp, appliquer) {
+  const bilan = pxFusionAvant(imp, appliquer);
+  (imp.fournisseurs || []).forEach((x, i) => {
+    const b = bilan[i];
+    // Les modèles du catalogue que Claude conseille de tester : ⭐ (ils seront cochés dans « Demander ses prix »).
+    if (appliquer) {
+      const fe = (b && b.id && mkFournisseur(b.id)) || ctTrouverFournisseur(x);
+      if (fe) (Array.isArray(x.produits) ? x.produits : []).forEach(xp => {
+        if (!xp.interesse) return;
+        const p = ctProduits(fe).find(y => ctCleRef(y.ref) && ctCleRef(y.ref) === ctCleRef(xp.ref));
+        if (p) { p.interesse = true; if (xp.pourquoi) p.pourquoi = String(xp.pourquoi); }
+      });
+    }
+    const offres = Array.isArray(x.offres) ? x.offres : []; if (!offres.length) return;
+    const f = (b && b.id && mkFournisseur(b.id)) || (appliquer ? ctTrouverFournisseur(x) : null);
+    let n = 0;
+    offres.forEach(xo => {
+      const qs = Array.isArray(xo.qualites) ? xo.qualites : (pxNombre(xo.prix) ? [{ niveau: xo.niveau || 'moyenne', moq: xo.moq, prix: xo.prix, paliers: xo.paliers }] : []);
+      n += pxNormaliserQualites(qs).length;
+      if (!appliquer || !f) return;
+      const L = pxLignesDe(f);
+      let l = xo.cle ? pxTrouverLigne(f, xo.cle) : null;
+      if (!l && xo.article) l = L.find(y => y.c && normaliserNom(y.c.article) === normaliserNom(xo.article) && (!xo.modele || !y.o.modele || normaliserNom(y.o.modele) === normaliserNom(xo.modele)));
+      if (!l && xo.modele) l = L.find(y => y.p && ctCleRef(y.p.ref) === ctCleRef(xo.modele));
+      if (!l) l = pxNouvelleLigne(f, xo.article || xo.modele || 'Produit', xo.modele);
+      pxAppliquer(f, l, { qualites: qs, devise: xo.devise || 'CNY', carton: xo.carton, delai: xo.delai, cible: xo.cible, note: xo.note }, 'claude');
+    });
+    if (b) { b.prix = (b.prix || 0) + n; b.cotations = n; }
+  });
+  if (appliquer && Array.isArray(imp.marche)) imp.marche.forEach(pxPoserMarche);
+  return bilan;
+};
+const pxApercuImportAvant = ctApercuImport;
+ctApercuImport = async function () {
+  await pxApercuImportAvant.apply(this, arguments);
+  const imp = ctImportEnCours, z = document.getElementById('ct_apercu_import');
+  if (imp && z && Array.isArray(imp.marche) && imp.marche.length) {
+    z.insertAdjacentHTML('beforeend', `<p style="margin:6px 0;font-size:16px">🇬🇳 <b>${imp.marche.length} prix du marché en Guinée</b> (pour le prix d'achat à ne pas dépasser).</p>`);
+    const bouton = document.getElementById('ct_bouton_import'); if (bouton) bouton.disabled = false;
+  }
+};
+
+// ---------- 7. ✏️ Noter ses prix à la main (il les dit au stand, ou sur WeChat) ----------
+let pxS = null;
+function pxBoiteSaisie(cid, oid) {
+  const c = trouverComparaison(cid), o = c && (c.offres || []).find(x => x.id === oid); if (!o) return;
+  const f = mkFournisseur(o.fournisseur_id);
+  const qs = pxQualites(o);
+  const pal = [...new Set(qs.flatMap(q => (q.paliers || []).map(p => num(p.qte))))].filter(Boolean).sort((a, b) => a - b);
+  const paliers = (pal.length ? pal : (f && f.px_demande && f.px_demande.paliers) || (C.voyage && C.voyage.px_paliers) || [500, 1000, 3000]).slice(0, 3);
+  pxS = { cid, oid, paliers };
+  const v = (q, k) => q && num(q[k]) ? num(q[k]) : '';
+  mkBoite(`<div class="mk-dlg ct-champs">
+    <h3>✏️ Ses prix : ${E(c.article)}${o.modele ? ' · ' + E(o.modele) : ''}</h3>
+    <p class="px-aide">${f ? E(mkNomFournisseur(f)) + ' · ' : ''}en yuans (¥). Remplissez seulement ce qu'il vous a dit ; une qualité vide est ignorée.</p>
+    ${PX_NIV.map(n => { const q = qs.find(x => x.niveau === n.k); return `<div class="px-saisie"><h4>${E(n.fr)} <span style="color:var(--gris)">${E(n.cn)}</span></h4>
+      <div class="px-g"><div><label for="pxs_${n.k}_moq">Dès (minimum)</label><input id="pxs_${n.k}_moq" inputmode="numeric" value="${v(q, 'moq')}" placeholder="ex. 500"></div>
+        <div><label for="pxs_${n.k}_prix">Prix ¥</label><input id="pxs_${n.k}_prix" inputmode="decimal" value="${v(q, 'prix')}" placeholder="ex. 45"></div>
+        ${paliers.map((t, i) => { const p = q && (q.paliers || []).find(x => num(x.qte) === t); return `<div><label for="pxs_${n.k}_p${i}">Prix pour ${E(nf(t))} pcs</label><input id="pxs_${n.k}_p${i}" inputmode="decimal" value="${p ? num(p.prix) : ''}"></div>`; }).join('')}</div>
+      <label for="pxs_${n.k}_diff">Ce qui la différencie</label><input id="pxs_${n.k}_diff" value="${E(q ? q.diff : '')}" placeholder="moteur cuivre, cuve épaisse…"></div>`; }).join('')}
+    <div class="duo"><div><label for="pxs_pcs">Pièces par carton</label><input id="pxs_pcs" inputmode="numeric" value="${num(o.qte_carton) || ''}"></div>
+      <div><label for="pxs_delai">Délai (jours)</label><input id="pxs_delai" inputmode="numeric" value="${num(o.delai) || ''}"></div></div>
+    <div class="mk-boutons"><button class="b vert" onclick="pxGarderSaisie()">✅ Garder ses prix</button><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+}
+function pxGarderSaisie() {
+  const c = trouverComparaison(pxS.cid), o = c && (c.offres || []).find(x => x.id === pxS.oid); if (!o) return;
+  const f = mkFournisseur(o.fournisseur_id);
+  const val = (id) => (document.getElementById(id) || {}).value || '';
+  const qualites = PX_NIV.map(n => ({ niveau: n.k, moq: val('pxs_' + n.k + '_moq'), prix: val('pxs_' + n.k + '_prix'), diff: val('pxs_' + n.k + '_diff'),
+    paliers: pxS.paliers.map((t, i) => ({ qte: t, prix: val('pxs_' + n.k + '_p' + i) })) }));
+  const l = { cle: 'o:' + o.id, c, o };
+  if (!pxNormaliserQualites(qualites).length) { avertir('Tapez au moins un prix.'); return; }
+  if (f) pxAppliquer(f, l, { qualites, devise: 'CNY', carton: { pcs: val('pxs_pcs') }, delai: val('pxs_delai') }, 'main');
+  else { o.qualites = pxNormaliserQualites(qualites); o.devise = 'CNY'; o.niveau = o.qualites[0].niveau; o.cotation_le = mkMaintenant(); o.cotation_source = 'main'; }
+  sauverLocal(); fermerBoite(); dessiner();
+  avertir('✅ Prix gardés : ' + c.article + '.');
+}
+
+// ---------- 8. 🛒 J'achète : la qualité, la quantité, le bon prix, le total ----------
+let pxA = null;
+function pxBoiteAchat(cid, oid) {
+  const c = trouverComparaison(cid), o = c && (c.offres || []).find(x => x.id === oid); if (!o) return;
+  const a = pxAchatDe(o), qs = pxQualites(o);
+  const r0 = pxPrixPour(o, o.niveau, 0);
+  pxA = { cid, oid, niveau: (a && a.px && a.px.niveau) || o.niveau || (qs[0] && qs[0].niveau) || '',
+    quantite: a ? num(a.quantite) : Math.max(num(c.quantite) || 0, (r0 && r0.moq) || num(o.moq) || 0) || 100,
+    prixMain: a && a.px && a.px.prix_main ? num(a.prix_unitaire) : 0 };
+  pxDessinerAchat();
+}
+function pxCalcAchat() {
+  const c = trouverComparaison(pxA.cid), o = c && (c.offres || []).find(x => x.id === pxA.oid);
+  const r = o ? pxPrixPour(o, pxA.niveau, pxA.quantite) : null;
+  const prix = pxA.prixMain > 0 ? pxA.prixMain : (r ? r.prix : 0);
+  return { c, o, r, qte: pxA.quantite, prix, devise: (o && o.devise) || 'CNY', niveau: r ? r.niveau : '', palier: r ? r.palier : 0, main: pxA.prixMain > 0 };
+}
+function pxDessinerAchat() {
+  const { c, o } = pxCalcAchat(); if (!o) return;
+  const f = mkFournisseur(o.fournisseur_id), a = pxAchatDe(o), qs = pxQualites(o);
+  mkBoite(`<div class="mk-dlg ct-champs">
+    <h3>🛒 J'achète : ${E(c.article)}${o.modele ? ' · ' + E(o.modele) : ''}</h3>
+    <p class="px-aide">${f ? 'Chez <b>' + E(mkNomFournisseur(f)) + '</b>' : E(o.fournisseur || '')}</p>
+    ${o.photo ? `<img src="${o.photo}" alt="" style="max-width:100%;max-height:180px;border-radius:12px;display:block;margin:6px 0">` : ''}
+    ${qs.length ? `<label>La qualité</label><div class="mk-puces">${qs.map(q => `<button type="button" class="mk-puce${pxA.niveau === q.niveau ? ' on' : ''}" onclick="pxA.niveau='${q.niveau}';pxA.prixMain=0;pxDessinerAchat()">${E(pxNiv(q.niveau).court)}${num(q.prix) ? ' · ' + E(nf(q.prix, 2)) + ' ¥' : ''}</button>`).join('')}</div>
+      ${pxTableHtml(o, pxA.niveau)}` : `<p class="px-aide">Un seul prix noté. « ✏️ Noter ses prix » pour ses 3 qualités et ses prix par quantité.</p>`}
+    <label for="px_qte">Combien de pièces ?</label>
+    <input id="px_qte" inputmode="numeric" value="${E(pxA.quantite || '')}" oninput="pxMajAchat()" style="font-size:20px;font-weight:800">
+    <label for="px_prix">Prix obtenu par pièce (si vous avez négocié)</label>
+    <input id="px_prix" inputmode="decimal" value="${pxA.prixMain > 0 ? E(pxA.prixMain) : ''}" placeholder="le prix de la quantité" oninput="pxMajAchat()">
+    <div id="px_calc" class="px-calc" role="status"></div>
+    <div class="mk-boutons">
+      <button class="b vert" onclick="pxValiderAchat()">✅ ${a ? 'Garder ce changement' : 'Valider l\'achat'}</button>
+      ${a ? `<button class="b rouge" onclick="pxAnnulerAchat()">🗑 Annuler cet achat</button>` : ''}
+      <button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+  pxMajAchat();
+}
+function pxMajAchat() {
+  const q = document.getElementById('px_qte'), p = document.getElementById('px_prix');
+  if (q) pxA.quantite = Math.round(pxNombre(q.value));
+  if (p) pxA.prixMain = pxNombre(p.value);
+  const z = document.getElementById('px_calc'); if (!z) return;
+  const { c, o, r, qte, prix, devise } = pxCalcAchat();
+  if (!(qte > 0) || !(prix > 0)) { z.innerHTML = qte > 0 ? 'Pas encore de prix pour ce produit : notez ses prix (✏️) ou tapez le prix obtenu.' : 'Tapez le nombre de pièces.'; if (p && r) p.placeholder = nf(r.prix, 2) + ' ¥'; return; }
+  if (p && r) p.placeholder = nf(r.prix, 2) + ' ' + mkSym(devise) + ' (prix pour ' + nf(r.palier) + ' pcs)';
+  const total = prix * qte, g = enGnf(total, devise), eur = tauxDe('EUR');
+  const a = pxAchatDe(o), deja = a ? coutAchatGnf(a) : 0, budget = budgetMarchandiseGnf(), apres = totalAchatsGnf() - deja + g;
+  const pl = pxPlafond(c, o), vente = num(c.prix_vente_vise_gnf);
+  const renduPiece = pxRenduGnf(c, o, enGnf(prix, devise));
+  const marge = vente > 0 ? Math.round((vente - renduPiece) / vente * 100) : null;
+  const qc = num(o.qte_carton);
+  z.innerHTML = `<div class="gros">${E(nf(qte))} × ${E(nf(prix, 2) + ' ' + mkSym(devise))} = ${E(nf(total, 2) + ' ' + mkSym(devise))}</div>
+    <div>= <b>${E(gnfStrict(g))}</b>${E(pxEnDevises(g))}</div>
+    ${r && !pxA.prixMain ? `<div>Prix pour ${E(nf(r.palier))} pièces et plus${r.niveau ? ' · ' + E(pxNiv(r.niveau).court) : ''}</div>` : ''}
+    ${r && r.sousMoq ? `<div class="att">⚠ Sous son minimum (${E(nf(r.moq))} pièces) : demandez-lui s'il accepte.</div>` : ''}
+    ${qc > 0 ? `<div>📦 ${E(nf(Math.ceil(qte / qc)))} carton(s) de ${E(nf(qc))}</div>` : ''}
+    ${pl && pl.cny > 0 && devise === 'CNY' ? `<div class="${prix > pl.cny ? 'ko' : 'ok'}">${prix > pl.cny ? '⛔ Au-dessus' : '✓ En dessous'} du prix maximum (${E(nf(pl.cny, 2))} ¥)</div>` : ''}
+    ${marge !== null ? `<div class="${marge >= (margeMinimum() || 35) ? 'ok' : marge > 0 ? 'att' : 'ko'}">Arrivé au magasin ≈ ${E(gnfStrict(renduPiece))} la pièce → vendu ${E(gnfStrict(vente))} : marge ${E(nf(marge))} %</div>` : ''}
+    <div>Total de mes achats après celui-ci : <b>${E(gnfStrict(apres))}</b>${budget > 0 ? (apres <= budget ? ' · reste ' + E(gnfStrict(budget - apres)) + ' du budget' : ' · <span class="ko">' + E(gnfStrict(apres - budget)) + ' au-dessus du budget</span>') : ''}</div>`;
+}
+function pxValiderAchat() {
+  pxMajAchat();
+  const { c, o, qte, prix, devise, niveau, palier, main } = pxCalcAchat(); if (!o) return;
+  if (!(qte > 0) || !(prix > 0)) { avertir('Il faut une quantité et un prix.'); return; }
+  const f = mkFournisseur(o.fournisseur_id);
+  let a = pxAchatDe(o);
+  if (!a) { a = { id: idUnique('a'), categorie: '', famille: '', code_barres: '', marge: 0.75, prix_grossiste_gnf: 0, conformite: { requise: false, verifie: false, note: '' } }; C.achats.push(a); }
+  const qc = num(o.qte_carton);
+  Object.assign(a, { nom: c.article + (o.modele && normaliserNom(c.article).indexOf(normaliserNom(o.modele)) < 0 ? ' ' + o.modele : '') + (niveau ? ' — ' + pxNiv(niveau).court : ''),
+    reference: o.modele || '', fournisseur: f ? mkNomFournisseur(f) : (o.fournisseur || ''), fournisseur_id: o.fournisseur_id || '',
+    quantite: qte, prix_unitaire: prix, devise, qte_carton: qc, cartons: qc > 0 ? Math.ceil(qte / qc) : 0,
+    dim_l: num(o.dim_l) || '', dim_la: num(o.dim_la) || '', dim_h: num(o.dim_h) || '', photo: o.photo || a.photo || '',
+    prix_detail_gnf: num(c.prix_vente_vise_gnf) || num(a.prix_detail_gnf) || 0,
+    note: [niveau ? 'Qualité ' + pxNiv(niveau).court.toLowerCase() : '', palier && !main ? 'prix pour ' + nf(palier) + ' pcs' : '', main ? 'prix négocié' : ''].filter(Boolean).join(' · '),
+    px: { cid: c.id, oid: o.id, niveau, palier, prix_main: main, le: mkMaintenant() } });
+  o.achat_id = a.id; if (niveau) o.niveau = niveau; o.prix = prix;
+  c.choisi = o.id; c.decision = 'acheter'; c.decide_le = mkMaintenant().slice(0, 10); c.transforme = true; c.quantite = qte;
+  sauverLocal(); fermerBoite(); dessiner();
+  avertir('🛒 Achat noté : ' + nf(qte) + ' × ' + nf(prix, 2) + ' ' + mkSym(devise) + ' = ' + gnfStrict(enGnf(prix * qte, devise)) + '\nTotal de mes achats : ' + gnfStrict(totalAchatsGnf()), 6500);
+}
+function pxAnnulerAchat() {
+  const { c, o } = pxCalcAchat(); if (!o) return;
+  const a = pxAchatDe(o); if (!a) return;
+  if (!confirmerEnDeuxTemps('px-annule-' + a.id, 'Annuler cet achat ? Touchez encore une fois pour confirmer.')) return;
+  C.achats = C.achats.filter(x => x.id !== a.id);
+  delete o.achat_id;
+  if (c.choisi === o.id) { delete c.decision; delete c.decide_le; c.transforme = false; }
+  sauverLocal(); fermerBoite(); dessiner();
+  avertir('Achat annulé. Total de mes achats : ' + gnfStrict(totalAchatsGnf()));
+}
+
+// ---------- 9. 🤝 Négocier ce produit : la négociation s'ouvre remplie ----------
+function pxNegocier(cid, oid) {
+  const c = trouverComparaison(cid), o = c && (c.offres || []).find(x => x.id === oid); if (!o) return;
+  const f = mkFournisseur(o.fournisseur_id), qs = pxQualites(o), q = qs.find(x => x.niveau === o.niveau) || qs[0];
+  const marches = q ? pxTiers(q).map(t => ({ id: idUnique('m'), qte: String(t.qte), prix: String(t.prix) }))
+    : (num(o.prix) > 0 ? [{ id: idUnique('m'), qte: String(num(o.moq) || ''), prix: String(num(o.prix)) }] : []);
+  const n = { id: idUnique('n'), produit: [c.article, o.modele, q ? pxNiv(q.niveau).court : '', f ? f.code : ''].filter(Boolean).join(' · '),
+    prix_vente_gnf: num(c.prix_vente_vise_gnf) || 0, marge_pct: margeMinimum() > 0 ? margeMinimum() : 35, frais_pct: pxModele(c, o).type === 'volume' ? 0 : pxFrais(c).pct, frais_source: pxModele(c, o).type === 'volume' ? 'claude' : pxFrais(c).source, marches,
+    note: o.cible && num(o.cible.prix) ? 'Claude propose ' + nf(o.cible.prix, 2) + ' ' + mkSym(o.cible.devise || 'CNY') + (o.cible.raison ? ' : ' + o.cible.raison : '') : '',
+    le: mkMaintenant().slice(0, 10), px: { cid: c.id, oid: o.id } };
+  negociations().unshift(n); negoActive = n.id;
+  sauverLocal(); fermerBoite(); allerA('negocier');
+  if (n.note) avertir('🎯 ' + n.note, 7000);
+}
+</script>
+<style>
+/* ===================== 1.7.0 — LE CONTRAT D'ACHAT (21/10/2026) =====================
+   Contre les arnaques : chaque achat chez un fournisseur devient un contrat chinois-anglais (et sa version française),
+   acompte 30 %, contrôle avant le solde, remboursement si non conforme, date de livraison et pénalités.
+   Textes jamais sous 14 px. Couleurs = variables du carnet. */
+.ctr-lst{display:flex;flex-direction:column;gap:6px;margin:6px 0}
+.ctr-l{display:flex;gap:10px;align-items:center;font-size:16px;line-height:1.35;background:var(--gris-clair);border-radius:10px;padding:8px}
+.ctr-l img,.ctr-l .px-vide{width:52px;height:52px;flex:none;border-radius:8px;object-fit:cover;background:var(--bleu-pale);display:flex;align-items:center;justify-content:center;font-size:24px}
+.ctr-l small{font-size:14px;color:var(--texte-note)}
+.ctr-total{font-size:18px;font-weight:900;color:var(--bleu);margin:8px 0}
+.ctr-g{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ctr-g .plein{grid-column:1/-1}
+.ctr-attention{font-size:15px;line-height:1.45;background:var(--rouge-pale);color:var(--rouge);border-radius:12px;padding:10px 12px;margin:8px 0;font-weight:700}
+.ctr-ok{font-size:15px;line-height:1.45;background:var(--vert-pale);color:var(--vert);border-radius:12px;padding:10px 12px;margin:8px 0;font-weight:700}
+.ctr-etapes{display:flex;flex-direction:column;gap:6px;margin:8px 0}
+.ctr-etapes button{display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;font-size:16px;font-weight:800;min-height:52px;border-radius:12px;
+  border:2px solid var(--lisiere);background:var(--carte);color:var(--noir);padding:8px 12px}
+.ctr-etapes button.fait{border-color:var(--vert);background:var(--vert-pale);color:var(--vert)}
+.ctr-etapes button.ko{border-color:var(--rouge);background:var(--rouge-pale);color:var(--rouge)}
+.ctr-etapes button span{font-size:14px;font-weight:700}
+.ctr-explique{font-size:15px;line-height:1.5}
+.ctr-explique li{margin:4px 0}
+.ctr-apercu{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+.ctr-apercu img{width:100%;border:1px solid var(--lisiere);border-radius:8px;background:#fff;cursor:zoom-in}
+.ctr-etat{font-size:16px;line-height:1.45;padding:10px 12px;border-radius:12px;background:var(--bleu-pale);margin:8px 0}
+</style>
+<script>
+// =====================================================================================================
+//  CARNET 1.7.0 — « 📝 Le contrat d'achat » (21/10/2026, Foire de Canton)
+//  Riche, 21/10 à 7 h 03 : « faire très attention aux arnaques : on commande un produit, on te livre une mauvaise qualité
+//  ou un truc que tu n'as pas commandé… il faut un document pour le fournisseur qu'il puisse signer quand je passe la
+//  commande ; je paye 30 % ; [un contrôleur] que j'ai choisi ; si la livraison correspond, l'affaire continue ; sinon il est
+//  obligé de me rembourser et on annule… comme le font les grandes entreprises, pour qu'ils prennent ça au sérieux…
+//  on l'envoie d'abord sur WeChat pour confirmer, puis on l'imprime, chacun garde sa copie signée… et le délai de livraison. »
+//  Le carnet remplit le contrat avec SES achats chez ce fournisseur (photo, qualité, quantité, prix) :
+//   - un PDF chinois-anglais pour le fournisseur (WeChat pour accord, puis imprimé en 2 exemplaires, signés et tamponnés) ;
+//   - un PDF en français pour Riche (la même chose, pour savoir ce qu'il signe) ;
+//   - les étapes : envoyé pour accord → signé → acompte payé → contrôle (conforme / pas conforme) → solde payé.
+//  Les pages sont dessinées (chinois compris) puis rangées dans un PDF : rien ne part sur Internet.
+// =====================================================================================================
+window.KYLO_CONTRAT = '1.7.0';
+const CTR_W = 1240, CTR_H = 1754, CTR_MG = 90;            // une page A4 à 150 points par pouce
+const CTR_POLICE = '"PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Noto Sans SC","Source Han Sans SC","Microsoft YaHei",sans-serif';
+function ctrAchatsDe(f) { return (C.achats || []).filter(a => a.fournisseur_id === f.id && num(a.quantite) > 0 && num(a.prix_unitaire) > 0); }
+function ctrAcheteur() {
+  C.voyage.acheteur = Object.assign({ societe: 'KYLO EURGUINE', representant: '', adresse: 'Conakry, République de Guinée', tel: '', email: '', wechat: '' }, C.voyage.acheteur || {});
+  return C.voyage.acheteur;
+}
+function ctrVendeur(f) {
+  f.vendeur_legal = Object.assign({ nom: String(f.societe || '').trim(), code: '', adresse: String(f.adresse || '').trim(), representant: String(f.contact || '').trim(),
+    tel: String(f.mobile || f.tel || '').trim(), titulaire: '', banque: '', compte: '', swift: '' }, f.vendeur_legal || {});
+  return f.vendeur_legal;
+}
+function ctrContrat(f) {
+  const jour = (n) => { const d = new Date(Date.now() + n * 864e5); return d.toLocaleDateString('fr-CA'); };
+  f.contrat = Object.assign({ no: '', date: new Date().toLocaleDateString('fr-CA'), acompte: 30, livraison: jour(30), lieu: '', lieu_inclus: true,
+    controleur: '', francais: false, prise: 'C/F', penalite: 0.5, penalite_max: 10, retard_max: 15, rembourse_jours: 7, remplace_jours: 10, garantie_jours: 90, etapes: {} }, f.contrat || {});
+  if (!f.contrat.no) f.contrat.no = 'KYLO-' + new Date().toLocaleDateString('fr-CA').replace(/-/g, '') + '-' + (f.code || 'F');
+  return f.contrat;
+}
+// Le montant en chiffres chinois « majuscules » (人民币大写), comme sur les contrats chinois : on ne peut pas le maquiller.
+function ctrMajuscules(n) {
+  const ch = '零壹贰叁肆伍陆柒捌玖', u = ['', '拾', '佰', '仟'], grands = ['', '万', '亿'];
+  let v = Math.round((Number(n) || 0) * 100); if (!(v > 0)) return '零元整';
+  const fen = v % 10, jiao = Math.floor(v / 10) % 10; let y = Math.floor(v / 100);
+  let s = '';
+  if (y > 0) {
+    const groupes = []; while (y > 0) { groupes.push(y % 10000); y = Math.floor(y / 10000); }
+    let zero = false;
+    for (let gi = groupes.length - 1; gi >= 0; gi--) {
+      const gpe = groupes[gi]; let t = '';
+      if (gpe === 0) { zero = s !== ''; continue; }
+      if (zero || (s !== '' && gpe < 1000)) t += '零';
+      zero = false;
+      const ds = String(gpe).padStart(4, '0').split('').map(Number);
+      let z = false, debut = true;
+      ds.forEach((d, i) => {
+        if (d === 0) { if (!debut) z = true; return; }
+        if (z) { t += '零'; z = false; }
+        t += ch[d] + u[3 - i]; debut = false;
+      });
+      s += t + grands[gi];
+    }
+    s += '元';
+  }
+  if (jiao === 0 && fen === 0) return s + '整';
+  if (jiao > 0) s += ch[jiao] + '角'; else if (s) s += '零';
+  if (fen > 0) s += ch[fen] + '分';
+  return s;
+}
+// ---------- Les textes du contrat : chinois + anglais (pour le fournisseur), français (pour Riche) ----------
+function ctrTextes(f, k, langue) {
+  const v = ctrVendeur(f), a = ctrAcheteur(), A = ctrAchatsDe(f);
+  const total = A.reduce((s, x) => s + num(x.quantite) * num(x.prix_unitaire), 0), ac = num(k.acompte) || 30;
+  const yuan = (n) => '¥ ' + nf(n, 2), d = k.livraison || '', jour = k.date || new Date().toLocaleDateString('fr-CA');
+  const nb = (x) => String(x || '').replace(/ /g, '\u00a0');      // un numéro ne se coupe pas en fin de ligne
+  const lieu = String(k.lieu || '').trim() ? { cn: k.lieu, en: k.lieu, fr: k.lieu } : { cn: '买方指定的广州货代仓库（地址由买方提供）', en: 'the Buyer\'s forwarder warehouse in Guangzhou (address given by the Buyer)', fr: 'l\'entrepôt du transitaire de l\'acheteur à Canton (adresse donnée par l\'acheteur)' };
+  const insp = String(k.controleur || '').trim();
+  const prise = k.prise === 'G' ? { cn: '英标（G型）', en: 'British type G', fr: 'anglaise (type G)' } : { cn: '欧标（C/F型）', en: 'European type C/F', fr: 'européenne (type C/F)' };
+  const T = {
+    titre: { cn: '采购合同', en: 'PURCHASE CONTRACT', fr: 'CONTRAT D\'ACHAT' },
+    entete: { cn: '合同编号：' + k.no + '　　签订日期：' + jour + '　　签订地点：中国广州',
+      en: 'Contract No.: ' + k.no + '   Date: ' + jour + '   Place: Guangzhou, China',
+      fr: 'Contrat n° ' + k.no + '   Date : ' + jour + '   Lieu : Canton (Guangzhou), Chine' },
+    parties: [
+      { cn: '买方：' + a.societe + '（' + a.adresse + '）　代表：' + (a.representant || '________') + '　电话：' + nb(a.tel || '________') + (a.wechat ? '　微信：' + a.wechat : ''),
+        en: 'Buyer: ' + a.societe + ' (' + a.adresse + ') — Representative: ' + (a.representant || '________') + ' — Tel: ' + nb(a.tel || '________') + (a.wechat ? ' — WeChat: ' + a.wechat : ''),
+        fr: 'Acheteur : ' + a.societe + ' (' + a.adresse + ') — Représentant : ' + (a.representant || '________') + ' — Tél. : ' + nb(a.tel || '________') + (a.wechat ? ' — WeChat : ' + a.wechat : '') },
+      { cn: '卖方：' + (v.nom || '________') + '　统一社会信用代码：' + nb(v.code || '________________') + '　地址：' + (v.adresse || '________') + '　联系人：' + (v.representant || '________') + '　电话：' + nb(v.tel || '________'),
+        en: 'Seller: ' + (v.nom || '________') + ' — Unified Social Credit Code: ' + nb(v.code || '________________') + ' — Address: ' + (v.adresse || '________') + ' — Contact: ' + (v.representant || '________') + ' — Tel: ' + nb(v.tel || '________'),
+        fr: 'Vendeur : ' + (v.nom || '________') + ' — Code de crédit social (licence) : ' + nb(v.code || '________________') + ' — Adresse : ' + (v.adresse || '________') + ' — Contact : ' + (v.representant || '________') + ' — Tél. : ' + nb(v.tel || '________') }],
+    preambule: { cn: '买卖双方经友好协商，就以下产品的买卖达成一致，签订本合同，双方共同遵守。',
+      en: 'After friendly negotiation, the Buyer and the Seller agree on the purchase and sale of the products below under the following terms, which both parties undertake to respect.',
+      fr: 'Après négociation amicale, l\'acheteur et le vendeur conviennent de l\'achat et de la vente des produits ci-dessous aux conditions suivantes, que les deux parties s\'engagent à respecter.' },
+    articles: [
+      { t: { cn: '第一条　产品、数量和价格', en: 'Article 1 — Products, quantities and prices', fr: 'Article 1 — Produits, quantités et prix' }, tableau: true, p: [
+        { cn: '合计：' + yuan(total) + '（人民币大写：' + ctrMajuscules(total) + '）。', en: 'Total: ' + yuan(total) + ' (Chinese Yuan, RMB).', fr: 'Total : ' + yuan(total) + ' (yuans, RMB) ≈ ' + gnfStrict(enGnf(total, 'CNY')) + '.' },
+        { cn: '价格为人民币出厂价，含出口包装' + (k.lieu_inclus ? '及送货至第四条所列交货地点的费用' : '') + '。',
+          en: 'Prices are ex-factory in RMB, including export packaging' + (k.lieu_inclus ? ' and delivery to the place stated in Article 4' : '') + '.',
+          fr: 'Prix départ usine en yuans, emballage d\'export compris' + (k.lieu_inclus ? ', livraison au lieu de l\'article 4 comprise' : '') + '.' }] },
+      { t: { cn: '第二条　质量', en: 'Article 2 — Quality', fr: 'Article 2 — Qualité' }, p: [
+        { cn: '产品必须全新，符合双方确认并封存的样品，以及本合同所列的档次和规格；电压 220 V / 50 Hz，插头为' + prise.cn + '。',
+          en: 'Products must be brand new and conform to the sample confirmed and sealed by both parties, and to the grade and specifications listed in this contract; voltage 220 V / 50 Hz, plug: ' + prise.en + '.',
+          fr: 'Les produits doivent être neufs, conformes à l\'échantillon confirmé et scellé par les deux parties, et à la qualité et aux caractéristiques de ce contrat ; 220 V / 50 Hz, prise ' + prise.fr + '.' },
+        { cn: '未经买方书面同意，卖方不得更改产品、材料、型号、档次或包装。',
+          en: 'The Seller may not change the product, materials, model, grade or packaging without the Buyer\'s written consent.',
+          fr: 'Le vendeur ne peut changer ni le produit, ni les matériaux, ni le modèle, ni la qualité, ni l\'emballage sans l\'accord écrit de l\'acheteur.' }]
+        .concat(k.francais ? [{ cn: '彩盒和说明书须印法语（文字由买方提供）。', en: 'Colour box and user manual printed in French (text provided by the Buyer).', fr: 'Boîte et notice imprimées en français (texte fourni par l\'acheteur).' }] : []) },
+      { t: { cn: '第三条　包装和唛头', en: 'Article 3 — Packaging and marking', fr: 'Article 3 — Emballage et marquage' }, p: [
+        { cn: '标准出口纸箱；外箱唛头：KYLO EURGUINE／合同编号／箱号。卖方在交货前发送包装好的货物照片。',
+          en: 'Standard export cartons; shipping marks: KYLO EURGUINE / contract No. / carton No. The Seller sends photos of the packed goods before delivery.',
+          fr: 'Cartons d\'export ; marquage : KYLO EURGUINE / n° de contrat / n° de carton. Le vendeur envoie les photos de la marchandise emballée avant la livraison.' }] },
+      { t: { cn: '第四条　交货', en: 'Article 4 — Delivery', fr: 'Article 4 — Livraison' }, p: [
+        { cn: '交货日期：' + (d || '________') + ' 之前。交货地点：' + lieu.cn + '。',
+          en: 'Delivery date: on or before ' + (d || '________') + '. Delivery place: ' + lieu.en + '.',
+          fr: 'Date de livraison : au plus tard le ' + (d || '________') + '. Lieu de livraison : ' + lieu.fr + '.' },
+        { cn: '逾期交货的，每逾期一天，卖方按逾期货物金额的 ' + nf(k.penalite, 1) + '% 支付违约金，最高 ' + nf(k.penalite_max, 0) + '%。逾期超过 ' + k.retard_max + ' 天，买方有权解除合同，卖方须在 ' + k.rembourse_jours + ' 天内全额退还买方已付的全部款项。',
+          en: 'For each day of delay, the Seller pays a penalty of ' + nf(k.penalite, 1) + '% of the value of the late goods, up to ' + nf(k.penalite_max, 0) + '%. If the delay exceeds ' + k.retard_max + ' days, the Buyer may cancel the contract and the Seller shall refund all amounts paid in full within ' + k.rembourse_jours + ' days.',
+          fr: 'Pour chaque jour de retard, le vendeur paie une pénalité de ' + nf(k.penalite, 1) + ' % de la valeur des produits en retard, au maximum ' + nf(k.penalite_max, 0) + ' %. Au-delà de ' + k.retard_max + ' jours de retard, l\'acheteur peut annuler le contrat et le vendeur rembourse tout ce qui a été payé dans les ' + k.rembourse_jours + ' jours.' }] },
+      { t: { cn: '第五条　付款', en: 'Article 5 — Payment', fr: 'Article 5 — Paiement' }, p: [
+        { cn: '合同签字盖章后，买方支付总金额的 ' + ac + '% 作为预付款（' + yuan(total * ac / 100) + '）。',
+          en: 'After signature and company seal, the Buyer pays ' + ac + '% of the total amount as advance payment (' + yuan(total * ac / 100) + ').',
+          fr: 'Après signature et cachet, l\'acheteur paie ' + ac + ' % du total comme acompte (' + yuan(total * ac / 100) + ').' },
+        { cn: '余款 ' + (100 - ac) + '%（' + yuan(total * (100 - ac) / 100) + '）在验货合格后、发货前支付。',
+          en: 'The balance of ' + (100 - ac) + '% (' + yuan(total * (100 - ac) / 100) + ') is paid after the goods pass inspection, before shipment.',
+          fr: 'Le solde de ' + (100 - ac) + ' % (' + yuan(total * (100 - ac) / 100) + ') est payé après un contrôle conforme, avant l\'expédition.' },
+        { cn: '所有款项只付到下列卖方公司账户。账户如有任何变更，须由卖方加盖公章书面通知并经视频电话确认；付到其他账户的要求一律无效。',
+          en: 'All payments are made only to the Seller\'s company bank account below. Any change of account must be notified in writing with the company seal and confirmed by video call; any request to pay another account is void.',
+          fr: 'Tous les paiements vont uniquement sur le compte de la société ci-dessous. Tout changement de compte doit être écrit, avec le cachet de la société, et confirmé par appel vidéo ; une demande de payer sur un autre compte est nulle.' },
+        { cn: '开户名：' + (v.titulaire || '________') + '　开户行：' + (v.banque || '________') + '　账号：' + nb(v.compte || '________') + (v.swift ? '　SWIFT：' + v.swift : ''),
+          en: 'Account name: ' + (v.titulaire || '________') + ' — Bank: ' + (v.banque || '________') + ' — Account No.: ' + nb(v.compte || '________') + (v.swift ? ' — SWIFT: ' + v.swift : ''),
+          fr: 'Titulaire : ' + (v.titulaire || '________') + ' — Banque : ' + (v.banque || '________') + ' — N° de compte : ' + nb(v.compte || '________') + (v.swift ? ' — SWIFT : ' + v.swift : ''), gras: true }] },
+      { t: { cn: '第六条　验货', en: 'Article 6 — Inspection', fr: 'Article 6 — Contrôle' }, p: [
+        { cn: '发货前，买方或买方指定的验货人员' + (insp ? '（' + insp + '）' : '') + '在卖方工厂或仓库检验产品的数量、质量、型号和包装，卖方应予配合。卖方在验货前提供产品照片和视频。',
+          en: 'Before shipment, the Buyer or the inspector appointed by the Buyer' + (insp ? ' (' + insp + ')' : '') + ' checks the quantity, quality, model and packaging at the Seller\'s factory or warehouse; the Seller shall cooperate and send photos and videos of the goods before the inspection.',
+          fr: 'Avant l\'expédition, l\'acheteur ou le contrôleur qu\'il a choisi' + (insp ? ' (' + insp + ')' : '') + ' vérifie la quantité, la qualité, le modèle et l\'emballage à l\'usine ou à l\'entrepôt du vendeur ; le vendeur coopère et envoie photos et vidéos avant le contrôle.' }] },
+      { t: { cn: '第七条　不合格的处理', en: 'Article 7 — Non-conforming goods', fr: 'Article 7 — Marchandise non conforme' }, p: [
+        { cn: '如产品与样品或本合同不符（质量、型号、数量不符或发错货），买方有权：(1) 要求卖方在 ' + k.remplace_jours + ' 天内免费更换或补足；或 (2) 解除合同，卖方须在 ' + k.rembourse_jours + ' 天内全额退还买方已付的全部款项（包括预付款）。',
+          en: 'If the goods do not conform to the sample or to this contract (quality, model, quantity or wrong goods), the Buyer may: (1) require the Seller to replace or complete them free of charge within ' + k.remplace_jours + ' days; or (2) cancel the contract, in which case the Seller refunds all amounts paid, including the advance payment, within ' + k.rembourse_jours + ' days.',
+          fr: 'Si les produits ne sont pas conformes à l\'échantillon ou au contrat (qualité, modèle, quantité, mauvais produit), l\'acheteur peut : (1) exiger un remplacement ou un complément gratuit sous ' + k.remplace_jours + ' jours ; ou (2) annuler le contrat : le vendeur rembourse alors tout ce qui a été payé, acompte compris, sous ' + k.rembourse_jours + ' jours.', gras: true },
+        { cn: '到货后 ' + k.garantie_jours + ' 天内发现的隐藏质量问题（凭照片或视频），由卖方免费更换或退款。',
+          en: 'Hidden defects found within ' + k.garantie_jours + ' days after arrival (with photos or videos) are replaced free of charge or refunded by the Seller.',
+          fr: 'Les défauts cachés découverts dans les ' + k.garantie_jours + ' jours après l\'arrivée (photos ou vidéos à l\'appui) sont remplacés gratuitement ou remboursés par le vendeur.' }] },
+      { t: { cn: '第八条　其他', en: 'Article 8 — Other terms', fr: 'Article 8 — Autres conditions' }, p: [
+        { cn: '本合同的修改须经双方书面同意；双方在微信上的书面确认有效。', en: 'Any change to this contract requires the written agreement of both parties; written confirmations on WeChat are valid.',
+          fr: 'Toute modification demande l\'accord écrit des deux parties ; les confirmations écrites sur WeChat sont valables.' },
+        { cn: '争议由双方友好协商解决；协商不成的，任何一方可向卖方所在地有管辖权的人民法院提起诉讼。',
+          en: 'Disputes are settled by friendly negotiation; failing that, either party may bring the case before the competent People\'s Court of the Seller\'s place.',
+          fr: 'Les litiges se règlent à l\'amiable ; à défaut, chaque partie peut saisir le tribunal populaire compétent du lieu du vendeur.' },
+        { cn: '本合同一式两份，双方各执一份，中英文具有同等效力，自双方签字并加盖公章之日起生效；扫描件及经微信确认的文本与原件具有同等效力。',
+          en: 'This contract is made in two originals, one for each party, in Chinese and English with equal validity, and takes effect on the date of signature and company seal of both parties; scanned copies and copies confirmed on WeChat have the same validity as the originals.',
+          fr: 'Le contrat est fait en deux exemplaires, un pour chaque partie, en chinois et en anglais (même valeur) ; il entre en vigueur à la signature et au cachet des deux parties ; une copie scannée ou confirmée sur WeChat vaut l\'original.' }] }],
+    signatures: { cn: ['买方（签字）', '卖方（签字并加盖公章）', '日期'], en: ['Buyer (signature)', 'Seller (signature and company seal)', 'Date'], fr: ['Acheteur (signature)', 'Vendeur (signature et cachet de la société)', 'Date'] },
+    colonnes: { cn: ['序号', '照片', '产品／型号', '档次', '数量', '单价', '金额'], en: ['No.', 'Photo', 'Product / model', 'Grade', 'Qty', 'Unit price', 'Amount'], fr: ['N°', 'Photo', 'Produit / modèle', 'Qualité', 'Qté', 'Prix unitaire', 'Montant'] }
+  };
+  return { T, A, total, langues: langue === 'fr' ? ['fr'] : ['cn', 'en'] };
+}
+// ---------- Le dessin des pages (A4) ----------
+function ctrMorceaux(t) {   // le chinois se coupe entre deux caractères, le reste entre deux mots
+  const m = []; let mot = '';
+  for (const c of String(t)) {
+    if (/[　-鿿＀-￯]/.test(c)) { if (mot) { m.push(mot); mot = ''; } if (/[，。；：、）」』！？％]/.test(c) && m.length) m[m.length - 1] += c; else m.push(c); }
+    else if (c === ' ') { m.push(mot + ' '); mot = ''; }
+    else mot += c;
+  }
+  if (mot) m.push(mot);
+  return m;
+}
+function ctrLignes(g, t, l) {
+  const res = []; let ligne = '';
+  ctrMorceaux(t).forEach(x => {
+    if (g.measureText(ligne + x).width > l && ligne.trim()) { res.push(ligne.trimEnd()); ligne = x.trimStart(); }
+    else ligne += x;
+  });
+  if (ligne.trim()) res.push(ligne.trimEnd());
+  return res;
+}
+async function ctrPages(f, langue) {
+  const k = ctrContrat(f), { T, A, total, langues } = ctrTextes(f, k, langue);
+  const photos = await Promise.all(A.map(async a => { try { return a.photo ? await trImage(a.photo) : null; } catch (e) { return null; } }));
+  const pages = []; let g = null, y = 0;
+  const L = CTR_W - 2 * CTR_MG;
+  const nouvelle = () => {
+    const c = document.createElement('canvas'); c.width = CTR_W; c.height = CTR_H; g = c.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, CTR_W, CTR_H); g.textBaseline = 'alphabetic'; pages.push(c);
+    g.fillStyle = '#0d3f85'; g.fillRect(0, 0, CTR_W, 14);
+    g.font = '20px ' + CTR_POLICE; g.fillStyle = '#5a6b85'; g.textAlign = 'right'; g.fillText(k.no, CTR_W - CTR_MG, 52); g.textAlign = 'left';
+    y = 90;
+  };
+  const place = (h) => { if (y + h > CTR_H - 150) nouvelle(); };
+  const texte = (t, taille, gras, couleur, retrait) => {
+    g.font = (gras ? 'bold ' : '') + taille + 'px ' + CTR_POLICE; g.fillStyle = couleur || '#16233a';
+    const ls = ctrLignes(g, t, L - (retrait || 0)), h = Math.round(taille * 1.45);
+    ls.forEach(l => { place(h); g.font = (gras ? 'bold ' : '') + taille + 'px ' + CTR_POLICE; g.fillStyle = couleur || '#16233a'; g.fillText(l, CTR_MG + (retrait || 0), y + taille); y += h; });
+  };
+  const bilingue = (o, taille, gras) => langues.forEach((lg, i) => texte(o[lg], taille || 22, gras || (o.gras && i === 0), i ? '#3d4a5f' : '#16233a', 0));
+  nouvelle();
+  // Titre
+  g.textAlign = 'center'; g.fillStyle = '#0d3f85';
+  langues.forEach((lg, i) => { g.font = 'bold ' + (i ? 34 : 48) + 'px ' + CTR_POLICE; g.fillText(T.titre[lg], CTR_W / 2, y + (i ? 36 : 50)); y += i ? 52 : 66; });
+  g.textAlign = 'left'; y += 6;
+  langues.forEach(lg => texte(T.entete[lg], 20, false, '#3d4a5f'));
+  y += 10; g.fillStyle = '#d7e1f0'; g.fillRect(CTR_MG, y, L, 3); y += 18;
+  T.parties.forEach(p => { bilingue(p, 22); y += 8; });
+  bilingue(T.preambule, 22); y += 10;
+  for (const art of T.articles) {
+    y += 10; place(90);
+    langues.forEach((lg, i) => texte(art.t[lg], i ? 22 : 26, true, '#0d3f85'));
+    y += 4;
+    if (art.tableau) {
+      // Le tableau des produits : la photo prouve ce qui a été commandé (pas de « produit changé »).
+      const cols = [60, 130, 330, 160, 100, 140, 140], hEnt = 70, hL = 140;
+      place(hEnt + hL);
+      const entete = () => {
+        g.fillStyle = '#e8effb'; g.fillRect(CTR_MG, y, L, hEnt); g.strokeStyle = '#9fb3d1'; g.lineWidth = 2; g.strokeRect(CTR_MG, y, L, hEnt);
+        let x = CTR_MG; g.fillStyle = '#16233a';
+        T.colonnes[langues[0]].forEach((t, i) => { g.font = 'bold 20px ' + CTR_POLICE; g.fillText(t, x + 8, y + 28); if (langues[1]) { g.font = '17px ' + CTR_POLICE; g.fillText(T.colonnes[langues[1]][i], x + 8, y + 54); } x += cols[i]; });
+        y += hEnt;
+      };
+      entete();
+      A.forEach((a, i) => {
+        if (y + hL > CTR_H - 150) { nouvelle(); entete(); }
+        g.strokeStyle = '#9fb3d1'; g.lineWidth = 2; g.strokeRect(CTR_MG, y, L, hL);
+        let x = CTR_MG;
+        const niv = a.px && a.px.niveau ? pxNiv(a.px.niveau) : null;
+        const nomP = String(a.nom || '').split(' — ')[0], cnP = langues[0] === 'cn' ? pxNomChinois(nomP) : '';
+        const cellules = [String(i + 1), null, nomP + '\n' + [cnP, a.reference].filter(Boolean).join(' · '),
+          niv ? (langues[0] === 'fr' ? niv.fr : niv.cn + '\n' + niv.en) : '—', nf(a.quantite), nf(a.prix_unitaire, 2) + ' ¥', nf(num(a.quantite) * num(a.prix_unitaire), 2) + ' ¥'];
+        cellules.forEach((t, j) => {
+          if (j === 1) { const im = photos[i]; if (im) { const e = Math.min((cols[1] - 16) / im.width, (hL - 16) / im.height); g.drawImage(im, x + 8, y + 8, im.width * e, im.height * e); } }
+          else {
+            g.fillStyle = '#16233a'; let yy = y + 32;
+            String(t).split('\n').forEach((part, pi) => { g.font = (pi ? '' : 'bold ') + (pi ? 18 : 20) + 'px ' + CTR_POLICE;
+              ctrLignes(g, part, cols[j] - 14).slice(0, 3).forEach(l => { g.fillText(l, x + 8, yy); yy += 26; }); });
+          }
+          if (j) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + hL); g.stroke(); }
+          x += cols[j];
+        });
+        y += hL;
+      });
+      y += 14;
+    }
+    art.p.forEach(p => { bilingue(p, 22); y += 6; });
+  }
+  // Les signatures
+  y += 20; place(330);
+  const s = T.signatures, demi = (L - 40) / 2;
+  [0, 1].forEach(i => {
+    const x = CTR_MG + i * (demi + 40);
+    g.strokeStyle = '#16233a'; g.lineWidth = 2; g.strokeRect(x, y, demi, 300);
+    g.fillStyle = '#16233a'; g.font = 'bold 22px ' + CTR_POLICE; g.fillText(s[langues[0]][i], x + 16, y + 38);
+    if (langues[1]) { g.font = '18px ' + CTR_POLICE; g.fillText(s[langues[1]][i], x + 16, y + 66); }
+    g.font = '20px ' + CTR_POLICE; g.fillText(i ? (ctrVendeur(f).nom || '') : ctrAcheteur().societe, x + 16, y + 106);
+    g.fillText(s[langues[0]][2] + (langues[1] ? ' ' + s[langues[1]][2] : '') + ' : ____________', x + 16, y + 280);
+  });
+  y += 320;
+  // Le pied de chaque page : le n° de page, et une case pour parapher (on ne remplace pas une page en cachette).
+  pages.forEach((c, i) => {
+    const h = c.getContext('2d'); h.font = '18px ' + CTR_POLICE; h.fillStyle = '#5a6b85';
+    const pied = langues[0] === 'fr' ? 'Page ' + (i + 1) + ' / ' + pages.length + ' — paraphes : acheteur ______  vendeur ______'
+      : '第 ' + (i + 1) + ' 页，共 ' + pages.length + ' 页 · Page ' + (i + 1) + '/' + pages.length + ' — 双方小签 Initials: 买方 Buyer ______  卖方 Seller ______';
+    h.fillText(pied, CTR_MG, CTR_H - 60);
+    if (langue === 'fr') { h.save(); h.globalAlpha = 0.08; h.fillStyle = '#0d3f85'; h.font = 'bold 120px ' + CTR_POLICE; h.translate(CTR_W / 2, CTR_H / 2); h.rotate(-0.5); h.textAlign = 'center'; h.fillText('POUR MOI', 0, 0); h.restore(); }
+  });
+  return pages;
+}
+// ---------- Un vrai fichier PDF, fait dans le téléphone (chaque page = une image) ----------
+function ctrPdf(jpegs) {
+  const enc = new TextEncoder(), morceaux = [], offs = [];
+  let taille = 0;
+  const ajoute = (x) => { const b = typeof x === 'string' ? enc.encode(x) : x; morceaux.push(b); taille += b.length; };
+  const objet = (n, corps, flux) => { offs[n] = taille; ajoute(n + ' 0 obj\n' + corps + '\n'); if (flux) { ajoute('stream\n'); ajoute(flux); ajoute('\nendstream\n'); } ajoute('endobj\n'); };
+  ajoute('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+  const n = jpegs.length, W = 595.28, H = 841.89;
+  objet(1, '<< /Type /Catalog /Pages 2 0 R >>');
+  objet(2, '<< /Type /Pages /Kids [' + jpegs.map((_, i) => (3 + i * 3) + ' 0 R').join(' ') + '] /Count ' + n + ' >>');
+  jpegs.forEach((j, i) => {
+    const p = 3 + i * 3;
+    objet(p, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + W + ' ' + H + '] /Resources << /XObject << /Im0 ' + (p + 1) + ' 0 R >> >> /Contents ' + (p + 2) + ' 0 R >>');
+    objet(p + 1, '<< /Type /XObject /Subtype /Image /Width ' + j.w + ' /Height ' + j.h + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + j.octets.length + ' >>', j.octets);
+    const cs = 'q ' + W + ' 0 0 ' + H + ' 0 0 cm /Im0 Do Q';
+    objet(p + 2, '<< /Length ' + cs.length + ' >>', enc.encode(cs));
+  });
+  const xref = taille, total = 3 + n * 3;
+  let x = 'xref\n0 ' + total + '\n0000000000 65535 f \n';
+  for (let i = 1; i < total; i++) x += String(offs[i]).padStart(10, '0') + ' 00000 n \n';
+  ajoute(x + 'trailer\n<< /Size ' + total + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF\n');
+  return new Blob(morceaux, { type: 'application/pdf' });
+}
+async function ctrFabriquer(f, langue) {
+  const pages = await ctrPages(f, langue);
+  const jpegs = pages.map(c => { const u = c.toDataURL('image/jpeg', 0.88), b = atob(u.split(',')[1]), o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return { w: c.width, h: c.height, octets: o }; });
+  return { pdf: ctrPdf(jpegs), apercus: pages.map(c => c.toDataURL('image/jpeg', 0.6)) };
+}
+
+// ---------- La fenêtre « 📝 Contrat d'achat » ----------
+const CTR_ETAPES = [['envoye', '📤 Envoyé sur WeChat pour accord'], ['accepte', '👍 Il est d\'accord (sur WeChat)'], ['signe', '✍️ Signé et tamponné par les deux'],
+  ['acompte', '💵 Acompte payé (sur le compte de la société)'], ['controle_ok', '✅ Contrôle : conforme'], ['controle_ko', '❌ Contrôle : PAS conforme'], ['solde', '💰 Solde payé'], ['expedie', '🚢 Parti chez le transitaire']];
+let ctrFid = '';
+function ctrBoite(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  ctrFid = fid; ctrAcheteur(); ctrVendeur(f); ctrContrat(f);
+  ctrDessiner();
+}
+function ctrAlertes(f) {
+  const v = ctrVendeur(f), k = ctrContrat(f), a = ctrAcheteur(), al = [];
+  const nom = normaliserNom(v.nom).replace(/[^a-z0-9一-鿿]/g, ''), tit = normaliserNom(v.titulaire).replace(/[^a-z0-9一-鿿]/g, '');
+  if (v.titulaire && nom && tit && nom !== tit && !nom.includes(tit) && !tit.includes(nom)) al.push('⚠ Le compte bancaire n\'est PAS au nom de la société (« ' + v.titulaire + ' »). C\'est le piège le plus courant : ne payez que sur un compte au nom de la société du contrat.');
+  if (!v.titulaire || !v.compte || !v.banque) al.push('Compte bancaire de la société : demandez-le (nom du titulaire, banque, numéro).');
+  if (!/^[0-9A-Z]{18}$/.test(String(v.code || '').trim().toUpperCase())) al.push('Code de crédit social (18 caractères) : demandez la photo de sa licence (营业执照) et recopiez le code. Une vraie société l\'a toujours.');
+  if (!v.nom || !/[一-鿿]/.test(v.nom)) al.push('Nom de la société : écrivez le nom chinois officiel (celui de la licence et du cachet).');
+  if (!a.representant) al.push('Votre nom complet (représentant de KYLO EURGUINE) n\'est pas rempli.');
+  if (!k.livraison) al.push('Date de livraison : à remplir.');
+  return al;
+}
+function ctrChamp(id, etiquette, valeur, plus) { return `<div class="${plus && plus.plein ? 'plein' : ''}"><label for="${id}">${etiquette}</label><input id="${id}" value="${E(valeur || '')}"${plus && plus.type ? ' type="' + plus.type + '"' : ''}${plus && plus.ph ? ' placeholder="' + E(plus.ph) + '"' : ''} onchange="ctrGarderChamps()"></div>`; }
+function ctrDessiner() {
+  const f = mkFournisseur(ctrFid); if (!f) return;
+  const A = ctrAchatsDe(f), v = ctrVendeur(f), a = ctrAcheteur(), k = ctrContrat(f);
+  const total = A.reduce((s, x) => s + num(x.quantite) * num(x.prix_unitaire), 0), al = ctrAlertes(f);
+  const etapes = k.etapes || {};
+  mkBoite(`<div class="mk-dlg ct-champs">
+    <h3>📝 Contrat d'achat — ${E(mkNomFournisseur(f))}</h3>
+    <p class="px-aide">Contre les arnaques : il signe ce qu'il doit livrer (photo, qualité, quantité, prix), quand, et ce qui se passe si ce n'est pas conforme.
+      En <b>chinois et en anglais</b> pour lui ; en <b>français</b> pour vous.</p>
+    ${A.length ? `<div class="px-titre">1. Ce que vous achetez chez lui (${A.length})</div>
+      <div class="ctr-lst">${A.map(x => `<div class="ctr-l">${x.photo ? `<img src="${x.photo}" alt="">` : '<span class="px-vide">📦</span>'}
+        <span><b>${E(x.nom)}</b><br><small>${E(nf(x.quantite))} × ${E(nf(x.prix_unitaire, 2))} ¥ = ${E(nf(num(x.quantite) * num(x.prix_unitaire), 2))} ¥</small></span></div>`).join('')}</div>
+      <div class="ctr-total">Total : ${E(nf(total, 2))} ¥ = ${E(gnfStrict(enGnf(total, 'CNY')))}${E(pxEnDevises(enGnf(total, 'CNY')))}</div>`
+      : '<div class="ctr-attention">Aucun achat noté chez lui. Sur chaque produit : « 🛒 J\'achète » (qualité, quantité, prix), puis revenez ici.</div>'}
+    <div class="px-titre">2. Sa société (comme sur sa licence 营业执照)</div>
+    <div class="ctr-g">${ctrChamp('ctr_v_nom', 'Nom officiel (chinois)', v.nom, { plein: true, ph: '某某电器有限公司' })}${ctrChamp('ctr_v_code', 'Code de crédit social (18)', v.code, { ph: '91330200…' })}
+      ${ctrChamp('ctr_v_rep', 'Son représentant', v.representant)}${ctrChamp('ctr_v_adr', 'Adresse de la société', v.adresse, { plein: true })}${ctrChamp('ctr_v_tel', 'Téléphone', v.tel)}</div>
+    <div class="px-titre">3. Son compte bancaire (au nom de la société)</div>
+    <div class="ctr-g">${ctrChamp('ctr_v_tit', 'Titulaire du compte', v.titulaire, { plein: true })}${ctrChamp('ctr_v_ban', 'Banque', v.banque)}${ctrChamp('ctr_v_cpt', 'Numéro de compte', v.compte)}${ctrChamp('ctr_v_swift', 'SWIFT (si virement de l\'étranger)', v.swift)}</div>
+    <div class="px-titre">4. La livraison et le paiement</div>
+    <div class="ctr-g">${ctrChamp('ctr_k_liv', 'Livré au plus tard le', k.livraison, { type: 'date' })}${ctrChamp('ctr_k_ac', 'Acompte (%)', k.acompte)}
+      ${ctrChamp('ctr_k_lieu', 'Lieu de livraison (adresse de votre transitaire, en chinois si possible)', k.lieu, { plein: true, ph: 'vide = « l\'entrepôt de mon transitaire à Canton »' })}${ctrChamp('ctr_k_ctrl', 'Contrôleur choisi par vous (nom, facultatif)', k.controleur, { plein: true })}</div>
+    <label style="display:flex;gap:10px;align-items:center;font-size:16px"><input type="checkbox" id="ctr_k_inclus" ${k.lieu_inclus ? 'checked' : ''} onchange="ctrGarderChamps()" style="width:24px;height:24px"> Livraison jusqu'à ce lieu comprise dans le prix</label>
+    <label style="display:flex;gap:10px;align-items:center;font-size:16px"><input type="checkbox" id="ctr_k_fr" ${k.francais ? 'checked' : ''} onchange="ctrGarderChamps()" style="width:24px;height:24px"> Boîte et notice en français</label>
+    <label for="ctr_k_prise">Prise électrique</label><select id="ctr_k_prise" onchange="ctrGarderChamps()" style="font-size:16px"><option value="C/F"${k.prise !== 'G' ? ' selected' : ''}>Européenne (type C/F) — Guinée</option><option value="G"${k.prise === 'G' ? ' selected' : ''}>Anglaise (type G)</option></select>
+    <div class="px-titre">5. Vous (l'acheteur)</div>
+    <div class="ctr-g">${ctrChamp('ctr_a_soc', 'Société', a.societe)}${ctrChamp('ctr_a_rep', 'Votre nom complet', a.representant)}${ctrChamp('ctr_a_adr', 'Adresse', a.adresse, { plein: true })}${ctrChamp('ctr_a_tel', 'Téléphone', a.tel)}${ctrChamp('ctr_a_wx', 'WeChat', a.wechat)}</div>
+    <div id="ctr_alertes">${al.length ? al.map(x => `<div class="ctr-attention">${E(x)}</div>`).join('') : '<div class="ctr-ok">✓ Tout est rempli. Le compte est au nom de la société.</div>'}</div>
+    <div class="px-titre">6. Ce que dit le contrat (en bref)</div>
+    <ul class="ctr-explique"><li>Neuf, <b>conforme à l'échantillon</b> scellé ; il ne change rien (produit, matière, modèle, qualité, emballage) sans votre accord écrit.</li>
+      <li><b>${E(nf(num(k.acompte) || 30))} % d'acompte</b> après signature, <b>le reste après un contrôle conforme</b>, avant l'expédition — <b>seulement sur le compte de la société</b> du contrat.</li>
+      <li>Pas conforme : il <b>remplace gratuitement</b> sous ${k.remplace_jours} jours, <b>ou il rembourse tout</b> (acompte compris) sous ${k.rembourse_jours} jours et le contrat est annulé.</li>
+      <li>En retard : ${E(nf(k.penalite, 1))} % par jour (au plus ${k.penalite_max} %) ; plus de ${k.retard_max} jours : vous pouvez annuler, il rembourse tout.</li>
+      <li>Défauts cachés découverts dans les ${k.garantie_jours} jours après l'arrivée : remplacés ou remboursés.</li>
+      <li>Les accords écrits sur WeChat comptent. Chaque page paraphée par les deux ; signé ET <b>tamponné (公章)</b> par sa société.</li></ul>
+    <div class="px-titre">7. Envoyer, imprimer, signer</div>
+    <div class="px-boutons">
+      <button type="button" class="b" style="background:#1aad19;color:#fff" onclick="ctrEnvoyer('cnen')" ${A.length ? '' : 'disabled'}>📤 Le contrat chinois-anglais (PDF) → WeChat</button>
+      <button type="button" class="b contour" onclick="ctrEnvoyer('fr')" ${A.length ? '' : 'disabled'}>📄 La version française (pour moi)</button></div>
+    <div id="ctr_apercu" class="ctr-apercu"></div>
+    <p class="px-aide">Imprimez-le (dans WeChat ou Fichiers : ⋯ → Imprimer, ou dans une imprimerie) en 2 exemplaires : vous signez, il signe et met le cachet rouge de la société. Chacun garde le sien.</p>
+    <div class="px-titre">8. Où en est ce contrat</div>
+    <div class="ctr-etapes">${CTR_ETAPES.map(([cle, t]) => `<button type="button" class="${etapes[cle] ? (cle === 'controle_ko' ? 'ko' : 'fait') : ''}" onclick="ctrEtape('${cle}')">${t}<span>${etapes[cle] ? E(mkJour(etapes[cle])) : 'touchez quand c\'est fait'}</span></button>`).join('')}</div>
+    ${etapes.controle_ko ? `<div class="ctr-attention">Contrôle pas conforme : demandez par écrit sur WeChat le remplacement sous ${k.remplace_jours} jours OU le remboursement de tout ce que vous avez payé sous ${k.rembourse_jours} jours (article 7 du contrat). Ne payez pas le solde.</div>` : ''}
+    <div class="mk-boutons"><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+}
+function ctrGarderChamps() {
+  const f = mkFournisseur(ctrFid); if (!f) return;
+  const val = (id) => { const e = document.getElementById(id); return e ? (e.type === 'checkbox' ? e.checked : String(e.value || '').trim()) : undefined; };
+  const v = ctrVendeur(f), a = ctrAcheteur(), k = ctrContrat(f);
+  Object.assign(v, { nom: val('ctr_v_nom'), code: String(val('ctr_v_code') || '').toUpperCase(), representant: val('ctr_v_rep'), adresse: val('ctr_v_adr'), tel: val('ctr_v_tel'),
+    titulaire: val('ctr_v_tit'), banque: val('ctr_v_ban'), compte: val('ctr_v_cpt'), swift: val('ctr_v_swift') });
+  Object.assign(a, { societe: val('ctr_a_soc') || 'KYLO EURGUINE', representant: val('ctr_a_rep'), adresse: val('ctr_a_adr'), tel: val('ctr_a_tel'), wechat: val('ctr_a_wx') });
+  Object.assign(k, { livraison: val('ctr_k_liv'), acompte: Math.min(100, Math.max(0, num(val('ctr_k_ac')) || 30)), lieu: val('ctr_k_lieu'), controleur: val('ctr_k_ctrl'),
+    lieu_inclus: !!val('ctr_k_inclus'), francais: !!val('ctr_k_fr'), prise: val('ctr_k_prise') || 'C/F' });
+  sauverLocal();
+  const al = ctrAlertes(f), z = document.getElementById('ctr_alertes');
+  if (z) z.innerHTML = al.length ? al.map(x => `<div class="ctr-attention">${E(x)}</div>`).join('') : '<div class="ctr-ok">✓ Tout est rempli. Le compte est au nom de la société.</div>';
+}
+async function ctrEnvoyer(langue) {
+  const f = mkFournisseur(ctrFid); if (!f) return;
+  ctrGarderChamps();
+  const z = document.getElementById('ctr_apercu'); if (z) z.innerHTML = '<p class="px-aide">⏳ Le contrat se prépare…</p>';
+  try {
+    const r = await ctrFabriquer(f, langue);
+    if (z) z.innerHTML = r.apercus.map((src, i) => `<img src="${src}" alt="Page ${i + 1}" onclick="mkApercu(this.src, 'Page ${i + 1}')">`).join('');
+    const k = ctrContrat(f);
+    const nom = (langue === 'fr' ? 'Contrat-FR-' : 'Contract-合同-') + k.no + '.pdf';
+    const voie = await remettreFichier(r.pdf, nom);
+    if (langue !== 'fr' && voie !== 'annule' && voie !== 'erreur' && !(k.etapes || {}).envoye) { k.etapes = Object.assign({}, k.etapes, { envoye: mkMaintenant() }); k.version = (k.version || 0) + 1; sauverLocal(); }
+  } catch (e) { if (z) z.innerHTML = '<div class="ctr-attention">Le contrat n\'a pas pu être préparé : ' + E(e.message || e) + '</div>'; }
+}
+function ctrEtape(cle) {
+  const f = mkFournisseur(ctrFid); if (!f) return;
+  ctrGarderChamps();
+  const k = ctrContrat(f); k.etapes = Object.assign({}, k.etapes);
+  if (k.etapes[cle]) delete k.etapes[cle];
+  else { k.etapes[cle] = mkMaintenant(); if (cle === 'controle_ok') delete k.etapes.controle_ko; if (cle === 'controle_ko') delete k.etapes.controle_ok; }
+  sauverLocal(); ctrDessiner();
+  const d = document.getElementById('boite'); if (d) { const b = d.querySelector('.ctr-etapes'); if (b) b.scrollIntoView({ block: 'center' }); }
+}
+// Sa fiche : le bouton et où en est le contrat.
+function ctrEtatHtml(f) {
+  const A = ctrAchatsDe(f); if (!A.length && !f.contrat) return '';
+  const e = (f.contrat && f.contrat.etapes) || {};
+  const der = CTR_ETAPES.filter(([k]) => e[k]).pop();
+  return `<div class="ctr-etat">📝 <b>Contrat d'achat</b> : ${der ? E(der[1]) + ' le ' + E(mkJour(e[der[0]])) : 'pas encore fait'}
+    <button type="button" class="b ${der ? 'contour' : 'vert'}" style="margin-top:8px;min-height:50px;font-size:16px" onclick="ctrBoite('${f.id}')">📝 ${der ? 'Ouvrir son contrat' : 'Faire son contrat (chinois-anglais + français)'}</button></div>`;
+}
+</script>
+<style>
+/* ---------- 💬 L'ajouter sur WeChat (1.7.0) ---------- */
+.wx-statut{margin:8px 0;padding:10px 12px;border-radius:12px;font-size:16px;line-height:1.4}
+.wx-statut.ami{background:#e8f6e8;color:#14532d}
+.wx-statut.invite{background:#fff6dc;color:#713f12}
+.wx-statut.rien{background:#eef2f7;color:#1e293b}
+.wx-etape{margin:12px 0;padding:12px;border:1px solid var(--lisiere, #d6dbe3);border-radius:14px}
+.wx-etape summary{font-size:16px;font-weight:700;cursor:pointer}
+.wx-etape h4{margin:0 0 6px;font-size:17px}
+.wx-etape p,.wx-etape li{font-size:15px;line-height:1.45}
+.wx-etape ol{margin:6px 0 0;padding-left:22px}
+.wx-etape textarea{width:100%;box-sizing:border-box;font-size:17px;line-height:1.4;padding:10px;border-radius:10px;border:1px solid var(--lisiere, #d6dbe3)}
+.wx-etape .wx-fr{font-size:14px;color:#475569;margin-top:4px}
+.wx-route{margin-top:10px;padding-top:10px;border-top:1px dashed var(--lisiere, #d6dbe3)}
+.wx-route:first-of-type{border-top:0;padding-top:0}
+.wx-route .b{width:100%;min-height:54px;font-size:16px;margin-top:6px}
+.wx-etape .b{width:100%;min-height:54px;font-size:16px;margin-top:6px}
+.wx-etape .b.wechat{background:#1aad19;color:#fff}
+.wx-limite{font-size:14px;color:#475569;margin:6px 0 0}
+.fs-pastilles span.wx-att{color:#9a3412}
+</style>
+<script>
+// ---------- 💬 L'ajouter sur WeChat : trouver son profil, l'invitation prête, puis son catalogue (1.7.0) ----------
+// WeChat ne laisse AUCUNE autre application ouvrir un profil ou envoyer une invitation : le carnet prépare tout
+// (son QR dans Photos, son ID ou son portable copié, le mot d'invitation en chinois) et note où on en est :
+//   ''        rien encore ;   'invite'  invitation envoyée (wx_invite_le) ;   'ami'  il est dans mes contacts (wx_ami_le).
+function wxEtat(f) {
+  if (!f) return '';
+  if (f.wx_ami_le) return 'ami';
+  if (f.wx_invite_le) return 'invite';
+  return '';
+}
+// Déjà en contact sur WeChat ? Noté « ami », renommé dans WeChat, catalogue demandé par WeChat, ou catalogue / prix reçus.
+function wxAjoute(f, e) {
+  if (!f) return false;
+  if (f.wx_ami_le || f.wechat_renomme || f.catalogue_canal === 'wechat') return true;
+  e = e || fsEtapes(f);
+  return !!(e.cata || e.prix);
+}
+// Son portable pour la recherche WeChat (« ID WeChat / numéro de portable ») : 11 chiffres pour un portable chinois.
+function wxPortable(f) {
+  for (const k of ['mobile', 'whatsapp', 'tel']) {
+    const brut = String((f && f[k]) || '').trim(); if (!brut) continue;
+    let d = brut.replace(/\D/g, '');
+    if (d.startsWith('0086')) d = d.slice(2);
+    const cn = d.match(/^86(1[3-9]\d{9})$/); if (cn) return cn[1];
+    if (/^1[3-9]\d{9}$/.test(d)) return d;
+    if (d.length >= 8) return (brut.startsWith('+') || d.length > 11 ? '+' : '') + d;
+  }
+  return '';
+}
+function wxIdentifiant(f) { return f && f.wechat && !/^https?:/i.test(f.wechat) ? String(f.wechat).trim() : ''; }
+function wxLien(f) { return f ? (f.wechat_lien || (/^https?:/i.test(f.wechat || '') ? f.wechat : '')) : ''; }
+// Les chemins pour trouver son profil, du plus court au plus long.
+function wxMoyens(f) {
+  const m = [];
+  if (f && f.qr_photo) m.push('qr');
+  if (wxIdentifiant(f)) m.push('id');
+  if (wxPortable(f)) m.push('tel');
+  if (wxLien(f)) m.push('lien');
+  return m;
+}
+function wxAFaire(f, e) { return !wxAjoute(f, e) && wxMoyens(f).length > 0; }
+// Le mot d'invitation (la case « Envoyer une demande d'ajout » / 发送添加朋友申请) : court, en chinois, pour qu'il le reconnaisse.
+function wxMotInvitation(f) {
+  const moi = ctSignature().split('–')[0].trim() || 'Riche';
+  const lieu = f.lieu_rencontre && f.lieu_rencontre !== 'foire' ? ctLieu(f.lieu_rencontre, 'cn')
+    : '在广交会' + (String(f.allee || '').trim() ? String(f.allee).trim().replace(/\s+/g, '') + '展位' : '');
+  return '我是几内亚KYLO EURGUINE的' + moi + '，' + lieu + '见过，想要贵司目录和报价';   // moins de 50 signes
+}
+function wxMotFrancais(f) {
+  const lieu = f.lieu_rencontre && f.lieu_rencontre !== 'foire' ? ctLieu(f.lieu_rencontre, 'en').replace(/^at /, '')
+    : 'Foire de Canton' + (String(f.allee || '').trim() ? ', stand ' + String(f.allee).trim() : '');
+  return 'En français : « Je suis ' + (ctSignature().split('–')[0].trim() || 'Riche') + ' de KYLO EURGUINE (Guinée), on s\'est vus (' + lieu + '), je voudrais votre catalogue et vos prix. »';
+}
+function wxStatutHtml(f) {
+  const st = wxEtat(f);
+  if (st === 'ami') return `<div class="wx-statut ami" role="status">✅ Dans mes contacts WeChat depuis le ${E(mkJour(f.wx_ami_le))}.</div>`;
+  if (st === 'invite') return `<div class="wx-statut invite" role="status">⏳ Invitation envoyée le ${E(mkJour(f.wx_invite_le))} à ${E(mkHeure(f.wx_invite_le))} : attendez qu'il accepte (WeChat vous prévient).</div>`;
+  if (wxAjoute(f)) return '<div class="wx-statut ami" role="status">✅ Déjà en contact (son catalogue ou ses prix sont arrivés).</div>';
+  return '<div class="wx-statut rien" role="status">💬 Pas encore ajouté sur WeChat.</div>';
+}
+function wxBoite(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const st = wxEtat(f), m = wxMoyens(f), id = wxIdentifiant(f), tel = wxPortable(f), nomWx = trNomPourWeChat(f);
+  const e = fsEtapes(f), sansCata = !e.cata, deja = st === 'ami' || (st === '' && wxAjoute(f, e));
+  const routes = [];
+  if (m.includes('qr')) routes.push(`<div class="wx-route"><p><b>Avec son QR</b> (le plus rapide) :</p>
+      <img class="mk-grand-qr" src="${f.qr_photo}" alt="QR WeChat">
+      <ol><li>« 🖼️ Enregistrer son QR dans Photos » (ou appui long sur le QR → Enregistrer).</li>
+        <li>« 📋 Copier le mot et ouvrir le Scanner » : dans WeChat, <b>Scanner</b> → l'<b>icône image</b> (en bas à droite) → choisissez son QR.</li>
+        <li>Son profil s'ouvre → <b>Ajouter aux contacts</b> (添加到通讯录) → effacez « 我是… », <b>appui long → Coller</b> → <b>Envoyer</b> (发送).</li></ol>
+      <button class="b vert" onclick="mkPartagerQR('${f.id}')">🖼️ Enregistrer son QR dans Photos</button>
+      <button class="b wechat" onclick="wxScanner('${f.id}')">📋 Copier le mot et ouvrir le Scanner</button>
+      <p class="wx-limite">Si WeChat s'ouvre sur l'accueil : touchez <b>+</b> (en haut à droite) → <b>Scanner</b>.</p></div>`);
+  if (m.includes('id') || m.includes('tel')) routes.push(`<div class="wx-route"><p><b>${m.includes('qr') ? 'Sinon, avec' : 'Avec'} son ${id ? 'ID WeChat' : 'portable'}</b> :</p>
+      <ol><li>Copiez ${id ? 'son ID' : 'son portable'} ci-dessous, puis dans WeChat : <b>+</b> → <b>Ajouter des contacts</b> (添加朋友) → collez → <b>Rechercher</b>.</li>
+        <li>Son profil s'ouvre → <b>Ajouter aux contacts</b>. Revenez ici : « 📋 Copier le mot d'invitation », puis dans WeChat <b>Coller</b> → <b>Envoyer</b>.</li></ol>
+      ${id ? `<button class="b vert" onclick="wxCopierEtOuvrir('${f.id}','id')">📋 Copier son ID (${E(id)}) et ouvrir WeChat</button>` : ''}
+      ${tel ? `<button class="b ${id ? 'contour' : 'vert'}" onclick="wxCopierEtOuvrir('${f.id}','tel')">📋 Copier son portable (${E(tel)}) et ouvrir WeChat</button>` : ''}
+      ${tel && !id ? '<p class="wx-limite">Le portable marche si son WeChat est relié à ce numéro (presque toujours en Chine). Sinon : « Personne trouvée » → demandez son QR.</p>' : ''}</div>`);
+  if (m.includes('lien')) routes.push(`<div class="wx-route"><button class="b contour" onclick="mkOuvrirLien('${f.id}')">🔗 Essayer son lien WeChat</button></div>`);
+  if (!m.length) routes.push(`<div class="wx-route"><p>Aucun QR, ID ni portable gardé pour lui. Au stand, photographiez sa carte ou son QR :</p>
+      <button class="b vert" onclick="fermerBoite();trStandOuvrir('${f.id}')">📷 Au stand : sa carte, son QR</button>
+      <button class="b contour" onclick="fermerBoite();mkModifierFournisseur('${f.id}')">✏️ Taper son WeChat ou son portable</button></div>`);
+  const guide = `<div class="wx-etape"><h4>1. Trouver son profil</h4>${routes.join('')}</div>
+    <div class="wx-etape"><h4>2. Le mot d'invitation (en chinois)</h4>
+      <p>Pour qu'il sache qui vous êtes et accepte vite. Vous pouvez le modifier.</p>
+      <textarea id="wx_mot" rows="3">${E(wxMotInvitation(f))}</textarea>
+      <div class="wx-fr">${E(wxMotFrancais(f))}</div>
+      <button class="b contour" onclick="wxCopierMot('${f.id}')">📋 Copier le mot d'invitation</button>
+      <p class="wx-limite">Nom à lui donner dans WeChat (case « Remarque » / 备注) : <b>${E(nomWx)}</b></p>
+      <button class="b contour" onclick="mkCopier(${E(JSON.stringify(nomWx))}, 'Nom copié : collez-le dans « Remarque » (备注).')">📋 Copier le nom à lui donner (${E(f.code || '')})</button></div>`;
+  const actions = `<div class="wx-etape"><h4>${deja || st === 'invite' ? 'Ensuite' : '3. Noter où j\'en suis'}</h4>
+      ${st === '' && !deja ? `<button class="b vert" onclick="wxNoter('${f.id}','invite')">✅ Invitation envoyée</button>
+        <button class="b contour" onclick="wxNoter('${f.id}','ami')">Il est déjà dans mes contacts WeChat</button>` : ''}
+      ${st === 'invite' ? `<button class="b vert" onclick="wxNoter('${f.id}','ami')">🤝 Il m'a accepté${sansCata ? ' → demander son catalogue' : ''}</button>` : ''}
+      ${deja && sansCata && !f.catalogue_demande_le ? `<button class="b vert" onclick="fermerBoite();fsDemanderCatalogue('${f.id}')">📖 Demander son catalogue</button>` : ''}
+      ${deja ? `<button class="b wechat" onclick="trAQui(mkFournisseur('${f.id}'), () => ctAller('weixin://'))">💬 Ouvrir sa discussion WeChat</button>` : ''}
+      ${st !== '' ? `<button class="b contour" onclick="wxNoter('${f.id}','')">↩️ Remettre « pas encore ajouté »</button>` : ''}
+    </div>`;
+  // Pas encore ajouté : le mode d'emploi d'abord. Invitation envoyée : « Il m'a accepté » d'abord, le mode d'emploi replié.
+  const corps = deja ? actions + (m.length ? `<details class="wx-etape"><summary>🔎 Revoir son QR, son ID ou son portable</summary>${routes.join('')}</details>` : '')
+    : st === 'invite' ? actions + `<details class="wx-etape"><summary>🔎 Revoir le mode d'emploi (son QR, le mot d'invitation)</summary>${guide}</details>`
+    : !m.length ? `<div class="wx-etape"><h4>Son WeChat</h4>${routes.join('')}${f.email && sansCata && !f.catalogue_demande_le
+        ? `<p class="wx-limite">En attendant, son catalogue peut se demander par e-mail (${E(f.email)}).</p><button class="b contour" onclick="fermerBoite();fsDemanderCatalogue('${f.id}')">📖 Demander son catalogue par e-mail</button>` : ''}</div>` + actions
+    : `<p class="wx-limite">WeChat ne laisse aucune application ouvrir son profil ou envoyer l'invitation à votre place : le carnet prépare tout, il vous reste 3 touches dans WeChat.</p>` + guide + actions;
+  mkBoite(`<div class="mk-dlg wx-dlg">
+    <h3>💬 Ajouter ${E(mkNomFournisseur(f))} sur WeChat</h3>
+    ${wxStatutHtml(f)}
+    ${corps}
+    <div class="mk-boutons"><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+  // La fenêtre s'ouvre en haut (sinon le téléphone descend jusqu'au premier bouton).
+  const haut = () => { const d = document.getElementById('boite'); if (d) d.scrollTop = 0; };
+  haut(); requestAnimationFrame(haut); setTimeout(haut, 60);
+}
+function wxTexteMot() { const t = document.getElementById('wx_mot'); return t && t.value.trim() ? t.value.trim() : ''; }
+function wxCopierMot(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  mkCopier(wxTexteMot() || wxMotInvitation(f), 'Mot copié : dans WeChat, effacez « 我是… », appui long → Coller → Envoyer (发送).');
+}
+function wxScanner(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  mkCopier(wxTexteMot() || wxMotInvitation(f), 'Mot copié. WeChat s\'ouvre : Scanner → icône image → son QR → Ajouter aux contacts → Coller → Envoyer.');
+  setTimeout(() => ctAller('weixin://dl/scan'), 600);
+}
+function wxCopierEtOuvrir(fid, quoi) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const v = quoi === 'id' ? wxIdentifiant(f) : wxPortable(f); if (!v) return;
+  mkCopier(v, (quoi === 'id' ? 'ID' : 'Portable') + ' copié. WeChat : + → Ajouter des contacts → collez → Rechercher. Puis revenez copier le mot d\'invitation.');
+  setTimeout(() => ctAller('weixin://'), 600);
+}
+function wxNoter(fid, etat) {
+  const f = mkFournisseur(fid); if (!f) return;
+  if (etat === 'invite') { f.wx_invite_le = mkMaintenant(); delete f.wx_ami_le; }
+  else if (etat === 'ami') { f.wx_ami_le = mkMaintenant(); if (!f.wx_invite_le) f.wx_invite_le = f.wx_ami_le; }
+  else { delete f.wx_invite_le; delete f.wx_ami_le; }
+  sauverLocal();
+  const sansCata = !fsEtapes(f).cata && !f.catalogue_demande_le;
+  if (etat === 'ami' && sansCata) { fermerBoite(); dessiner(); fsDemanderCatalogue(f.id); avertir('🤝 ' + mkNomFournisseur(f) + ' est dans vos contacts WeChat. Demandez-lui son catalogue.'); return; }
+  wxBoite(f.id); dessiner();
+  avertir(etat === 'invite' ? '⏳ Invitation notée : quand il accepte, touchez « 🤝 Il m\'a accepté ».' : etat === 'ami' ? '🤝 Noté : il est dans vos contacts WeChat.' : 'Remis à « pas encore ajouté ».');
+}
+// Le bouton WeChat dit où on en est (liste des fournisseurs, sa fiche).
+function wxLibelle(f, court) {
+  const st = wxEtat(f);
+  if (st === 'ami' || wxAjoute(f)) return '💬 Son WeChat ✓';
+  if (st === 'invite') return '⏳ Invitation envoyée';
+  return court ? '💬 Ajouter sur WeChat' : '💬 L\'ajouter sur WeChat';
+}
+// « Où j'en suis » : la pastille WeChat, le filtre, la prochaine étape, le compte.
+function wxPastille(f, e, past) {
+  const st = wxEtat(f);
+  if (st === 'ami' || wxAjoute(f, e)) return past(true, 'WeChat ajouté');
+  if (st === 'invite') return past(false, 'invitation WeChat envoyée', true);
+  return wxMoyens(f).length ? '<span class="wx-att">○ WeChat à ajouter</span>' : past(false, 'WeChat');
+}
+function wxResumeHtml() {
+  let a = 0, i = 0;
+  fournisseursListe().forEach(f => { const e = fsEtapes(f); if (!wxAFaire(f, e)) return; if (wxEtat(f) === 'invite') i++; else a++; });
+  return [a ? `💬 <b>${a}</b> à ajouter sur WeChat (avant de demander le catalogue)` : '', i ? `⏳ <b>${i}</b> invitation(s) WeChat en attente` : ''].filter(Boolean).join('<br>');
+}
+mkContact = function (fid) { wxBoite(fid); };
+const wxProchaineAvant = fsProchaine;
+fsProchaine = function (f, e) {
+  if (e.coord && !e.cata && !e.cataDemande && wxAFaire(f, e))
+    return wxEtat(f) === 'invite' ? ['🤝 Il a accepté ? Son catalogue', `mkContact('${f.id}')`] : ['💬 L\'ajouter sur WeChat', `mkContact('${f.id}')`];
+  return wxProchaineAvant(f, e);
+};
+// Le catalogue demandé PAR WeChat : c'est qu'on est en contact.
+const wxEnvoyerCatalogueAvant = fsEnvoyerCatalogue;
+fsEnvoyerCatalogue = function (fid, canal) {
+  const f = mkFournisseur(fid);
+  if (f && canal === 'wechat') { f.catalogue_canal = 'wechat'; sauverLocal(); }
+  return wxEnvoyerCatalogueAvant(fid, canal);
+};
+// « Envoyer à Claude » garde où on en est sur WeChat.
+['wx_invite_le', 'wx_ami_le', 'catalogue_canal', 'wechat_renomme'].forEach(k => {
+  if (typeof CL_CHAMPS_ENVOI !== 'undefined' && !CL_CHAMPS_ENVOI.includes(k)) CL_CHAMPS_ENVOI.push(k);
+  if (typeof FS_CHAMPS_ENVOI !== 'undefined' && !FS_CHAMPS_ENVOI.includes(k)) FS_CHAMPS_ENVOI.push(k);
+});
 </script>
 <script>
 

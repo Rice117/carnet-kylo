@@ -91,6 +91,27 @@ catégorie, groupe de produits, note de fiabilité 0–5 avec ses raisons et ses
 (du mieux noté au moins bien noté) ; Sa fiche « 🔎 Qui est-ce ? Fiabilité ». Rien de retiré.
 ⚠ Même remarque : à reporter dans `KYLO-Achats.html` (module `classement-1.6.1.html` et les retouches de `construire-1.6.1.py`).
 
+Version 1.7.0 — 21/10/2026 : **Des prix à l'achat, et le contrat**. Sa fiche → « 💰 Demander ses prix » : les produits vus
+au stand et ceux du catalogue, numérotés ; prix en yuans, quantité minimum, prix pour 2 ou 3 quantités, en 3 qualités
+(高档 / 中档 / 低档) et leur différence ; envoyés en photos numérotées, en tableau Excel à remplir (feuille cachée « kylo »)
+et en message chinois-anglais. Le tableau rempli revient par « 📥 Fichier reçu sur WeChat » et chaque prix va sur le bon
+produit ; le retour de Claude (format kylo-import) peut porter des « offres » (3 qualités, paliers, prix à proposer) et
+le « marché » guinéen (prix de vente, frais jusqu'au magasin). Sur chaque produit : le tableau des qualités en ¥, francs et
+dollars, « ⛔ Ne payez pas plus de » (prix de vente × (1 − marge) ÷ (1 + frais)), « 🎯 Proposez ». « 🛒 J'achète » : la
+qualité et la quantité donnent le prix de cette quantité, le total, le budget ; « Mes achats décidés » et l'objectif de
+30 à 35 produits différents. Négocier s'ouvre rempli et compte la marge comme Comparer. « 📝 Contrat d'achat » : un PDF
+chinois-anglais (et une version française) rempli avec les achats chez ce fournisseur — acompte, contrôle avant le solde,
+remplacement ou remboursement, délai et pénalités, compte bancaire de la société seulement — fait dans le téléphone.
+Les dollars à côté des euros ; plus aucune écriture sous 14 px. Rien de retiré.
+Aussi dans la 1.7.0 : les frais jusqu'au magasin se comptent au VOLUME (bateau = m³ par pièce × prix du m³, douane sur la
+valeur arrivée, + 5 %) ; « 💬 L'ajouter sur WeChat » (WeChat ne permet à aucune application d'ouvrir un profil ou d'envoyer
+une invitation : le carnet prépare le QR dans Photos, l'ID ou le portable copié, le mot d'invitation chinois, puis suit
+« ⏳ invitation envoyée » → « 🤝 accepté » → demande de catalogue) ; les grands catalogues (des milliers de modèles, chacun
+avec sa photo) : familles repliées dessinées à l'ouverture, en Photos comme en Détails et dans Comparer par produit (60
+lignes à la fois) ; la mémoire du téléphone n'écrit pas les cases vides des produits (completerCarnet les remet à
+l'ouverture) ; un fichier kylo-import peut arriver en plusieurs parties, la suite d'un fournisseur se range chez lui.
+⚠ Même remarque : à reporter dans `KYLO-Achats.html` (modules `prix-1.7.0.html`, `contrat-1.7.0.html`, `wechat-1.7.0.html` et les retouches de `construire-1.7.0.py`).
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

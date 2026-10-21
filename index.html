@@ -5661,7 +5661,7 @@ async function ctAjouterPhotos(fid, type, input) {
       const id = idUnique('d');
       // Assez grande pour lire les petites lignes d'un catalogue (batterie, carton, poids).
       await ctEcrire(id, mkReduire(img, 1800, 0.74));
-      const mini = mkReduire(img, 280, 0.62);
+      const mini = mkReduire(img, 560, 0.74);
       await ctEcrire(id + '~m', mini);
       ctMiniCache[id] = mini;
       if (!Array.isArray(f.docs)) f.docs = [];
@@ -7300,12 +7300,12 @@ function trOuvrirWhatsApp(fid) {
 // ---------- 4. Les photos rangées, et lues en arrière-plan ----------
 // Une photo de carte (ou du panneau du stand) est marquée « à lire » : le carnet la lit dès qu'il peut,
 // même plus tard (lecture pas encore prête, carnet refermé) — rien n'est perdu.
-const TR_TAILLES = { carte: [1800, 0.82], page: [2400, 0.8], produit: [1800, 0.82], stand: [1600, 0.8] };
+const TR_TAILLES = { carte: [3600, 0.88], page: [3600, 0.88], produit: [2400, 0.85], stand: [2400, 0.85] };
 async function trRangerPhoto(f, type, source) {
   const id = idUnique('d');
   const [max, q] = TR_TAILLES[type] || TR_TAILLES.page;
   await ctEcrire(id, mkReduire(source, max, q));
-  const mini = mkReduire(source, 280, 0.62);
+  const mini = mkReduire(source, 560, 0.74);
   await ctEcrire(id + '~m', mini);
   ctMiniCache[id] = mini;
   if (!Array.isArray(f.docs)) f.docs = [];
@@ -7614,8 +7614,8 @@ function trPlat(source) {
 async function trPileAnalyser(fichier) {
   const img = await mkLireFichier(fichier);
   const id = idUnique('d');
-  await ctEcrire(id, mkReduire(img, 2400, 0.8));
-  const mini = mkReduire(img, 280, 0.62);
+  await ctEcrire(id, mkReduire(img, 3600, 0.88));
+  const mini = mkReduire(img, 560, 0.74);
   await ctEcrire(id + '~m', mini); ctMiniCache[id] = mini;
   const ph = { id, nom: fichier.name || '', mini, type: 'page', qrs: [], champs: {}, cles: [], mots: 0, ocr: false, plat: trPlat(img) };
   ph.qrs = await trLireTousQR(img, ph.plat >= 0.45);   // fouiller morceau par morceau : seulement une photo qui ressemble à une carte
@@ -8002,7 +8002,7 @@ async function trPhotosImport(imp, suivi) {
       if (deja && deja.photo_doc) { delete xp.photo; fait++; continue; }
       const id = idUnique('d');
       await ctEcrire(id, xp.photo);
-      const mini = mkReduire(await trImage(xp.photo), 280, 0.7);
+      const mini = mkReduire(await trImage(xp.photo), 560, 0.74);
       await ctEcrire(id + '~m', mini); ctMiniCache[id] = mini;
       xp.photo_doc = id; delete xp.photo; n++; fait++;
       if (suivi) suivi(fait, total);
@@ -8567,7 +8567,7 @@ async function trDecAjouter() {
     const id = idUnique('d');
     try {
       await ctEcrire(id, c.photo);
-      const mini = mkReduire(await trImage(c.photo), 280, 0.7); await ctEcrire(id + '~m', mini); ctMiniCache[id] = mini;
+      const mini = mkReduire(await trImage(c.photo), 560, 0.74); await ctEcrire(id + '~m', mini); ctMiniCache[id] = mini;
     } catch (e) { avertir('⚠ Mémoire pleine : ' + n + ' produit(s) ajouté(s) seulement.'); break; }
     const incertain = !saisi ? 'référence et détails pas encore écrits : ils sont sur la photo (ou envoyez la page à Claude)'
       : (c.devine && saisi === c.ref ? 'référence lue par le téléphone : à vérifier sur la photo' : '');
@@ -9204,7 +9204,7 @@ async function fwLirePdf(fichier, suivi) {
       tDessin += Date.now() - tPage;
     }
     // Les morceaux de page à découper plus tard (les produits) : la page est gardée en JPEG, pas en entier.
-    p.src = c.toDataURL('image/jpeg', 0.8); p.mini = mkReduire(c, 280, 0.62);
+    p.src = c.toDataURL('image/jpeg', 0.8); p.mini = mkReduire(c, 560, 0.74);
     p.toile = null; c.width = c.height = 1;
     pages.push(p);
     if (!p.dessinee && (i <= 2 || i > n - 2)) texteContacts.push(fwLignesContact(morceaux.map(m => m.s)));
@@ -9782,7 +9782,7 @@ async function fwLireTableur(fichier) {
 }
 async function fwLireImage(fichier) {
   const img = await mkLireFichier(fichier);
-  const res = { type: 'image', nom: fichier.name, prix: [], produits: [], pages: [{ num: 1, src: mkReduire(img, 2000, 0.8), mini: mkReduire(img, 280, 0.62) }], contacts: {}, texte: '' };
+  const res = { type: 'image', nom: fichier.name, prix: [], produits: [], pages: [{ num: 1, src: mkReduire(img, 2000, 0.8), mini: mkReduire(img, 560, 0.74) }], contacts: {}, texte: '' };
   if (await trOcrDispo()) {
     try { const o = await trOcrLire(mkToile(img, 1200), 'chi_sim+eng', '6'); res.texte = o.texte; } catch (e) {}
     trOcrLiberer();
@@ -9952,7 +9952,7 @@ async function fwRanger() {
       if (fwEtat.choix[i] === false) continue;
       const x = ps[i];
       let photoId = '';
-      if (x.photo) { photoId = idUnique('d'); await ctEcrire(photoId, x.photo); const mini = mkReduire(await trImage(x.photo), 280, 0.7); await ctEcrire(photoId + '~m', mini); ctMiniCache[photoId] = mini; }
+      if (x.photo) { photoId = idUnique('d'); await ctEcrire(photoId, x.photo); const mini = mkReduire(await trImage(x.photo), 560, 0.74); await ctEcrire(photoId + '~m', mini); ctMiniCache[photoId] = mini; }
       const p = fwTrouverProduit(f, x.ref);
       if (p) {
         ['categorie', 'caracteristiques', 'colisage', 'dim_l', 'dim_la', 'dim_h', 'poids_kg', 'page'].forEach(k => { if (!p[k] && x[k]) p[k] = x[k]; });
@@ -10188,7 +10188,7 @@ async function fsCartePhoto(p, input) {
   // 2. La carte rangée chez le fournisseur, et lue en entier.
   let f = fsFournisseurDuFormulaire(p);
   if (!f) return;
-  const id = idUnique('d'), mini = mkReduire(img, 280, 0.62);
+  const id = idUnique('d'), mini = mkReduire(img, 560, 0.74);
   try { await ctEcrire(id, mkReduire(img, 1800, 0.82)); await ctEcrire(id + '~m', mini); }
   catch (e) { fsEtat(p, '⚠ La mémoire du téléphone refuse la photo (pleine ?).', 'att'); return; }
   ctMiniCache[id] = mini;
@@ -10243,7 +10243,7 @@ async function fsMettreOrdre() {
     fsAccorderTel(f); if (f.mobile !== telAvant) r.tel++;
     if (typeof f.carte_photo === 'string' && f.carte_photo.startsWith('data:image')) {
       try {
-        const img = await trImage(f.carte_photo), id = idUnique('d'), mini = mkReduire(img, 280, 0.62);
+        const img = await trImage(f.carte_photo), id = idUnique('d'), mini = mkReduire(img, 560, 0.74);
         await ctEcrire(id, mkReduire(img, 1800, 0.82)); await ctEcrire(id + '~m', mini); ctMiniCache[id] = mini;
         if (!Array.isArray(f.docs)) f.docs = [];
         f.docs.push({ id, type: 'carte', le: f.vu_le || f.le || mkMaintenant(), a_lire: true, origine: 'marche' });
@@ -10759,7 +10759,7 @@ async function asFichierCarte(input) {
     try {
       const img = await mkLireFichier(fi), f = trStandF();
       const [a, b] = asCartesDe(f);
-      await asGarderCarte(!a ? 1 : (!b ? 2 : 2), mkToile(img, 2600), 'fichier', !!(a && b));
+      await asGarderCarte(!a ? 1 : (!b ? 2 : 2), mkToile(img, 3600), 'fichier', !!(a && b));
     } catch (e) { avertir('Une photo n\'a pas pu être rangée (mémoire pleine ?).'); }
   }
 }
@@ -11225,7 +11225,7 @@ function asCamera(o) {
       const L = Array.from(input.files || []); input.value = '';
       for (const fi of L) {
         if (fini) break;
-        try { await prendre(mkToile(await mkLireFichier(fi), 2600), 'fichier'); }
+        try { await prendre(mkToile(await mkLireFichier(fi), 3600), 'fichier'); }
         catch (e) { aide.textContent = 'Cette photo ne s\'ouvre pas : reprenez-la.'; }
       }
     };
@@ -11752,7 +11752,7 @@ async function clImage(src) {
   if (typeof src === 'string' && src.startsWith('idb:')) { try { src = await ctLire(src.slice(4)); } catch (e) { return null; } }
   if (typeof src !== 'string') return null;
   if (src.startsWith('data:image/jpeg')) return clOctets(src);
-  try { return clOctets(mkReduire(await trImage(src), 2000, 0.85)); } catch (e) { return null; }
+  try { return clOctets(mkReduire(await trImage(src), 3600, 0.88)); } catch (e) { return null; }
 }
 const CL_TAILLE_PARTIE = 15e6;
 let clEnvoi = null;   // { parties: [{ blob, nom, taille, fait }], resume }
@@ -11988,7 +11988,8 @@ const PX_NIV = [
   { k: 'haute', fr: 'Haute qualité', court: 'Haute', cn: '高档', en: 'High' },
   { k: 'moyenne', fr: 'Qualité moyenne', court: 'Moyenne', cn: '中档', en: 'Medium' },
   { k: 'basse', fr: 'Basse qualité (économique)', court: 'Basse', cn: '低档', en: 'Low' }];
-const PX_PALIERS_CHOIX = [100, 200, 300, 500, 1000, 2000, 3000, 5000, 10000];
+// Riche (21/10) : un débutant commence petit ; avec de grosses quantités le vendeur donne le même prix pour 10 que pour 1 000.
+const PX_PALIERS_CHOIX = [10, 20, 30, 40, 50, 100, 200, 300, 500, 1000, 2000, 3000];
 const pxNiv = (k) => PX_NIV.find(n => n.k === k) || { k: k || '', fr: k || 'Qualité', court: k || 'Qualité', cn: '', en: '' };
 function pxNiveauDe(t) {
   const s = String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -12489,7 +12490,7 @@ function pxBoiteDemande(fid) {
   const L = pxLignesDe(f);
   if (!pxD || pxD.fid !== fid) {
     const choix = L.filter(l => l.o || l.interesse).map(l => l.cle);      // ce qu'il a vu au stand + les ⭐ (pas tout le catalogue d'un coup)
-    const pal = (f.px_demande && f.px_demande.paliers) || (C.voyage && C.voyage.px_paliers) || [500, 1000, 3000];
+    const pal = (f.px_demande && f.px_demande.paliers) || (C.voyage && C.voyage.px_paliers) || [20, 50, 100];
     pxD = { fid, choix: new Set(choix), paliers: pal.slice(0, 3), images: [], jeton: 0, minuterie: null };
   }
   pxDessinerDemande();
@@ -12894,7 +12895,7 @@ function pxBoiteSaisie(cid, oid) {
   const f = mkFournisseur(o.fournisseur_id);
   const qs = pxQualites(o);
   const pal = [...new Set(qs.flatMap(q => (q.paliers || []).map(p => num(p.qte))))].filter(Boolean).sort((a, b) => a - b);
-  const paliers = (pal.length ? pal : (f && f.px_demande && f.px_demande.paliers) || (C.voyage && C.voyage.px_paliers) || [500, 1000, 3000]).slice(0, 3);
+  const paliers = (pal.length ? pal : (f && f.px_demande && f.px_demande.paliers) || (C.voyage && C.voyage.px_paliers) || [20, 50, 100]).slice(0, 3);
   pxS = { cid, oid, paliers };
   const v = (q, k) => q && num(q[k]) ? num(q[k]) : '';
   mkBoite(`<div class="mk-dlg ct-champs">

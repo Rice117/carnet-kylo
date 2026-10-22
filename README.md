@@ -112,6 +112,15 @@ lignes à la fois) ; la mémoire du téléphone n'écrit pas les cases vides des
 l'ouverture) ; un fichier kylo-import peut arriver en plusieurs parties, la suite d'un fournisseur se range chez lui.
 ⚠ Même remarque : à reporter dans `KYLO-Achats.html` (modules `prix-1.7.0.html`, `contrat-1.7.0.html`, `wechat-1.7.0.html` et les retouches de `construire-1.7.0.py`).
 
+Version 1.8.0 — 22/10/2026 : **Tout se parle**. « + Achat » : aide sous « Qté / carton » et « Cartons », calcul en direct
+(12 × 50 = 600), le feu 🟢 🟡 🔴 sur le prix (rendu magasin et prix maximum, calculés avec le DEUXIÈME prix = prix affiché
+− écart de marchandage réglable, le bateau au volume, la douane), le fournisseur choisi dans le carnet (créé s'il manque),
+bannière des codes-barres claire. Comparer → achat garde fournisseur, photo et notes. Négocier : « Avec quel fournisseur ? »,
+« 🤝 Négocier avec lui » depuis Sa fiche (pré-rempli). Les bonnes questions : chaque question en chinois, 是 / 否 / autre +
+« ma condition », écran à tendre au vendeur, message chinois + anglais. Sa fiche : questions, réponses, conditions,
+négociations, achats. Module `coherence-1.8.0.html`, `construire-1.8.0.py` (part de la 1.7.0). Rien de retiré.
+⚠ Même remarque pour `KYLO-Achats.html`.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

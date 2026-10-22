@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.7.0';
+window.KYLO_APPLICATION = '1.8.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -2550,9 +2550,8 @@ function texteEnquete(eid) {
 function montrerTexteEnquete(eid) {
   const t = texteEnquete(eid);
   boite('<h3>Le message pour le fournisseur</h3>'
-    + '<p class="muet">En anglais : c’est la langue que lisent les fournisseurs chinois. '
-    + 'Copiez-le et collez-le dans WeChat, WhatsApp ou Alibaba. Les questions auxquelles vous avez '
-    + 'déjà une réponse n’y sont pas.</p>'
+    + '<p class="muet">Chaque question en chinois puis en anglais, avec « 是 / 否 / 其他 » à remplir. '
+    + 'Copiez-le et collez-le dans WeChat. Les questions auxquelles vous avez déjà une réponse n’y sont pas.</p>'
     + '<textarea id="enq_texte" rows="12">' + E(t) + '</textarea>'
     + '<div style="height:10px"></div>'
     + '<button class="b vert" onclick="copierTexteEnquete()">Copier le message</button>'
@@ -2576,7 +2575,7 @@ function ecranEnquete() {
   const e = enquetesListe().find(x => x.id === enqueteActive);
   if (!e) {
     return note + trCarteQuestionsChinois() + `<div class="carte"><h2>Ouvrir une liste de questions</h2>
-      ${Object.entries(MODELES_ENQUETE).map(([cle, m]) => `
+      ${Object.entries(MODELES_ENQUETE).sort((a, b) => (a[0] === 'caisson') - (b[0] === 'caisson')).map(([cle, m]) => `
         <div class="q-modele" onclick="nouvelleEnquete('${cle}')">
           <div class="q-m-nom">${E(m.nom)}</div>
           <div class="q-m-quoi">${E(m.quoi)}</div>
@@ -2599,20 +2598,18 @@ function ecranEnquete() {
       <div><label>Fournisseur / stand</label><input id="enq_fournisseur" value="${E(e.fournisseur)}"
         oninput="noterEnteteEnquete('${e.id}')" placeholder="ex : Bât. H, allée 23"></div>
     </div>
+    ${coEnqFournisseurHtml(e)}
     <p class="muet">Réponses notées : <b id="enqCompteur">${repondues(e)} / ${nombreQuestions(e.modele)}</b></p>
-    <button class="b" onclick="montrerTexteEnquete('${e.id}')">Le message à envoyer au fournisseur</button>
+    <button class="b vert" style="min-height:56px;font-size:17px" onclick="coMontrerVendeur('${e.id}')">🀄 Montrer les questions au vendeur (il touche 是 / 否)</button>
+    <div style="height:8px"></div>
+    <button class="b" onclick="montrerTexteEnquete('${e.id}')">Le message à envoyer (chinois + anglais)</button>
     <div style="height:8px"></div>
     <div class="duo">
       <button class="b gris" onclick="enqueteActive=null;dessiner()">‹ Toutes mes listes</button>
       <button class="b rouge" onclick="supprimerEnquete('${e.id}')">Supprimer</button>
     </div></div>
     ${m.sections.map(([titre, questions]) => `<div class="carte"><h2>${E(titre)}</h2>
-      ${questions.map(q => `<div class="q-bloc">
-        <div class="q-fr">${E(q[1])}</div>
-        <div class="q-en">${E(q[2])}</div>
-        ${q[3] ? `<div class="q-pq"><b>Pourquoi :</b> ${E(q[3])}</div>` : ''}
-        <textarea rows="2" placeholder="sa réponse…" oninput="noterReponse('${e.id}','${q[0]}',this.value)">${E((e.rep || {})[q[0]] || '')}</textarea>
-      </div>`).join('')}</div>`).join('')}`;
+      ${questions.map(q => coQuestionHtml(e, q)).join('')}</div>`).join('')}`;
 }
 
 // ---- arme 5 : les phrases de Chine, hors ligne — a montrer a l'ecran ----
@@ -3122,6 +3119,7 @@ function ecranNegocier() {
     <label>Produit</label>
     <input id="n_produit" value="${E(n.produit)}" placeholder="ex : Thermos 1 L" oninput="majNego()">
     ${n.note ? `<div class="px-cible">🎯 ${E(n.note)}</div>` : ''}
+    ${coNegoFournisseurHtml(n)}
     <div class="duo">
       <div><label>Prix de vente visé au magasin (GNF)</label>
         <input id="n_vente" inputmode="numeric" value="${E(n.prix_vente_gnf || '')}" oninput="majNego()"></div>
@@ -4081,14 +4079,7 @@ function modifierAchat(idA) {
   <button class="b contour" onclick="creerCodeMaintenant('${a.id}')">Créer le code-barres maintenant
     (${resteDuBloc()} restants)</button>` : ''}
   <div id="zoneCodeCree"></div>
-  ${!a.code_barres && resteDuBloc() <= 0 ? `<div class="alerte a-ambre" style="margin-top:8px">
-    <b>Ce carnet n'a pas encore reçu ses codes-barres.</b> Les codes réservés au magasin doivent
-    d'abord ARRIVER dans le carnet. Deux façons :
-    <div style="height:8px"></div>
-    <button class="b" onclick="recupererBlocDuMagasin()">Récupérer le bloc depuis le magasin (WiFi)</button>
-    <div style="height:6px"></div>
-    <button class="b contour" onclick="fermerBoite();allerA('voyage')">Ou recopier la ligne du bloc — onglet Voyage</button>
-    <div id="msgBloc"></div></div>` : ''}
+  ${!a.code_barres && resteDuBloc() <= 0 ? `<div class="alerte a-ambre" style="margin-top:8px;font-size:15px">${coTexteBloc()}</div>` : ''}
   <p class="muet" style="margin:4px 0 0">${a.code_barres
     ? (ean13Valide(a.code_barres) ? 'Code valide.' : 'Ce code n\'est pas un EAN-13 : il sera repris tel quel.')
     : (resteDuBloc() > 0
@@ -6046,6 +6037,7 @@ function ecranDossier() {
     </div>
   </details>
   ${trReponsesHtml(f)}
+  ${coFicheSectionsHtml(f)}
 
   <div class="carte"><label for="ct_rem" style="font-size:15px">📝 Remarques — dictez avec le micro du clavier 🎙️</label>
     <textarea id="ct_rem" rows="3" oninput="ctMajChamp('${f.id}','remarque',this.value)">${E(f.remarque)}</textarea>
@@ -11825,6 +11817,7 @@ async function fsEnvoyerAClaude(bouton) {
         prix: num(p.prix) || 0, devise: p.devise || '', moq: num(p.moq) || 0 }));
       x.fichiers = (f.fichiers || []).map(z => z.nom || z.name || z.titre || '').filter(Boolean);
       if (f.px_demande) x.prix_demandes = f.px_demande;
+      const enq = enquetesListe().filter(e => e.fid === f.id); if (enq.length) x.questions = enq.map(e => ({ modele: e.modele, produit: e.produit, le: e.le, rep: e.rep || {}, exige: e.exige || {} }));
       fiches.push(x);
     }
     // Les photos : d'abord les cartes (le plus important), puis les produits, puis les pages de catalogue.
@@ -13692,6 +13685,321 @@ fsEnvoyerCatalogue = function (fid, canal) {
   if (typeof CL_CHAMPS_ENVOI !== 'undefined' && !CL_CHAMPS_ENVOI.includes(k)) CL_CHAMPS_ENVOI.push(k);
   if (typeof FS_CHAMPS_ENVOI !== 'undefined' && !FS_CHAMPS_ENVOI.includes(k)) FS_CHAMPS_ENVOI.push(k);
 });
+</script>
+<style>
+/* ===================== 1.8.0 — TOUT SE PARLE (22/10/2026) =====================
+   Riche, 22/10 : aide sous les cases « Qté / carton » et « Cartons », calcul en direct, feu rouge / jaune / vert sur le prix ;
+   Négocier et les Questions reliés au fournisseur du carnet ; ce qu'on note d'un côté se voit de l'autre.
+   Textes jamais sous 14 px. Couleurs = variables du carnet. */
+.co-aide{font-size:14px;color:var(--texte-note,#475569);line-height:1.3;margin:2px 0 0}
+.co-calc{font-size:16px;font-weight:700;margin:6px 0 2px}
+.co-feu{display:flex;gap:10px;align-items:center;border-radius:12px;padding:10px 12px;margin:8px 0;font-size:16px;line-height:1.35}
+.co-feu .pt{width:22px;height:22px;border-radius:50%;flex:none;border:2px solid rgba(0,0,0,.15)}
+.co-feu.vert{background:#e3f6e8;color:#14532d}.co-feu.vert .pt{background:#22c55e}
+.co-feu.jaune{background:#fff6d6;color:#713f12}.co-feu.jaune .pt{background:#facc15}
+.co-feu.rouge{background:#fde2e2;color:#7f1d1d}.co-feu.rouge .pt{background:#ef4444}
+.co-feu.gris{background:var(--gris-clair,#eef2f7);color:#1e293b}.co-feu.gris .pt{background:#94a3b8}
+.co-feu small{display:block;font-size:14px;font-weight:400;margin-top:2px}
+.co-four{display:flex;gap:8px;align-items:flex-end}.co-four>div{flex:1}
+.co-four button{min-height:48px;font-size:15px;white-space:nowrap;width:auto;padding:0 12px}
+.q-pq{font-size:14px !important}
+.q-cn{font-size:19px;line-height:1.45;color:var(--bleu,#0b3d91);margin:4px 0 6px;font-weight:600}
+.q-rep{display:flex;gap:8px;margin:6px 0}
+.q-rep button{flex:1;min-height:50px;font-size:17px;border-radius:12px;border:2px solid var(--lisiere,#d6dbe3);background:var(--carte,#fff);font-weight:700}
+.q-rep button.on{background:var(--vert,#1a7f4b);color:#fff;border-color:var(--vert,#1a7f4b)}
+.q-rep button.non.on{background:#b91c1c;border-color:#b91c1c}
+.q-exige{margin-top:6px}.q-exige label{font-size:14px;color:#7c2d12;margin:0}
+.co-vendeur .q-bloc{padding:14px;border-bottom:1px solid var(--lisiere,#d6dbe3)}
+.co-vendeur .q-cn{font-size:24px}
+.co-vendeur .q-en{font-size:16px;color:#475569}
+.co-vendeur .q-rep button{min-height:60px;font-size:22px}
+.co-sec{margin:6px 0}
+.co-sec .l{display:flex;gap:8px;font-size:15px;line-height:1.4;padding:6px 0;border-bottom:1px solid var(--lisiere,#d6dbe3)}
+.co-sec .l b{flex:none;min-width:52px}
+.co-sec .l .rep{color:#14532d;font-weight:700}
+.co-sec .l .rep.non{color:#b91c1c}
+.co-sec .exige{color:#7c2d12;font-size:14px}
+</style>
+<script>
+// ---------- 1.8.0 : tout se parle — l'achat, le fournisseur, la négociation, les questions ----------
+// Les questions de l'écran « Les bonnes questions », en chinois (le vendeur lit, touche 是 / 否).
+const ENQ_CN = {"c1": "请问这是SEG卡布拉布灯箱吗？", "c2": "请问硅胶条（卡条）是12 mm的吗？", "c3": "请问贵司最畅销的三个标准尺寸是哪些？", "c4": "请问是单面还是双面的？", "c5": "请问壁挂、落地支架或吊挂配件是否包含在内？", "e1": "请问这个尺寸的灯箱功率是多少瓦？", "e2": "请问电源是220V 50Hz吗？", "e3": "请问能否加配备用电源？价格多少？", "e4": "请问LED的使用寿命是多久？保修期多长？", "a1": "请问布料是背光布（backlit）吗？", "a2": "请问单张画面（不含框）1件、50件、200件的价格各是多少？", "a3": "请问这个尺寸要求的文件分辨率是多少？", "a4": "请问印刷需要几天？能否空运？", "a5": "请问一张折叠后的画面重量和体积是多少？", "p1": "请问空灯箱（边框+LED+电源）1件、50件、200件的价格各是多少？", "p2": "请问最小起订量是多少？", "p3": "请问这个价格是EXW、FOB还是CIF？", "t1": "请问每箱装几个灯箱？外箱尺寸是多少？", "t2": "请问边框四角有运输保护吗？", "t3": "请问50个灯箱的体积是多少立方米？", "v1": "请问能否在发柜前先空运一套完整灯箱（含画面）给我？", "k1": "请问可以在上面打开Chrome浏览器访问任意网址吗？", "k2": "请问是什么系统：Windows还是Android？哪个版本？", "s1": "请问有面向顾客的第二屏吗？尺寸多大？", "s2": "请问有几个USB接口？", "i1": "请问打印机是80 mm还是58 mm的？", "i2": "请问能打印法语重音字母（é、à、ç）吗？", "i3": "请问钱箱是接在打印机上（RJ11）吗？", "i4": "请问80 mm热敏纸好买吗？能加配几卷？", "d1": "请问扫描枪是键盘模式（USB HID）、免驱动的吗？", "n1": "请问电源是220V 50Hz吗？", "n2": "请问保修期多长？有备件供应吗？", "n3": "请问1套、5套、20套完整收银机的价格各是多少？", "g1": "请问最小起订量是多少？", "g2": "请问1件、50件、200件以及一整柜的单价各是多少？", "g3": "请问这个价格是EXW、FOB还是CIF？", "g4": "请问每箱装几件？外箱尺寸和重量是多少？", "g5": "请问可以给外箱编号吗？", "g6": "请问可以把我的条形码贴在每件产品上吗？", "g7": "请问下单前能先拿样品吗？样品费多少？", "g8": "请问大货会和样品完全一致吗？", "g9": "请问有保修吗？有备件供应吗？", "g10": "请问付定金后生产周期是多少天？", "g11": "请问付款方式是什么？定金比例多少？", "g12": "请问这个产品进口到几内亚需要什么证书吗？"};
+
+// Qui est le fournisseur d'un achat : par identifiant, sinon par son nom / code.
+function coFournisseurDeAchat(a) {
+  if (!a) return null;
+  if (a.fournisseur_id) { const f = mkFournisseur(a.fournisseur_id); if (f) return f; }
+  const n = normaliserNom(a.fournisseur || ''); if (!n) return null;
+  return fournisseursListe().find(f => normaliserNom(mkNomFournisseur(f)) === n || (f.code && normaliserNom(f.code) === n) || normaliserNom(f.nom || '') === n) || null;
+}
+// Le prix de vente en Guinée pour cet achat : celui tapé, sinon celui que Claude a trouvé pour cette famille (marché).
+function coVenteGnf(a, nom) {
+  if (num(a && a.prix_detail_gnf) > 0) return { gnf: num(a.prix_detail_gnf), source: 'vous' };
+  const M = Array.isArray(C.marche_guinee) ? C.marche_guinee : [];
+  const texte = normaliserNom(nom || (a && a.nom) || '');
+  let m = M.find(x => texte && [x.article].concat(x.autres_noms || []).some(n => texte === normaliserNom(n)));
+  if (!m && texte) m = M.find(x => [x.article].concat(x.autres_noms || []).some(n => normaliserNom(n).length > 3 && texte.includes(normaliserNom(n))));
+  if (m && num(m.conseille) > 0) return { gnf: num(m.conseille), source: 'claude', marche: m };
+  return null;
+}
+// Riche, 22/10 : « en Guinée il y a le premier prix et le deuxième prix : le client discute ». Les prix trouvés en ligne sont des
+// premiers prix (affichés). Le feu compte avec le DEUXIÈME prix = prix affiché − l'écart de marchandage (10 % par défaut, réglable).
+function coRabaisPct() { const v = num(C.voyage && C.voyage.co_rabais_pct); return C.voyage && C.voyage.co_rabais_pct !== undefined && C.voyage.co_rabais_pct !== '' ? v : 10; }
+function coBoiteRabais() {
+  mkBoite(`<div class="mk-dlg ct-champs"><h3>🏷 Premier prix, deuxième prix</h3>
+    <p class="px-aide">En Guinée le client discute : le prix affiché (premier prix) n'est pas celui auquel on vend (deuxième prix).
+      Quel écart, en pourcentage, entre les deux chez vous ? Le feu rouge / jaune / vert compte avec le deuxième prix.</p>
+    <label for="co_rabais">Écart de marchandage (%)</label><input id="co_rabais" inputmode="decimal" value="${E(coRabaisPct())}">
+    <p class="px-aide">Exemple : prix affiché 380 000 GNF, écart 10 % → vendu 342 000 GNF. Mettez 0 si vous vendez au prix affiché.</p>
+    <div class="mk-boutons"><button class="b vert" onclick="C.voyage.co_rabais_pct=num(document.getElementById('co_rabais').value);sauverLocal();fermerBoite();const b=document.getElementById('a_pu');if(b)b.dispatchEvent(new Event('input'));else dessiner()">✅ Garder</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+}
+// Le prix à ne pas dépasser pour un achat (même règle que Comparer / J'achète) : marge sur le prix de vente, frais au volume si on les connaît.
+function coPlafondAchat(a, nom, prixGnfUnitaire) {
+  const v0 = coVenteGnf(a, nom); if (!v0) return null;
+  const v = Object.assign({}, v0, { affiche: v0.gnf, gnf: v0.gnf * (1 - coRabaisPct() / 100) });
+  const regle = margeMinimum() > 0, marge = regle ? margeMinimum() : 35;
+  const m = v.marche, d = m && num(m.douane_pct) > 0 ? num(m.douane_pct) / 100 : 0;
+  let m3 = 0;
+  if (num(a.qte_carton) > 0 && num(a.dim_l) > 0 && num(a.dim_la) > 0 && num(a.dim_h) > 0) m3 = num(a.dim_l) * num(a.dim_la) * num(a.dim_h) / 1e6 / num(a.qte_carton);
+  else if (m && num(m.volume_m3) > 0) m3 = num(m.volume_m3);
+  let max, rendu, mode;
+  if (d > 0 && m3 > 0 && typeof pxFretM3 === 'function') {
+    const F = m3 * pxFretM3().gnf;
+    max = Math.max(0, (v.gnf * (1 - marge / 100) - F * (1 + d)) / (1 + d + 0.05));
+    rendu = prixGnfUnitaire > 0 ? (prixGnfUnitaire + F) * (1 + d) + 0.05 * prixGnfUnitaire : 0; mode = 'volume';
+  } else {
+    const pct = m && num(m.frais_pct) > 0 ? num(m.frais_pct) : fraisPourcent();
+    max = v.gnf * (1 - marge / 100) / (1 + pct / 100);
+    rendu = prixGnfUnitaire > 0 ? prixGnfUnitaire * (1 + pct / 100) : 0; mode = 'pct';
+  }
+  return { vente: v.gnf, affiche: v.affiche, autres: m && num(m.min) > 0 ? { min: num(m.min), max: num(m.max) } : null, source: v.source, marge, margeDefaut: !regle, max, rendu, mode };
+}
+function coFeuHtml(a, nom, prix, devise) {
+  const g = enGnf(num(prix), devise || C.voyage.devise);
+  const pl = coPlafondAchat(a, nom, g);
+  if (!pl) return `<div class="co-feu gris"><span class="pt"></span><div>Prix de vente en Guinée inconnu pour « ${E(nom || 'ce produit')} »<small>Tapez-le dans « Marge souhaitée » plus bas, ou dans Comparer : le feu rouge / jaune / vert s'allumera.</small></div></div>`;
+  const vente = `vendu <b>${E(gnfStrict(pl.vente))}</b> (deuxième prix : affiché ${E(gnfStrict(pl.affiche))} − ${E(nf(coRabaisPct(), 0))} % de marchandage <button type="button" class="mk-lien" onclick="coBoiteRabais()">🏷 changer</button>)${pl.autres ? ' · les autres affichent ' + E(gnfStrict(pl.autres.min)) + ' à ' + E(gnfStrict(pl.autres.max)) : ''}`;
+  if (!(g > 0)) return `<div class="co-feu gris"><span class="pt"></span><div>Tapez le prix d'achat : le carnet dira s'il est bon<small>À ne pas dépasser : <b>${E(gnfStrict(pl.max))}</b> la pièce — ${vente}, marge ${E(nf(pl.marge, 0))} %${pl.margeDefaut ? ' par défaut' : ''}.</small></div></div>`;
+  const r = g / pl.max, marge = pl.rendu > 0 ? (pl.vente - pl.rendu) / pl.vente * 100 : 0;
+  const cls = r <= 1 ? 'vert' : r <= 1.15 ? 'jaune' : 'rouge';
+  const titre = cls === 'vert' ? '🟢 Bon prix : achetez' : cls === 'jaune' ? '🟡 Un peu cher : négociez encore' : '🔴 Trop cher : ne payez pas ça';
+  return `<div class="co-feu ${cls}"><span class="pt"></span><div>${titre}<small>Rendu magasin ≈ ${E(gnfStrict(pl.rendu))} la pièce, ${vente} → marge ${E(nf(marge, 0))} %. À ne pas dépasser : <b>${E(gnfStrict(pl.max))}</b> (${E(nf(pl.max / (tauxDe(devise || C.voyage.devise) || 1), 2))} ${E(mkSym(devise || C.voyage.devise))}).</small></div></div>`;
+}
+// Le formulaire « Achat » : l'aide sous les cases, le calcul en direct, le feu, le fournisseur du carnet.
+const coModifierAchatAvant = modifierAchat;
+modifierAchat = function (idA) {
+  coModifierAchatAvant(idA);
+  const a = trouverAchat(idA); if (!a) return;
+  const d = document.getElementById('contenuBoite') || document; const q = (s) => d.querySelector(s);
+  const qc = q('#a_qc'), ct = q('#a_ct'), qt = q('#a_qt'), pu = q('#a_pu'), dev = q('#a_dev'), conv = q('#a_conv'), four = q('#a_four'), nom = q('#a_nom');
+  if (qc && qc.parentElement && !q('#co_aide_qc')) {
+    qc.parentElement.insertAdjacentHTML('beforeend', '<div class="co-aide" id="co_aide_qc">pièces dans UN carton (ex. 12)</div>');
+    ct.parentElement.insertAdjacentHTML('beforeend', '<div class="co-aide">nombre de cartons (ex. 50)</div>');
+    qt.parentElement.insertAdjacentHTML('beforeend', '<div class="co-aide" id="co_calc">= pièces en tout</div>');
+  }
+  if (conv && !q('#co_feu')) conv.insertAdjacentHTML('afterend', '<div id="co_feu"></div>');
+  const majCalc = () => { const c = document.getElementById('co_calc'); if (!c) return;
+    const x = num(qc.value), y = num(ct.value);
+    c.innerHTML = x > 0 && y > 0 ? `<span class="co-calc">${E(nf(x))} × ${E(nf(y))} = ${E(nf(x * y))} pièces</span>` : '= pièces en tout (ou tapez-la directement)'; };
+  const majFeu = () => { const z = document.getElementById('co_feu'); if (z) z.innerHTML = coFeuHtml(a, nom ? nom.value : a.nom, pu ? pu.value : a.prix_unitaire, dev ? dev.value : deviseDe(a)); };
+  [qc, ct].forEach(e => e && e.addEventListener('input', majCalc));
+  [pu, dev, nom].forEach(e => e && e.addEventListener('input', majFeu)); if (dev) dev.addEventListener('change', majFeu);
+  majCalc(); majFeu();
+  // Le fournisseur : un de ceux du carnet (sa fiche suit), ou un nom libre.
+  if (four && !q('#co_four_liste')) {
+    const L = fournisseursListe();
+    four.setAttribute('list', 'co_four_liste'); four.placeholder = 'nom, ou choisissez dans la liste';
+    four.insertAdjacentHTML('afterend', `<datalist id="co_four_liste">${L.map(f => `<option value="${E(mkNomFournisseur(f))}">`).join('')}</datalist>
+      <div class="co-aide" id="co_four_aide"></div>`);
+    const majFour = () => { const f = coFournisseurDeAchat({ fournisseur: four.value, fournisseur_id: '' }) || (a.fournisseur_id && normaliserNom(four.value) === normaliserNom(a.fournisseur) ? mkFournisseur(a.fournisseur_id) : null);
+      const z = document.getElementById('co_four_aide'); if (!z) return;
+      z.innerHTML = f ? `✓ ${E(f.code || '')} dans le carnet${f.classement && f.classement.fiabilite ? ' · ' + clNoteHtml(f) : ''} <button type="button" class="mk-lien" onclick="fermerBoite();ctOuvrirDossier('${f.id}')">📂 Sa fiche</button>` : (four.value.trim() ? 'Pas dans le carnet : il sera créé à l\'enregistrement.' : ''); };
+    four.addEventListener('input', majFour); four.addEventListener('change', majFour); majFour();
+  }
+};
+// À l'enregistrement : l'achat garde l'identifiant de son fournisseur (créé s'il n'existe pas), et sa fiche le montre.
+const coEnregistrerAchatAvant = enregistrerAchat;
+enregistrerAchat = function (idA) {
+  const a = trouverAchat(idA); const nomF = ((document.getElementById('a_four') || {}).value || '').trim();
+  coEnregistrerAchatAvant(idA);
+  if (!a || !nomF || !a.nom) return;
+  let f = coFournisseurDeAchat({ fournisseur: nomF, fournisseur_id: a.fournisseur_id && normaliserNom(nomF) === normaliserNom(a.fournisseur) ? a.fournisseur_id : '' });
+  if (!f) {
+    f = { id: idUnique('f'), code: mkProchainCode(), nom: nomF, marche: C.voyage && C.voyage.marche_lieu || 'Foire de Canton', batiment: '', allee: '', wechat: '', tel: '', qualite: '', remarque: '',
+      le: mkMaintenant().slice(0, 10), vu_le: mkMaintenant(), source: 'achat', decision: 'contacter', docs: [], produits: [] };
+    fournisseursListe().unshift(f);
+  }
+  if (a.fournisseur_id !== f.id) { a.fournisseur_id = f.id; sauverLocal(); }
+};
+// Comparer → achat : l'identifiant du fournisseur et la comparaison suivent (rien ne se perd).
+const coTransformerAvant = transformerEnAchat;
+transformerEnAchat = function (idc) {
+  const c = trouverComparaison(idc); const avant = C.achats.length;
+  coTransformerAvant(idc);
+  if (!c || C.achats.length === avant) return;
+  const a = C.achats[C.achats.length - 1], o = (c.offres || []).find(x => x.id === c.choisi);
+  if (o && o.fournisseur_id) a.fournisseur_id = o.fournisseur_id;
+  a.comparaison_id = c.id; if (o && o.photo_doc && !a.photo) a.photo_doc = o.photo_doc;
+  const f = o && mkFournisseur(o.fournisseur_id);
+  const plus = [f && f.remarque ? 'Fournisseur : ' + String(f.remarque).slice(0, 120) : '', c.note ? 'Comparaison : ' + c.note : ''].filter(Boolean).join(' · ');
+  if (plus && String(a.note || '').indexOf(plus) < 0) a.note = [a.note, plus].filter(Boolean).join(' · ');
+  sauverLocal();
+};
+// La bannière des codes-barres, dite clairement.
+function coTexteBloc() {
+  return `<b>Pas de bloc de codes-barres dans ce carnet.</b> L'achat s'enregistre quand même (le magasin donnera le code au retour).
+    Pour imprimer les étiquettes à l'avance, il faut la ligne « BLOC-… » du magasin (Administration → Codes-barres → « Préparer un voyage ») :
+    <div style="height:8px"></div>
+    <button class="b contour" onclick="fermerBoite();allerA('voyage');setTimeout(() => { const e = document.getElementById('v_bloc'); if (e) { e.scrollIntoView({block: 'center'}); e.focus(); } }, 300)">Recopier la ligne du bloc (onglet Voyage, en bas)</button>
+    <div style="height:6px"></div>
+    <button class="b gris" onclick="recupererBlocDuMagasin()">Ou la recevoir du magasin par son Wi-Fi (chez vous seulement)</button>
+    <div id="msgBloc"></div>`;
+}
+
+// ---------- Négocier, relié au fournisseur ----------
+function coNegoFournisseurHtml(n) {
+  const L = fournisseursListe(), f = n.fid ? mkFournisseur(n.fid) : null;
+  return `<label>Avec quel fournisseur ?</label>
+    <div class="co-four"><div><select id="n_fid" onchange="coNegoChoisir('${n.id}', this.value)" style="font-size:17px">
+      <option value="">— pas encore choisi —</option>${L.map(x => `<option value="${x.id}" ${n.fid === x.id ? 'selected' : ''}>${E(mkNomFournisseur(x))}</option>`).join('')}
+      <option value="nouveau">➕ Un nouveau fournisseur</option></select></div>
+      ${f ? `<button type="button" class="b contour" onclick="ctOuvrirDossier('${f.id}')">📂 Sa fiche</button>` : ''}</div>
+    ${f ? `<div class="co-aide">${E(f.code || '')}${f.allee ? ' · stand ' + E(f.allee) : ''}${f.classement && f.classement.fiabilite ? ' · ' : ''}${f.classement && f.classement.fiabilite ? clNoteHtml(f) : ''}${ctProduits(f).length ? ' · ' + ctProduits(f).length + ' modèle(s) dans sa fiche' : ''}${mkOffresDe(f).length ? ' · ' + mkOffresDe(f).length + ' prix vu(s)' : ''}</div>` : ''}`;
+}
+function coNegoChoisir(nid, v) {
+  const n = negociations().find(x => x.id === nid); if (!n) return;
+  if (v === 'nouveau') {
+    const f = { id: idUnique('f'), code: mkProchainCode(), nom: n.produit ? 'Vendeur de ' + n.produit : '', marche: 'Foire de Canton', batiment: '', allee: '', wechat: '', tel: '', qualite: '', remarque: '',
+      le: mkMaintenant().slice(0, 10), vu_le: mkMaintenant(), source: 'negociation', decision: '', docs: [], produits: [] };
+    fournisseursListe().unshift(f); n.fid = f.id; sauverLocal(); dessiner();
+    avertir('Fournisseur ' + f.code + ' créé : complétez sa fiche (carte, WeChat) quand vous pouvez.', 5000); return;
+  }
+  n.fid = v || ''; sauverLocal(); dessiner();
+}
+function coNegoPour(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const vus = mkOffresDe(f);
+  const n = { id: idUnique('n'), produit: vus.length === 1 ? vus[0].c.article : '', prix_vente_gnf: vus.length === 1 ? num(vus[0].c.prix_vente_vise_gnf) || 0 : 0, marge_pct: margeMinimum() > 0 ? margeMinimum() : '',
+    frais_pct: ratioFraisConseille(), marches: vus.length === 1 && num(vus[0].o.prix) > 0 ? [{ id: idUnique('m'), qte: String(num(vus[0].o.moq) || ''), prix: String(num(vus[0].o.prix)) }] : [],
+    note: '', le: mkMaintenant().slice(0, 10), fid: f.id };
+  negociations().unshift(n); negoActive = n.id; sauverLocal(); allerA('negocier');
+}
+const coPxNegocierAvant = typeof pxNegocier === 'function' ? pxNegocier : null;
+if (coPxNegocierAvant) pxNegocier = function (cid, oid) {
+  const c = trouverComparaison(cid), o = c && (c.offres || []).find(x => x.id === oid);
+  coPxNegocierAvant(cid, oid);
+  const n = negoCourante(); if (n && o && o.fournisseur_id && !n.fid) { n.fid = o.fournisseur_id; sauverLocal(); }
+};
+function coNegoFicheHtml(f) {
+  const L = negociations().filter(n => n.fid === f.id); if (!L.length) return '';
+  return `<div class="co-sec">${L.map(n => `<div class="l"><b>${E(dateFr(n.le))}</b><div>🤝 ${E(n.produit || 'négociation')}${n.marches.filter(m => num(m.prix) > 0).length ? ' — ' + n.marches.filter(m => num(m.prix) > 0).map(m => E(m.qte) + ' → ' + E(m.prix) + ' ' + E(mkSym(C.voyage.devise || 'CNY'))).join(', ') : ''}
+    ${n.note ? '<div class="exige">' + E(n.note) + '</div>' : ''} <button type="button" class="mk-lien" onclick="ouvrirNegociation('${n.id}');allerA('negocier')">ouvrir</button></div></div>`).join('')}</div>`;
+}
+
+// ---------- Les questions au fournisseur : en chinois aussi, oui / non / autre, mes conditions ----------
+function coEnqFournisseurHtml(e) {
+  const L = fournisseursListe(), f = e.fid ? mkFournisseur(e.fid) : null;
+  return `<label>Fournisseur du carnet</label>
+    <div class="co-four"><div><select id="enq_fid" onchange="coEnqChoisir('${e.id}', this.value)" style="font-size:17px">
+      <option value="">— choisir —</option>${L.map(x => `<option value="${x.id}" ${e.fid === x.id ? 'selected' : ''}>${E(mkNomFournisseur(x))}</option>`).join('')}
+      <option value="nouveau">➕ Un nouveau fournisseur</option></select></div>
+      ${f ? `<button type="button" class="b contour" onclick="ctOuvrirDossier('${f.id}')">📂 Sa fiche</button>` : ''}</div>`;
+}
+function coEnqChoisir(eid, v) {
+  const e = enquetesListe().find(x => x.id === eid); if (!e) return;
+  if (v === 'nouveau') {
+    const f = { id: idUnique('f'), code: mkProchainCode(), nom: e.fournisseur || '', marche: 'Foire de Canton', batiment: '', allee: '', wechat: '', tel: '', qualite: '', remarque: '',
+      le: mkMaintenant().slice(0, 10), vu_le: mkMaintenant(), source: 'questions', decision: '', docs: [], produits: [] };
+    fournisseursListe().unshift(f); e.fid = f.id;
+  } else e.fid = v || '';
+  const f = e.fid && mkFournisseur(e.fid); if (f && !e.fournisseur) e.fournisseur = mkNomFournisseur(f);
+  sauverLocal(); dessiner();
+}
+function coEnqPour(fid, modele) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const e = { id: idUnique('q'), modele: modele || 'produit', produit: '', fournisseur: mkNomFournisseur(f), fid: f.id, rep: {}, exige: {}, note: '', le: mkMaintenant().slice(0, 10) };
+  enquetesListe().unshift(e); enqueteActive = e.id; sauverLocal(); allerA('enquete');
+}
+function coQuestionHtml(e, q) {
+  const rep = String((e.rep || {})[q[0]] || ''), ex = String((e.exige || {})[q[0]] || '');
+  const estOui = /^(oui|yes|是|有|可以)/i.test(rep), estNon = /^(non|no|否|没有|不可以|不行)/i.test(rep);
+  return `<div class="q-bloc" id="qb_${e.id}_${q[0]}">
+    <div class="q-fr">${E(q[1])}</div>
+    <div class="q-cn">${E(ENQ_CN[q[0]] || '')}</div>
+    <div class="q-en">${E(q[2])}</div>
+    ${q[3] ? `<div class="q-pq"><b>Pourquoi :</b> ${E(q[3])}</div>` : ''}
+    <div class="q-rep">
+      <button type="button" class="${estOui ? 'on' : ''}" onclick="coRepondre('${e.id}','${q[0]}','Oui')">✅ 是 Oui</button>
+      <button type="button" class="non ${estNon ? 'on' : ''}" onclick="coRepondre('${e.id}','${q[0]}','Non')">❌ 否 Non</button>
+      <button type="button" class="${rep && !estOui && !estNon ? 'on' : ''}" onclick="document.getElementById('qt_${e.id}_${q[0]}').focus()">✏️ 其他 Autre</button></div>
+    <textarea id="qt_${e.id}_${q[0]}" rows="2" placeholder="sa réponse, ses chiffres…" oninput="noterReponse('${e.id}','${q[0]}',this.value)">${E(rep)}</textarea>
+    <div class="q-exige"><label for="qe_${e.id}_${q[0]}">⚠ Ma condition (ce que j'exige, écrit au contrat)</label>
+      <input id="qe_${e.id}_${q[0]}" value="${E(ex)}" placeholder="ex : 220 V obligatoire, sinon pas de commande" oninput="coExiger('${e.id}','${q[0]}',this.value)"></div>
+  </div>`;
+}
+function coRepondre(eid, cle, v) {
+  const e = enquetesListe().find(x => x.id === eid); if (!e) return;
+  const t = document.getElementById('qt_' + eid + '_' + cle);
+  const actuel = String((e.rep || {})[cle] || '');
+  const reste = actuel.replace(/^(oui|non)\b\s*[·:,-]?\s*/i, '');
+  const nv = v + (reste && reste !== actuel ? ' · ' + reste : (reste && !/^(oui|non)/i.test(actuel) ? ' · ' + reste : ''));
+  noterReponse(eid, cle, nv); if (t) t.value = nv;
+  const b = document.getElementById('qb_' + eid + '_' + cle); if (b) b.querySelectorAll('.q-rep button').forEach((x, i) => x.classList.toggle('on', (i === 0 && v === 'Oui') || (i === 1 && v === 'Non')));
+}
+function coExiger(eid, cle, v) { const e = enquetesListe().find(x => x.id === eid); if (!e) return; e.exige = e.exige || {}; e.exige[cle] = v; sauverLocal(); }
+// L'écran à tendre au vendeur : les questions en chinois, en grand ; il touche 是 / 否, le carnet note.
+function coMontrerVendeur(eid) {
+  const e = enquetesListe().find(x => x.id === eid), m = e && MODELES_ENQUETE[e.modele]; if (!m) return;
+  const qs = questionsDe(e.modele);
+  mkBoite(`<div class="mk-dlg co-vendeur"><h3>🀄 请回答以下问题 / Please answer</h3>
+    <p class="mk-aide" style="font-size:15px">Tendez le téléphone au vendeur : il touche 是 (oui) ou 否 (non) ; pour un chiffre, il tape dans la case.</p>
+    ${qs.map((q, i) => `<div class="q-bloc" id="qv_${q[0]}"><div class="q-cn">${i + 1}. ${E(ENQ_CN[q[0]] || '')}</div><div class="q-en">${E(q[2])}</div>
+      <div class="q-rep"><button type="button" class="${/^oui/i.test((e.rep || {})[q[0]] || '') ? 'on' : ''}" onclick="coRepondre('${e.id}','${q[0]}','Oui');coVendeurMaj('${e.id}','${q[0]}')">是</button>
+        <button type="button" class="non ${/^non/i.test((e.rep || {})[q[0]] || '') ? 'on' : ''}" onclick="coRepondre('${e.id}','${q[0]}','Non');coVendeurMaj('${e.id}','${q[0]}')">否</button></div>
+      <input id="qv_t_${q[0]}" value="${E(String((e.rep || {})[q[0]] || '').replace(/^(oui|non)\\b\\s*[·:,-]?\\s*/i, ''))}" placeholder="数字 / 其他 (chiffre, autre)" oninput="coVendeurTexte('${e.id}','${q[0]}',this.value)" style="font-size:18px"></div>`).join('')}
+    <div class="mk-boutons"><button class="b vert" onclick="fermerBoite();dessiner()">✅ 完成 / Terminé</button></div></div>`);
+}
+function coVendeurMaj(eid, cle) { const e = enquetesListe().find(x => x.id === eid); const b = document.getElementById('qv_' + cle); if (!e || !b) return;
+  const r = String((e.rep || {})[cle] || ''); b.querySelectorAll('.q-rep button').forEach((x, i) => x.classList.toggle('on', (i === 0 && /^oui/i.test(r)) || (i === 1 && /^non/i.test(r)))); }
+function coVendeurTexte(eid, cle, v) { const e = enquetesListe().find(x => x.id === eid); if (!e) return;
+  const r = String((e.rep || {})[cle] || ''), tete = (r.match(/^(oui|non)/i) || [''])[0]; noterReponse(eid, cle, [tete, v.trim()].filter(Boolean).join(' · ')); }
+// Le message : chaque question en chinois et en anglais, avec « 是 / 否 / 其他：___ » à remplir.
+const coTexteEnqueteAvant = texteEnquete;
+texteEnquete = function (eid) {
+  const e = enquetesListe().find(x => x.id === eid), m = e && MODELES_ENQUETE[e.modele]; if (!m) return '';
+  const L = ['您好！我是几内亚 KYLO EURGUINE 公司的 ' + (ctSignature().split('–')[0].trim() || 'Riche') + '。下单之前，请回答以下问题（是 / 否 / 其他）：',
+    'Hello, this is ' + (ctSignature().split('–')[0].trim() || 'Riche') + ' from KYLO EURGUINE (Guinea). Before ordering, please answer these questions (yes / no / other):', ''];
+  let n = 0;
+  for (const q of questionsDe(e.modele)) {
+    if (String((e.rep || {})[q[0]] || '').trim()) continue;
+    n++; L.push(n + '. ' + (ENQ_CN[q[0]] || '') + '\n   ' + q[2] + '\n   → 是 / 否 / 其他：______');
+    const ex = String((e.exige || {})[q[0]] || '').trim(); if (ex) L.push('   ⚠ 我方要求 / Our requirement: ' + ex);
+  }
+  if (!n) return 'Toutes les questions ont déjà une réponse.';
+  L.push('', '谢谢！Thank you.', ctSignature()); return L.join('\n');
+};
+// Sur Sa fiche : les questions posées et ses réponses, mes conditions — et à la commande.
+function coQuestionsFicheHtml(f) {
+  const L = enquetesListe().filter(e => e.fid === f.id); if (!L.length) return '';
+  return L.map(e => { const m = MODELES_ENQUETE[e.modele] || { nom: e.modele };
+    const qs = questionsDe(e.modele).filter(q => String((e.rep || {})[q[0]] || '').trim() || String((e.exige || {})[q[0]] || '').trim());
+    return `<div class="co-sec"><div class="l"><b>${E(dateFr(e.le))}</b><div><b>${E(m.nom)}</b>${e.produit ? ' — ' + E(e.produit) : ''} · ${repondues(e)} / ${nombreQuestions(e.modele)} réponses <button type="button" class="mk-lien" onclick="ouvrirEnquete('${e.id}')">ouvrir</button></div></div>
+      ${qs.map(q => { const r = String((e.rep || {})[q[0]] || ''), ex = String((e.exige || {})[q[0]] || '');
+        return `<div class="l"><b>${E(q[0].toUpperCase())}</b><div>${E(q[1])}<br><span class="rep ${/^non/i.test(r) ? 'non' : ''}">${E(r || '— pas de réponse')}</span>${ex ? '<div class="exige">⚠ Ma condition : ' + E(ex) + '</div>' : ''}</div></div>`; }).join('')}</div>`; }).join('');
+}
+function coFicheSectionsHtml(f) {
+  const q = coQuestionsFicheHtml(f), n = coNegoFicheHtml(f), achats = C.achats.filter(a => coFournisseurDeAchat(a) === f);
+  return `<details class="ct-section" ${q || n ? 'open' : ''}><summary>❓ Questions posées et négociations (${enquetesListe().filter(e => e.fid === f.id).length + negociations().filter(x => x.fid === f.id).length})</summary>
+    ${q || '<p class="mk-aide" style="font-size:15px">Aucune question notée chez lui.</p>'}${n}
+    <div class="mk-deux" style="margin-top:8px">
+      <button type="button" class="b contour" onclick="coEnqPour('${f.id}','produit')">❓ Lui poser les questions de base</button>
+      <button type="button" class="b contour" onclick="coNegoPour('${f.id}')">🤝 Négocier avec lui</button></div>
+    ${achats.length ? `<p class="ct-sous" style="margin-top:8px">🛒 ${achats.length} achat(s) chez lui : ${achats.map(a => E(a.nom) + ' (' + E(nf(a.quantite)) + ')').join(', ')} <button type="button" class="mk-lien" onclick="allerA('achats')">voir</button></p>` : ''}
+  </details>`;
+}
+// « Envoyer à Claude » garde les liens.
+['fid'].forEach(k => { if (typeof CL_CHAMPS_ENVOI !== 'undefined' && !CL_CHAMPS_ENVOI.includes(k)) CL_CHAMPS_ENVOI.push(k); });
 </script>
 <script>
 

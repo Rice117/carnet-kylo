@@ -14303,10 +14303,29 @@ function cxPoserChoix(x) {
     ref: String(x.ref || ''), article: String(x.article || ''), pourquoi: String(x.pourquoi || ''), quantite: num(x.quantite), qualite: String(x.qualite || ''),
     prix_cny: { min: num(x.prix_cny && x.prix_cny.min), max: num(x.prix_cny && x.prix_cny.max) }, vente_gnf: num(x.vente_gnf), volume_m3: num(x.volume_m3),
     marche: { guinee: String(x.marche && x.marche.guinee || ''), voisins: String(x.marche && x.marche.voisins || ''), demande: String(x.marche && x.marche.demande || ''), preuve: String(x.marche && x.marche.preuve || '') },
-    le: String(x.le || mkMaintenant().slice(0, 10)) };
+    ou: String(x.ou || ''), cn: String(x.cn || ''), le: String(x.le || mkMaintenant().slice(0, 10)) };
+  if (x.photo_doc) neuf.photo_doc = String(x.photo_doc);
   if (c) Object.assign(c, neuf, { maj: mkMaintenant() }); else { c = Object.assign(neuf, { etat: '', qte_moi: 0, note_moi: '' }); L.push(c); }
   return 1;
 }
+// Un choix sans catalogue (à chercher à la Foire) arrive avec sa photo : elle se range dans la réserve du téléphone, pas dans la mémoire.
+const cxNbPhotosImportAvant = trNbPhotosImport;
+trNbPhotosImport = function (imp) { return cxNbPhotosImportAvant.apply(this, arguments) + ((imp && imp.choix_claude) || []).filter(x => typeof x.photo === 'string' && x.photo.startsWith('data:image')).length; };
+const cxPhotosImportAvant = trPhotosImport;
+trPhotosImport = async function (imp, suivi) {
+  let n = await cxPhotosImportAvant.apply(this, arguments);
+  for (const x of (imp && imp.choix_claude) || []) {
+    if (!(typeof x.photo === 'string' && x.photo.startsWith('data:image'))) { delete x.photo; continue; }
+    const deja = cxListe().find(c => c.id === String(x.id));
+    const id = deja && deja.photo_doc ? deja.photo_doc : 'dcx' + String(x.id).replace(/[^a-z0-9]/gi, '');
+    await ctEcrire(id, x.photo);
+    const mini = mkReduire(await trImage(x.photo), 560, 0.74);
+    await ctEcrire(id + '~m', mini); ctMiniCache[id] = mini;
+    x.photo_doc = id; delete x.photo; n++;
+    if (suivi) suivi(n, n);
+  }
+  return n;
+};
 const cxFusionAvant = ctFusion;
 ctFusion = function (imp, appliquer) {
   const bilan = cxFusionAvant.apply(this, arguments);
@@ -14394,14 +14413,16 @@ function cxBudgetHtml() {
 function cxMajBudget() { const z = document.getElementById('cx_budget'); if (z) z.innerHTML = cxBudgetHtml(); }
 function cxItemHtml(c) {
   const f = cxFournisseur(c), p = cxProduit(c), k = cxCout(c);
-  const photo = p && p.photo_doc ? `<img class="ct-mini" data-doc="${E(p.photo_doc)}" alt="">` : '<span class="cx-vide">📦</span>';
+  const doc = (p && p.photo_doc) || c.photo_doc;
+  const photo = doc ? `<img class="ct-mini" data-doc="${E(doc)}" alt="" onclick="cxAgrandir('${E(doc)}','${E((c.ref + ' — ' + c.article).replace(/'/g, ' '))}')">` : '<span class="cx-vide">📦</span>';
   const etat = c.etat || '';
   const fiab = f && f.classement && f.classement.fiabilite ? ' · fiabilité ' + E(String(f.classement.fiabilite.note)) + '/5' : '';
   return `<div class="cx-item ${etat}" id="cx_${c.id}">
     <div class="cx-haut">${photo}<div style="min-width:0;flex:1">
       <div><span class="cx-rang">n° ${E(c.rang || '?')}</span><span class="cx-type ${c.type}">${c.type === 'valeur' ? '💎 Valeur' : '🚶 Trafic'}</span>${etat === 'pris' ? ' <b style="color:#166534">✅ Je prends</b>' : etat === 'plus_tard' ? ' <b style="color:#854d0e">⏸ Plus tard</b>' : etat === 'ecarte' ? ' <b>❌ Écarté</b>' : ''}</div>
       <div class="cx-nom">${E(c.ref)} — ${E(c.article)}${c.qualite ? ' <span style="font-weight:600;color:#475569">(' + E(c.qualite) + ')</span>' : ''}</div>
-      <div class="cx-four">${f ? '🏭 ' + E(mkNomFournisseur(f)) + fiab : '🏭 ' + E(c.societe || 'fournisseur à retrouver') + ' <span style="color:#b45309">(pas encore dans le carnet)</span>'}${p && p.page ? ' · ' + E(p.page) : ''}</div></div></div>
+      ${!f && c.cn ? `<div style="font-size:22px;font-weight:800;margin:2px 0">${E(c.cn)}</div><div class="q-fr-moi">(à montrer au vendeur : « 有这个吗？多少钱？ » — vous en avez ? combien ?)</div>` : ''}
+      <div class="cx-four">${f ? '🏭 ' + E(mkNomFournisseur(f)) + fiab : c.ou ? '🔎 À chercher à la Foire : ' + E(c.ou) + (!doc ? ' · 📷 photo à prendre au stand' : '') : '🏭 ' + E(c.societe || 'fournisseur à retrouver') + ' <span style="color:#b45309">(pas encore dans le carnet)</span>'}${p && p.page ? ' · ' + E(p.page) : ''}</div></div></div>
     <div class="cx-pq">💡 ${E(c.pourquoi)}</div>
     ${c.marche.guinee || c.marche.voisins || c.marche.demande ? `<div class="cx-marche">${c.marche.guinee ? '🇬🇳 ' + E(c.marche.guinee) : ''}${c.marche.voisins ? '<br>🌍 ' + E(c.marche.voisins) : ''}${c.marche.demande ? '<br>📈 ' + E(c.marche.demande) : ''}${c.marche.preuve ? '<br><span style="color:#475569">Preuve : ' + E(c.marche.preuve) + '</span>' : ''}</div>` : ''}
     <div class="cx-chiffres">
@@ -14428,6 +14449,7 @@ function cxItemHtml(c) {
     <div class="cx-note" id="cx_note_${c.id}" style="display:${c.note_moi ? 'block' : 'none'};margin-top:6px"><textarea placeholder="ex : vu au stand, demander la version 220 V…" oninput="cxNoteMoi('${c.id}',this.value)">${E(c.note_moi || '')}</textarea></div>
   </div>`;
 }
+async function cxAgrandir(doc, legende) { try { const src = await ctLire(doc); if (src) mkApercu(src, legende); } catch (e) {} }
 function cxVoirNote(id) { const z = document.getElementById('cx_note_' + id); if (!z) return; z.style.display = z.style.display === 'none' ? 'block' : 'none'; if (z.style.display === 'block') { const t = z.querySelector('textarea'); if (t) t.focus(); } }
 function cxDemanderPrix(id) {
   const c = cxListe().find(x => x.id === id), f = c && cxFournisseur(c), p = c && cxProduit(c); if (!f) return;

@@ -14310,13 +14310,25 @@ function cxPoserChoix(x) {
 }
 // Un choix sans catalogue (à chercher à la Foire) arrive avec sa photo : elle se range dans la réserve du téléphone, pas dans la mémoire.
 const cxNbPhotosImportAvant = trNbPhotosImport;
-trNbPhotosImport = function (imp) { return cxNbPhotosImportAvant.apply(this, arguments) + ((imp && imp.choix_claude) || []).filter(x => typeof x.photo === 'string' && x.photo.startsWith('data:image')).length; };
+// Une photo d'exemple peut aussi venir du site du carnet (« exemples/… .jpg », photos libres de droits, sans donnée privée) : le code
+// à coller reste court, la photo se télécharge au moment de l'ajout (il faut Internet à ce moment-là).
+const CX_PHOTO_URL = /^exemples\/[a-z0-9-]+\.jpg$/;
+async function cxUrlEnPhoto(u) {
+  try { const r = await fetch(u, { cache: 'no-store' }); if (!r.ok) return ''; const b = await r.blob();
+    return await new Promise(ok => { const f = new FileReader(); f.onload = () => ok(String(f.result || '')); f.onerror = () => ok(''); f.readAsDataURL(b); }); } catch (e) { return ''; }
+}
+trNbPhotosImport = function (imp) { return cxNbPhotosImportAvant.apply(this, arguments) + ((imp && imp.choix_claude) || []).filter(x => (typeof x.photo === 'string' && x.photo.startsWith('data:image')) || CX_PHOTO_URL.test(String(x.photo_url || ''))).length; };
 const cxPhotosImportAvant = trPhotosImport;
 trPhotosImport = async function (imp, suivi) {
   let n = await cxPhotosImportAvant.apply(this, arguments);
   for (const x of (imp && imp.choix_claude) || []) {
-    if (!(typeof x.photo === 'string' && x.photo.startsWith('data:image'))) { delete x.photo; continue; }
     const deja = cxListe().find(c => c.id === String(x.id));
+    if (!(typeof x.photo === 'string' && x.photo.startsWith('data:image')) && CX_PHOTO_URL.test(String(x.photo_url || ''))) {
+      if (deja && deja.photo_doc) { x.photo_doc = deja.photo_doc; continue; }
+      x.photo = await cxUrlEnPhoto(x.photo_url);
+      if (!x.photo.startsWith('data:image')) { delete x.photo; continue; }
+    }
+    if (!(typeof x.photo === 'string' && x.photo.startsWith('data:image'))) { delete x.photo; continue; }
     const id = deja && deja.photo_doc ? deja.photo_doc : 'dcx' + String(x.id).replace(/[^a-z0-9]/gi, '');
     await ctEcrire(id, x.photo);
     const mini = mkReduire(await trImage(x.photo), 560, 0.74);
@@ -14420,7 +14432,7 @@ function cxItemHtml(c) {
   return `<div class="cx-item ${etat}" id="cx_${c.id}">
     <div class="cx-haut">${photo}<div style="min-width:0;flex:1">
       <div><span class="cx-rang">n° ${E(c.rang || '?')}</span><span class="cx-type ${c.type}">${c.type === 'valeur' ? '💎 Valeur' : '🚶 Trafic'}</span>${etat === 'pris' ? ' <b style="color:#166534">✅ Je prends</b>' : etat === 'plus_tard' ? ' <b style="color:#854d0e">⏸ Plus tard</b>' : etat === 'ecarte' ? ' <b>❌ Écarté</b>' : ''}</div>
-      <div class="cx-nom">${E(c.ref)} — ${E(c.article)}${c.qualite ? ' <span style="font-weight:600;color:#475569">(' + E(c.qualite) + ')</span>' : ''}</div>
+      <div class="cx-nom">${E(c.ref.replace(/ \(à chercher\)$/, ''))}${c.article && c.article !== 'Autre' ? ' — ' + E(c.article) : ''}${c.qualite ? ' <span style="font-weight:600;color:#475569">(' + E(c.qualite) + ')</span>' : ''}</div>
       ${!f && c.cn ? `<div style="font-size:22px;font-weight:800;margin:2px 0">${E(c.cn)}</div><div class="q-fr-moi">(à montrer au vendeur : « 有这个吗？多少钱？ » — vous en avez ? combien ?)</div>` : ''}
       <div class="cx-four">${f ? '🏭 ' + E(mkNomFournisseur(f)) + fiab : c.ou ? '🔎 À chercher à la Foire : ' + E(c.ou) + (!doc ? ' · 📷 photo à prendre au stand' : ' · 📷 photo d\'exemple (le type de produit, pas le modèle exact)') : '🏭 ' + E(c.societe || 'fournisseur à retrouver') + ' <span style="color:#b45309">(pas encore dans le carnet)</span>'}${p && p.page ? ' · ' + E(p.page) : ''}</div></div></div>
     <div class="cx-pq">💡 ${E(c.pourquoi)}</div>
@@ -14474,14 +14486,18 @@ function ecranChoix() {
     voisins, ce qui s'importe le plus, et votre budget. <b>💎 Valeur</b> = bonne marge par pièce ; <b>🚶 Trafic</b> = petit prix qui fait venir et revenir les clients.
     Vous décidez : <b>✅ Je prends</b>, <b>⏸ Plus tard</b> ou <b>❌ Écarter</b>. La liste se met à jour à chaque fichier de Claude ; vos décisions restent.</span></div>`;
   if (!L.length) return note + `<div class="carte"><h2>⭐ Les choix de Claude</h2>
-    <p style="font-size:16px;line-height:1.5">Pas encore de liste. Elle arrive dans un fichier <b>KYLO-choix-Claude-….json</b> : ouvrez-le avec
-    <b>Fournisseurs → ➕ Ajouter (fichier de Claude)</b>, comme les catalogues. Les choix se rangent ici tout seuls.</p>
-    <button class="b" onclick="allerA('radar')">Voir l'ancien Radar</button></div>`;
+    <p style="font-size:17px;line-height:1.5">Pas encore de liste dans ce téléphone. Claude vous l'envoie dans le chat : un <b>code qui commence par KYLOZ:</b>
+    (le plus simple) ou un fichier <b>KYLO-choix-Claude-….json</b>.</p>
+    <ol style="font-size:16px;line-height:1.5;margin:6px 0 10px 20px;padding:0"><li>Dans le chat de Claude, touchez <b>Copier</b> sur le code.</li>
+      <li>Ici, touchez le bouton vert ci-dessous, puis <b>📋 Coller le code de Claude</b>.</li><li>Touchez <b>✅ Ajouter au carnet</b> : la liste apparaît ici.</li></ol>
+    <button class="b vert" style="min-height:60px;font-size:18px" onclick="ctBoiteImport()">📥 Ouvrir la liste de Claude</button>
+    <div style="height:10px"></div><button class="b gris" onclick="allerA('radar')">Voir l'ancien Radar</button></div>`;
   return note + `<div class="carte"><h2>⭐ Les choix de Claude</h2>
     <div class="cx-tete"><span class="n">${L.filter(c => !c.retire).length}</span><span style="font-size:15px">produits conseillés${C.choix_claude_le ? ' · liste du ' + E(mkJour(C.choix_claude_le)) : ''}
       · ${L.filter(c => !c.retire && c.type === 'valeur').length} 💎 valeur · ${L.filter(c => !c.retire && c.type !== 'valeur').length} 🚶 trafic</span></div>
     ${C.choix_claude_mot ? `<p style="font-size:15px;line-height:1.45;background:#eff6ff;border-radius:10px;padding:8px">${E(C.choix_claude_mot)}</p>` : ''}
-    <div id="cx_budget">${cxBudgetHtml()}</div></div>
+    <div id="cx_budget">${cxBudgetHtml()}</div>
+    <button class="b contour" style="margin-top:10px;min-height:50px;font-size:16px" onclick="ctBoiteImport()">📥 Ajouter / mettre à jour la liste de Claude (code ou fichier)</button></div>
     <div class="cx-filtres">${puce('a_decider', '⏳ À décider (' + n('a_decider') + ')', cxFiltre === 'a_decider', "cxFiltre='a_decider';dessiner()")}${puce('pris', '✅ Je prends (' + n('pris') + ')', cxFiltre === 'pris', "cxFiltre='pris';dessiner()")}${puce('plus_tard', '⏸ Plus tard (' + n('plus_tard') + ')', cxFiltre === 'plus_tard', "cxFiltre='plus_tard';dessiner()")}${puce('ecarte', '❌ Écartés (' + n('ecarte') + ')', cxFiltre === 'ecarte', "cxFiltre='ecarte';dessiner()")}${puce('tous', 'Tous (' + n('tous') + ')', cxFiltre === 'tous', "cxFiltre='tous';dessiner()")}${L.some(c => c.retire) ? puce('retires', 'Retirés par Claude', cxFiltre === 'retires', "cxFiltre='retires';dessiner()") : ''}</div>
     <div class="cx-filtres">${puce('', 'Valeur + trafic', !cxType, "cxType='';dessiner()")}${puce('valeur', '💎 Valeur', cxType === 'valeur', "cxType='valeur';dessiner()")}${puce('trafic', '🚶 Trafic', cxType === 'trafic', "cxType='trafic';dessiner()")}</div>
     <div class="cx-filtres"><span style="font-size:14px;align-self:center;flex:none">Trier :</span>${puce('rang', 'Mon ordre', cxTri === 'rang', "cxTri='rang';dessiner()")}${puce('gain_lot', '💰 Gain du lot', cxTri === 'gain_lot', "cxTri='gain_lot';dessiner()")}${puce('gain_piece', 'Gain par pièce', cxTri === 'gain_piece', "cxTri='gain_piece';dessiner()")}${puce('rendement', 'Rendement', cxTri === 'rendement', "cxTri='rendement';dessiner()")}</div>

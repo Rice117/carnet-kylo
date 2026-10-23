@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.8.0';
+window.KYLO_APPLICATION = '1.9.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -1129,7 +1129,7 @@ KyloLecteurCodes.prototype.detect = function (source) {
 <nav>
   <button data-onglet="rencontres" class="actif">🏭 Fournisseurs</button>
   <button data-onglet="voyage">Voyage</button>
-  <button data-onglet="radar">Radar</button>
+  <button data-onglet="choix">⭐ Choix de Claude</button>
   <button data-onglet="negocier">Négocier</button>
   <button data-onglet="enquete">Questions</button>
   <button data-onglet="comparer">Comparer</button>
@@ -1608,6 +1608,7 @@ function dessiner() {
   else if (ongletActif === 'prix') z.innerHTML = ecranPrix();
   else if (ongletActif === 'objectif') z.innerHTML = ecranObjectif();
   else if (ongletActif === 'strategie') z.innerHTML = ecranStrategie();
+  else if (ongletActif === 'choix') { z.innerHTML = ecranChoix(); setTimeout(ctRemplirMinis, 0); }
   else if (ongletActif === 'radar') z.innerHTML = ecranRadar();
   else z.innerHTML = ecranEnvoi();
   _ongletDessine = ongletActif;
@@ -11834,7 +11835,7 @@ async function fsEnvoyerAClaude(bouton) {
     if (courante.length || !parties.length) parties.push(courante);
     const n = parties.length, enc = new TextEncoder();
     const resume = { format: 'kylo-pour-claude', version: 2, le: mkMaintenant(), application: window.KYLO_APPLICATION, parties: n,
-      nb_fournisseurs: fiches.length, nb_photos: nPhotos, fournisseurs: fiches };
+      nb_fournisseurs: fiches.length, nb_photos: nPhotos, fournisseurs: fiches, choix_claude: typeof cxDecisionsPourClaude === 'function' ? cxDecisionsPourClaude() : [] };
     const json = enc.encode(JSON.stringify(resume, null, 1));
     clEnvoi = { parties: parties.map((fichiers, i) => {
       const lisezmoi = enc.encode(`Carnet KYLO pour Claude — ${jour} — partie ${i + 1} sur ${n}\n${fiches.length} fournisseurs, ${nPhotos} photos en tout.\n`
@@ -12546,11 +12547,19 @@ function pxDessinerDemande() {
     <p class="px-aide" id="px_paliers_t">${pxTextePaliers()}</p>
     <div class="px-titre">3. Envoyer sur WeChat (dans sa discussion)</div>
     <div class="tr-etape"><span class="n">1</span><div class="c">
-      <button class="b" style="background:#1aad19;color:#fff" id="px_b_img" onclick="pxEnvoyerImages()">🖼️ Les photos numérotées</button>
-      <div id="px_images" class="tr-planches"></div></div></div>
+      <button class="b" style="background:#1aad19;color:#fff" id="px_b_pdf" onclick="cxEnvoyerDossier()">📄 Le dossier complet (PDF, 1 fichier)</button>
+      <p class="px-aide">Une page par produit : <b>sa photo</b>, la grille des 3 qualités × quantités, et <b>tout ce qui manque</b> (carton, poids, délai, matière, couleurs, garantie…) ;
+        ce qu'on sait déjà est pré-écrit en vert. Il remplit tout d'un coup.</p>
+      <details><summary class="px-voir">Ou les mêmes pages en images</summary>
+      <button class="b contour" id="px_b_img" onclick="pxEnvoyerImages()">🖼️ Les pages en images</button>
+      <div id="px_images" class="tr-planches"></div></details></div></div>
     <div class="tr-etape"><span class="n">2</span><div class="c">
       <button class="b" style="background:#1aad19;color:#fff" onclick="pxEnvoyerClasseur()">📊 Le tableau à remplir (Excel)</button>
-      <p class="px-aide">Il le remplit et vous le renvoie : « 📥 Sa réponse » range ses prix tout seul.</p></div></div>
+      <p class="px-aide">Les mêmes produits et les mêmes cases que le PDF, pré-remplies quand on sait déjà ; il complète les cases vides.</p>
+      <div class="px-rep"><b>Comment sa réponse revient dans le carnet :</b><br>
+        • Il renvoie <b>l'Excel rempli</b> → Sa fiche → <b>📥 Sa réponse (fichier Excel)</b> : ses prix se rangent tout seuls dans Comparer.<br>
+        • Il écrit sur les pages ou dans WeChat → Sa fiche → <b>✏️ Noter ses prix à la main</b>.<br>
+        • Ou vous envoyez tout à Claude (<b>📤 Envoyer à Claude</b>) : Claude lit et renvoie un fichier à ouvrir.</div></div></div>
     <div class="tr-etape"><span class="n">3</span><div class="c">
       <button class="b" style="background:#1aad19;color:#fff" onclick="ctEnvoyer('wechat')">💬 Copier le message et ouvrir WeChat</button>
       ${f.email || ctTelPropre(f.whatsapp || f.mobile || '') ? `<div class="px-boutons">${f.email ? `<button class="b contour" onclick="ctEnvoyer('email')">✉️ Par e-mail</button>` : ''}${ctTelPropre(f.whatsapp || f.mobile || '') ? `<button class="b contour" onclick="ctEnvoyer('whatsapp')">🟢 WhatsApp</button>` : ''}</div>` : ''}
@@ -13954,7 +13963,7 @@ function coMontrerVendeur(eid) {
   const qs = questionsDe(e.modele);
   mkBoite(`<div class="mk-dlg co-vendeur"><h3>🀄 请回答以下问题 / Please answer</h3>
     <p class="mk-aide" style="font-size:15px">Tendez le téléphone au vendeur : il touche 是 (oui) ou 否 (non) ; pour un chiffre, il tape dans la case.</p>
-    ${qs.map((q, i) => `<div class="q-bloc" id="qv_${q[0]}"><div class="q-cn">${i + 1}. ${E(ENQ_CN[q[0]] || '')}</div><div class="q-en">${E(q[2])}</div>
+    ${qs.map((q, i) => `<div class="q-bloc" id="qv_${q[0]}"><div class="q-cn">${i + 1}. ${E(ENQ_CN[q[0]] || '')}</div><div class="q-en">${E(q[2])}</div><div class="q-fr-moi">🇫🇷 ${E(q[1])}</div>
       <div class="q-rep"><button type="button" class="${/^oui/i.test((e.rep || {})[q[0]] || '') ? 'on' : ''}" onclick="coRepondre('${e.id}','${q[0]}','Oui');coVendeurMaj('${e.id}','${q[0]}')">是</button>
         <button type="button" class="non ${/^non/i.test((e.rep || {})[q[0]] || '') ? 'on' : ''}" onclick="coRepondre('${e.id}','${q[0]}','Non');coVendeurMaj('${e.id}','${q[0]}')">否</button></div>
       <input id="qv_t_${q[0]}" value="${E(String((e.rep || {})[q[0]] || '').replace(/^(oui|non)\\b\\s*[·:,-]?\\s*/i, ''))}" placeholder="数字 / 其他 (chiffre, autre)" oninput="coVendeurTexte('${e.id}','${q[0]}',this.value)" style="font-size:18px"></div>`).join('')}
@@ -14000,6 +14009,486 @@ function coFicheSectionsHtml(f) {
 }
 // « Envoyer à Claude » garde les liens.
 ['fid'].forEach(k => { if (typeof CL_CHAMPS_ENVOI !== 'undefined' && !CL_CHAMPS_ENVOI.includes(k)) CL_CHAMPS_ENVOI.push(k); });
+</script>
+<style>
+/* ===================== 1.9.0 — LES CHOIX DE CLAUDE + LA DEMANDE DE PRIX COMPLÈTE (23/10/2026) =====================
+   Riche, 23/10 : « les questions étaient en anglais et chinois, pas le français » ; « un seul fichier par fournisseur avec tout
+   ce qui manque à chaque produit, et la photo exacte » ; « un espace dédié à toi : tes coups de cœur, les quantités, le budget ».
+   Textes jamais sous 14 px. Couleurs = variables du carnet. */
+.q-fr-moi{font-size:14px;color:var(--texte-note,#475569);margin-top:2px;line-height:1.3}
+.cx-tete{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:4px 0 8px}
+.cx-tete .n{font-size:28px;font-weight:900;color:var(--bleu)}
+.cx-filtres{display:flex;gap:6px;overflow-x:auto;padding:4px 0 8px;-webkit-overflow-scrolling:touch}
+.cx-filtres .mk-puce{flex:none;font-size:15px}
+.cx-item{border:1px solid var(--lisiere);border-radius:14px;padding:10px;margin:8px 0;background:var(--carte)}
+.cx-item.pris{border-color:#22c55e;background:#f0fdf4}.cx-item.ecarte{opacity:.55}.cx-item.plus_tard{border-color:#facc15}
+.cx-haut{display:flex;gap:10px;align-items:flex-start}
+.cx-haut img,.cx-haut .cx-vide{width:96px;height:96px;object-fit:contain;border-radius:10px;background:#f1f5f9;flex:none;font-size:40px;display:flex;align-items:center;justify-content:center}
+.cx-rang{display:inline-block;background:var(--bleu);color:#fff;border-radius:999px;padding:2px 10px;font-size:14px;font-weight:800;margin-right:6px}
+.cx-type{display:inline-block;border-radius:999px;padding:2px 10px;font-size:14px;font-weight:700;background:#fef3c7;color:#78350f}
+.cx-type.valeur{background:#dbeafe;color:#1e3a8a}
+.cx-nom{font-size:17px;font-weight:900;line-height:1.25;margin:4px 0 2px}
+.cx-four{font-size:14px;color:var(--texte-note,#475569)}
+.cx-pq{font-size:15px;line-height:1.4;margin:8px 0}
+.cx-marche{font-size:14px;line-height:1.4;color:#1e3a8a;background:#eff6ff;border-radius:10px;padding:8px}
+.cx-chiffres{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;margin:8px 0;font-size:15px}
+.cx-chiffres b{font-size:16px}
+.cx-chiffres input{width:100%;font-size:18px;font-weight:800;padding:8px;border:2px solid var(--lisiere);border-radius:10px;min-height:44px}
+.cx-boutons{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.cx-boutons .b{flex:1 1 30%;min-height:48px;font-size:15px;padding:8px}
+.cx-liens{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.cx-liens .b{flex:1 1 45%;min-height:44px;font-size:14px;padding:6px}
+.cx-budget{font-size:16px;line-height:1.5}
+.cx-budget input{font-size:18px;font-weight:800;min-height:44px}
+.cx-jauge{height:14px;border-radius:7px;background:#e2e8f0;overflow:hidden;margin:6px 0}
+.cx-jauge i{display:block;height:100%;background:#22c55e}.cx-jauge.trop i{background:#ef4444}
+.cx-note textarea{width:100%;font-size:15px;min-height:44px;border:1px solid var(--lisiere);border-radius:10px;padding:6px}
+.px-rep{background:#f8fafc;border:1px dashed var(--lisiere);border-radius:12px;padding:10px;font-size:15px;line-height:1.45;margin:8px 0}
+.px-rep b{color:var(--bleu)}
+</style>
+<script>
+// ===================== 1.9.0 — LES CHOIX DE CLAUDE + LA DEMANDE DE PRIX COMPLÈTE (23/10/2026) =====================
+
+// ---------- 1. Le message aux fournisseurs : le français pour Riche, au-dessus ----------
+// Riche : « il faut que je sache ce que je demande ». Le message copié reste chinois + anglais (le vendeur) ; l'écran montre
+// d'abord, en français, les questions qui partent.
+const cxMontrerTexteEnqueteAvant = montrerTexteEnquete;
+montrerTexteEnquete = function (eid) {
+  cxMontrerTexteEnqueteAvant.apply(this, arguments);
+  const e = enquetesListe().find(x => x.id === eid); if (!e) return;
+  const z = document.getElementById('enq_texte'); if (!z) return;
+  const qs = questionsDe(e.modele).filter(q => !String((e.rep || {})[q[0]] || '').trim());
+  if (!qs.length) return;
+  z.insertAdjacentHTML('beforebegin', `<details class="px-rep" open><summary style="font-weight:800;font-size:16px;min-height:44px;display:flex;align-items:center">🇫🇷 Ce que vous demandez, en français (${qs.length})</summary>
+    <ol style="margin:6px 0 0 18px;padding:0">${qs.map(q => `<li style="margin:4px 0">${E(q[1])}${(e.exige || {})[q[0]] ? ` <span style="color:#7f1d1d">— ma condition : ${E((e.exige || {})[q[0]])}</span>` : ''}</li>`).join('')}</ol></details>`);
+};
+
+// ---------- 2. La demande de prix : la photo exacte, et tout ce qui manque, en UN dossier ----------
+// 2a. Un produit du catalogue mis dans Comparer perdait sa photo dans la demande (l'offre n'avait pas « photo_doc »).
+const cxLignesDeAvant = pxLignesDe;
+pxLignesDe = function (f) {
+  const L = cxLignesDeAvant.apply(this, arguments);
+  L.forEach(l => {
+    if (!l.o || l.p || !l.o.produit_id) return;
+    const p = ctProduit(f, l.o.produit_id); if (!p) return;
+    l.pc = p;
+    if (!l.photo && !l.doc && p.photo_doc) l.doc = p.photo_doc;
+  });
+  return L;
+};
+// « WD-9032 · Autre » ne dit rien au vendeur : quand la famille est « Autre », le début de la description prend sa place.
+function cxNom(l) {
+  const p = l.p || l.pc; const car = p && String(p.caracteristiques || '').split('·')[0].trim();
+  return /· Autre$/.test(String(l.nom || '')) && car ? String(l.nom).replace(/· Autre$/, '· ' + car) : l.nom;
+}
+const cxNomPourVendeurAvant = pxNomPourVendeur;
+pxNomPourVendeur = function (l) { return cxNomPourVendeurAvant(Object.assign({}, l, { nom: cxNom(l) })); };
+// Ce qu'on sait déjà d'un produit (pour ne demander que ce qui manque).
+function cxConnu(l) {
+  const p = l.p || l.pc || {}, o = l.o || {};
+  const pcs = num(o.qte_carton) || num(p.colisage), dl = num(o.dim_l) || num(p.dim_l), dla = num(o.dim_la) || num(p.dim_la), dh = num(o.dim_h) || num(p.dim_h);
+  const kg = num(o.poids_kg) || num(p.poids_kg), delai = num(o.delai);
+  return { pcs, dims: dl > 0 && dla > 0 && dh > 0 ? [dl, dla, dh] : null, kg, delai, carac: String(p.caracteristiques || o.note || '').trim(), page: String(p.page || '').trim() };
+}
+// Les lignes « à remplir » d'un produit : ce qui manque, en chinois + anglais, avec ce qu'on sait déjà pré-écrit.
+function cxChampsManquants(l) {
+  const k = cxConnu(l), L = [];
+  L.push(['每箱数量 Pcs / carton', k.pcs > 0 ? k.pcs + ' 个' : '']);
+  L.push(['外箱尺寸 Carton L×W×H (cm)', k.dims ? k.dims.map(x => nf(x, 1)).join(' × ') + ' cm' : '']);
+  L.push(['毛重 Gross weight (kg)', k.kg > 0 ? nf(k.kg, 2) + ' kg' : '']);
+  L.push(['交期 Lead time (days)', k.delai > 0 ? k.delai + ' 天' : '']);
+  L.push(['材料 / 功率 / 容量 Material / power / capacity', '']);
+  L.push(['颜色 Colours available', '']);
+  L.push(['保修 Warranty (months)', '']);
+  L.push(['认证 Certificates (CE / CB / RoHS)', '']);
+  L.push(['三个档次的区别 Difference between the 3 grades', '']);
+  return L;
+}
+function cxTexteLignes(g, texte, x, y, largeur, taille, interligne, maxLignes) {
+  g.font = '500 ' + taille + 'px system-ui,-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif';
+  const mots = String(texte || '').split(/(\s+|(?<=[一-鿿]))/).filter(m => m && !/^\s+$/.test(m));
+  const lignes = []; let cur = '';
+  for (const m of mots) {
+    const essai = cur ? cur + (/^[一-鿿]/.test(m) || /[一-鿿]$/.test(cur) ? '' : ' ') + m : m;
+    if (g.measureText(essai).width > largeur && cur) { lignes.push(cur); cur = m; } else cur = essai;
+    if (lignes.length >= maxLignes) break;
+  }
+  if (cur && lignes.length < maxLignes) lignes.push(cur);
+  lignes.forEach((t, i) => g.fillText(t, x, y + i * interligne));
+  return lignes.length;
+}
+// 2b. UNE page par produit : la photo (grande), le nom, ce qu'on sait, la grille des 3 qualités × quantités, puis ce qui manque.
+async function cxPagesProduits(f, lignes, paliers) {
+  const W = 1080, HAUT = 170, res = [];
+  const qui = [trMarque(f.societe) || f.nom || f.societe, f.contact].filter(Boolean).join(' — ');
+  const jour = new Date().toLocaleDateString('fr-CA');
+  const cols = ['档次 Grade', '起订量 MOQ', '起订价 ¥'].concat(paliers.map(q => q + '个 ¥'));
+  for (let i = 0; i < lignes.length; i++) {
+    const l = lignes[i], n = i + 1, k = cxConnu(l), champs = cxChampsManquants(l);
+    const H = HAUT + 420 + 24 + 4 * 76 + 30 + champs.length * 62 + 150;
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#0d3f85'; g.fillRect(0, 0, W, HAUT - 14);
+    g.fillStyle = '#ffffff'; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+    trTexteAjuste(g, '报价请求 · Price request · 第 ' + n + ' / ' + lignes.length + ' 个产品', 36, 60, W - 72, 40, true);
+    trTexteAjuste(g, qui, 36, 106, W - 72, 32, true);
+    trTexteAjuste(g, 'KYLO EURGUINE · 几内亚 Guinea · ' + jour + ' · 币种 RMB ¥ · 请填写空白处 Please fill in the blanks', 36, 146, W - 72, 24, false);
+    // La photo, grande, et le numéro rouge.
+    const y0 = HAUT, PH = 400;
+    g.strokeStyle = '#d7e1f0'; g.lineWidth = 2; g.strokeRect(24, y0 + 10, PH, PH);
+    const img = await pxImageDe(l);
+    if (img) { const e = Math.min((PH - 16) / img.width, (PH - 16) / img.height), lw = img.width * e, lh = img.height * e; g.drawImage(img, 24 + (PH - lw) / 2, y0 + 10 + (PH - lh) / 2, lw, lh); }
+    else { g.fillStyle = '#e8effb'; g.fillRect(26, y0 + 12, PH - 4, PH - 4); g.fillStyle = '#5a6b85'; g.textAlign = 'center'; trTexteAjuste(g, '(没有照片 / pas de photo)', 24 + PH / 2, y0 + PH / 2, PH - 30, 26, false); g.textAlign = 'left'; }
+    g.fillStyle = '#d32f2f'; g.beginPath(); g.arc(60, y0 + 46, 36, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#ffffff'; g.textAlign = 'center'; trTexteAjuste(g, String(n), 60, y0 + 59, 64, n > 99 ? 28 : 38, true); g.textAlign = 'left';
+    // À droite : le nom (chinois + référence), la page du catalogue, ce qu'on sait.
+    const xd = 24 + PH + 24, ld = W - xd - 24;
+    const nom = cxNom(l), cn = pxNomChinois(nom);
+    g.fillStyle = '#16233a';
+    let y = y0 + 52;
+    if (cn) { trTexteAjuste(g, cn, xd, y, ld, 34, true); y += 44; }
+    y += 34 * cxTexteLignes(g, nom, xd, y, ld, 30, 36, 2); g.font = '800 30px system-ui';
+    if (k.page) { g.fillStyle = '#5a6b85'; trTexteAjuste(g, '目录 Catalogue ' + k.page, xd, y + 4, ld, 24, false); y += 36; }
+    if (k.carac) { g.fillStyle = '#334155'; y += 30 * cxTexteLignes(g, k.carac, xd, y + 4, ld, 24, 30, 4) + 8; }
+    g.fillStyle = '#0d3f85'; trTexteAjuste(g, '请报三个档次的价格 Please quote 3 grades:', xd, y + 26, ld, 24, true);
+    // La grille des prix : 3 qualités × (minimum, prix au minimum, prix par quantité).
+    const gx = 24, gy = y0 + PH + 34, gw = W - 48, rh = 76, cw = [170].concat(Array(cols.length - 1).fill((gw - 170) / (cols.length - 1)));
+    g.fillStyle = '#e8effb'; g.fillRect(gx, gy, gw, rh);
+    g.strokeStyle = '#9fb3d1'; g.lineWidth = 2;
+    for (let r = 0; r <= 4; r++) { g.beginPath(); g.moveTo(gx, gy + r * rh); g.lineTo(gx + gw, gy + r * rh); g.stroke(); }
+    let x = gx;
+    for (let kk = 0; kk <= cols.length; kk++) { g.beginPath(); g.moveTo(x, gy); g.lineTo(x, gy + 4 * rh); g.stroke(); if (kk < cols.length) x += cw[kk]; }
+    x = gx; g.fillStyle = '#16233a'; g.textAlign = 'center';
+    cols.forEach((t, kk) => { trTexteAjuste(g, t, x + cw[kk] / 2, gy + 47, cw[kk] - 10, 24, true); x += cw[kk]; });
+    PX_NIV.forEach((nv, r) => { trTexteAjuste(g, nv.cn + ' ' + nv.en, gx + cw[0] / 2, gy + (r + 1) * rh + 47, cw[0] - 10, 24, true); });
+    g.textAlign = 'left';
+    // Ce qui manque : une ligne par information, pré-remplie quand on la connaît déjà.
+    let ym = gy + 4 * rh + 26;
+    g.fillStyle = '#0d3f85'; trTexteAjuste(g, '缺少的信息，请补充 Missing information, please complete:', 24, ym + 18, W - 48, 26, true); ym += 40;
+    champs.forEach(([lib, val]) => {
+      g.fillStyle = val ? '#f0fdf4' : '#fffbeb'; g.fillRect(24, ym, W - 48, 54);
+      g.strokeStyle = '#cbd5e1'; g.lineWidth = 1; g.strokeRect(24, ym, W - 48, 54);
+      g.fillStyle = '#16233a'; trTexteAjuste(g, lib, 36, ym + 35, 520, 23, true);
+      if (val) { g.fillStyle = '#166534'; trTexteAjuste(g, '已知 ' + val + '  （如有错请改正 correct if wrong）', 570, ym + 35, W - 600, 22, false); }
+      else { g.strokeStyle = '#94a3b8'; g.beginPath(); g.moveTo(570, ym + 40); g.lineTo(W - 40, ym + 40); g.stroke(); }
+      ym += 62;
+    });
+    g.fillStyle = '#fbf1de'; g.fillRect(0, ym + 10, W, H - ym - 10);
+    g.fillStyle = '#16233a'; g.textAlign = 'center';
+    trTexteAjuste(g, '可以直接在这页上写，拍照发回；或者填写 Excel 表格。', W / 2, ym + 56, W - 60, 27, true);
+    trTexteAjuste(g, 'You can write on this page and send a photo back, or fill in the Excel file. 谢谢 Thank you!', W / 2, ym + 98, W - 60, 24, false);
+    g.textAlign = 'left';
+    res.push({ src: c.toDataURL('image/jpeg', 0.86), w: W, h: H });
+  }
+  return res;
+}
+// La page de garde : qui, quoi, comment répondre.
+function cxPageGarde(f, lignes, paliers) {
+  const W = 1080, H = 1400, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#0d3f85'; g.fillRect(0, 0, W, 300);
+  g.fillStyle = '#ffffff'; g.textAlign = 'left';
+  trTexteAjuste(g, 'KYLO EURGUINE', 48, 90, W - 96, 54, true);
+  trTexteAjuste(g, '报价请求 · Price request · Demande de prix', 48, 160, W - 96, 42, true);
+  trTexteAjuste(g, '几内亚科纳克里 Conakry, Guinea (West Africa) · ' + new Date().toLocaleDateString('fr-CA'), 48, 220, W - 96, 28, false);
+  trTexteAjuste(g, [trMarque(f.societe) || f.nom || f.societe, f.contact].filter(Boolean).join(' — '), 48, 270, W - 96, 30, true);
+  const sig = ctSignature(), qui = sig.split('–')[0].trim() || 'Riche';
+  const pal = paliers.map(q => String(q));
+  const L = [['#16233a', 32, true, '请为以下 ' + lignes.length + ' 个产品报价 Please quote these ' + lignes.length + ' products:'],
+    ...lignes.slice(0, 18).map((l, i) => ['#334155', 26, false, (i + 1) + '. ' + pxNomPourVendeur(l)]),
+    ...(lignes.length > 18 ? [['#334155', 26, false, '… 共 ' + lignes.length + ' 个（见各页） … ' + lignes.length + ' in total (see each page)']] : []),
+    ['#16233a', 30, true, ''],
+    ['#16233a', 30, true, '每个产品请按三个档次报价 For each product, 3 grades (高 high / 中 medium / 低 low):'],
+    ['#334155', 26, false, '· 出厂价 人民币 Unit price in RMB (EXW) · 起订量 MOQ' + (pal.length ? ' · ' + pal.join(' / ') + ' 个的单价 price for ' + pal.join(' / ') + ' pcs' : '')],
+    ['#334155', 26, false, '· 每箱数量、外箱尺寸、毛重 Pcs/carton, carton size, gross weight · 交期 Lead time'],
+    ['#334155', 26, false, '· 三个档次的区别 Difference between grades (材料 material, 功率 power, 配件 accessories, 包装 packing)'],
+    ['#16233a', 30, true, ''],
+    ['#16233a', 30, true, '这是我们第一次合作，先试单 First order = trial order:'],
+    ['#334155', 26, false, '数量不大，请告诉我最少可以订多少。以后卖得好会长期返单。'],
+    ['#334155', 26, false, 'Small quantities first; please tell me the smallest quantity you accept. If it sells well we reorder regularly.'],
+    ['#16233a', 30, true, ''],
+    ['#16233a', 30, true, '怎么回复 How to reply:'],
+    ['#334155', 26, false, '1) 填写我们发的 Excel 表格 Fill in the Excel file we sent, or'],
+    ['#334155', 26, false, '2) 直接在每一页上写，拍照发微信 Write on each page and send photos on WeChat.'],
+    ['#16233a', 30, true, ''],
+    ['#16233a', 28, true, '谢谢！Thank you! — ' + qui]];
+  let y = 360;
+  L.forEach(([col, t, gras, texte]) => { if (texte) { g.fillStyle = col; trTexteAjuste(g, texte, 48, y, W - 96, t, gras); } y += t + 14; });
+  return { src: c.toDataURL('image/jpeg', 0.86), w: W, h: H };
+}
+// Un vrai PDF, fabriqué ici (pas de bibliothèque) : chaque page = une image JPEG pleine page.
+function cxPdfDepuisImages(pages) {
+  const enc = new TextEncoder(), morceaux = [], offsets = [];
+  let taille = 0;
+  const pousser = (x) => { const b = typeof x === 'string' ? enc.encode(x) : x; morceaux.push(b); taille += b.length; };
+  const octetsJpeg = (src) => { const b = atob(src.split(',')[1]); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };
+  const nObj = 2 + pages.length * 3;
+  pousser('%PDF-1.4\n%âãÏÓ\n');
+  const debut = (i) => { offsets[i] = taille; pousser(i + ' 0 obj\n'); };
+  debut(1); pousser('<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+  debut(2); pousser('<< /Type /Pages /Count ' + pages.length + ' /Kids [' + pages.map((p, i) => (3 + i * 3) + ' 0 R').join(' ') + '] >>\nendobj\n');
+  pages.forEach((p, i) => {
+    const o = 3 + i * 3, wp = 595.28, hp = Math.round(wp * p.h / p.w * 100) / 100;
+    debut(o); pousser('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + wp + ' ' + hp + '] /Resources << /XObject << /Im' + i + ' ' + (o + 2) + ' 0 R >> >> /Contents ' + (o + 1) + ' 0 R >>\nendobj\n');
+    const flux = 'q ' + wp + ' 0 0 ' + hp + ' 0 0 cm /Im' + i + ' Do Q';
+    debut(o + 1); pousser('<< /Length ' + flux.length + ' >>\nstream\n' + flux + '\nendstream\nendobj\n');
+    const j = octetsJpeg(p.src);
+    debut(o + 2); pousser('<< /Type /XObject /Subtype /Image /Width ' + p.w + ' /Height ' + p.h + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + j.length + ' >>\nstream\n');
+    pousser(j); pousser('\nendstream\nendobj\n');
+  });
+  const xref = taille;
+  pousser('xref\n0 ' + (nObj + 1) + '\n0000000000 65535 f \n' + Array.from({ length: nObj }, (_, i) => String(offsets[i + 1]).padStart(10, '0') + ' 00000 n \n').join(''));
+  pousser('trailer\n<< /Size ' + (nObj + 1) + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF\n');
+  return new Blob(morceaux, { type: 'application/pdf' });
+}
+// Les « photos numérotées » deviennent les pages complètes (une par produit) : même chose que le PDF, pour WeChat en images.
+pxImages = async function (f, lignes, paliers) { return (await cxPagesProduits(f, lignes, paliers)).map(p => p.src); };
+async function cxEnvoyerDossier() {
+  const f = mkFournisseur(pxD && pxD.fid); if (!f) return;
+  const ch = pxChoisies(f); if (!ch.length) { avertir('Choisissez au moins un produit.'); return; }
+  const b = document.getElementById('px_b_pdf'); if (b) { b.disabled = true; b.textContent = '⏳ Préparation du dossier…'; }
+  try {
+    const pages = [cxPageGarde(f, ch, pxD.paliers)].concat(await cxPagesProduits(f, ch, pxD.paliers));
+    const blob = cxPdfDepuisImages(pages);
+    await remettreFichier(blob, pxNomFichier(f, '.pdf'));
+  } catch (e) { avertir('Le dossier n\'a pas pu être préparé : ' + (e.message || e), 7000); }
+  if (b) { b.disabled = false; b.textContent = '📄 Le dossier complet (PDF, 1 fichier)'; }
+}
+// 2c. Le tableau Excel : une ligne par produit et par qualité, ce qu'on sait déjà pré-rempli, le numéro de page du dossier.
+pxClasseur = async function (f, lignes, paliers) {
+  const X = await fwScript('ocr/xlsx.full.min.js', 'XLSX');
+  const jour = new Date().toLocaleDateString('fr-CA');
+  const entete = ['序号 No.', '产品 Product', '档次 Grade', '起订量 MOQ (pcs)', '起订量单价 ¥ Unit price at MOQ']
+    .concat(paliers.map(q => q + '个单价 ¥ Price for ' + q + ' pcs'))
+    .concat(['每箱数量 Pcs/carton', '外箱尺寸 cm Carton size (L×W×H)', '毛重 kg Gross weight', '交期(天) Lead time (days)', '材料/功率 Material/power', '颜色 Colours', '保修 Warranty', '档次区别 / 备注 Difference / remarks', '照片 Photo']);
+  const rows = [['KYLO EURGUINE — 报价表 / Price list request'],
+    ['供应商 Supplier : ' + [f.code, f.societe || f.nom, f.contact].filter(Boolean).join(' · ')],
+    ['日期 Date : ' + jour + ' · 币种 Currency : 人民币 RMB ¥ · 请填写空白格（绿色 = 已知，如有错请改）Please fill in the blank cells (green = already known, correct if wrong)'], [], entete];
+  lignes.forEach((l, i) => {
+    const k = cxConnu(l);
+    PX_NIV.forEach(n => rows.push([i + 1, pxNomPourVendeur(l), n.cn + ' ' + n.en, '', ''].concat(paliers.map(() => ''))
+      .concat([k.pcs > 0 ? k.pcs : '', k.dims ? k.dims.map(x => nf(x, 1)).join(' × ') : '', k.kg > 0 ? k.kg : '', k.delai > 0 ? k.delai : '', '', '', '', '', 'PDF 第 ' + (i + 2) + ' 页 / page ' + (i + 2)])));
+  });
+  const ws = X.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{ wch: 8 }, { wch: 36 }, { wch: 12 }, { wch: 14 }, { wch: 18 }].concat(paliers.map(() => ({ wch: 16 }))).concat([{ wch: 14 }, { wch: 22 }, { wch: 12 }, { wch: 14 }, { wch: 22 }, { wch: 14 }, { wch: 12 }, { wch: 40 }, { wch: 16 }]);
+  ws['!merges'] = [0, 1, 2].map(r => ({ s: { r, c: 0 }, e: { r, c: entete.length - 1 } }));
+  const meta = X.utils.aoa_to_sheet([[JSON.stringify({ format: 'kylo-cotation', v: 2, fid: f.id, code: f.code || '', le: mkMaintenant(), paliers,
+    lignes: lignes.map((l, i) => ({ n: i + 1, cle: l.cle, nom: l.nom })) })]]);
+  const wb = X.utils.book_new();
+  X.utils.book_append_sheet(wb, ws, '报价 Quotation');
+  X.utils.book_append_sheet(wb, meta, 'kylo');
+  wb.Workbook = { Sheets: [{ Hidden: 0 }, { Hidden: 1 }] };
+  const tab = X.write(wb, { bookType: 'xlsx', type: 'array' });
+  return new Blob([tab], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+};
+// Le message WeChat parle du dossier.
+const cxMessageAvant = pxMessage;
+pxMessage = function (f, lignes, paliers) {
+  return cxMessageAvant.apply(this, arguments).replace('可以直接填写我发的 Excel 表格，或者这样回复：', '我发了一个 PDF 文件（每个产品一页，有照片和要补充的信息）和一个 Excel 表格。可以填写 Excel，或在 PDF 每页上写后拍照发给我，或者这样回复：');
+};
+
+// ---------- 3. ⭐ LES CHOIX DE CLAUDE ----------
+// Riche, 23/10 : « crée-moi une espace dédiée à toi : tes coups de cœur, telle quantité, d'après le marché guinéen et le budget ;
+// je confirme ou j'écarte ; tu la mets à jour à chaque nouveau catalogue ; ne prends pas les produits pour me faire plaisir ».
+// Les choix arrivent par le même fichier que les catalogues (« choix_claude »), et se rangent ici. Ce que Riche décide
+// (je prends / plus tard / écarté, sa quantité, sa note) reste même quand Claude renvoie une liste mise à jour.
+function cxListe() { return Array.isArray(C.choix_claude) ? C.choix_claude : (C.choix_claude = []); }
+let cxFiltre = 'a_decider', cxType = '', cxTri = 'rang';
+function cxPoserChoix(x) {
+  if (!x || !x.id) return 0;
+  const L = cxListe(); let c = L.find(y => y.id === x.id);
+  const neuf = { id: String(x.id), rang: num(x.rang), type: x.type === 'valeur' ? 'valeur' : 'trafic', societe: String(x.societe || ''), code: String(x.code || ''), fid: String(x.fid || ''),
+    ref: String(x.ref || ''), article: String(x.article || ''), pourquoi: String(x.pourquoi || ''), quantite: num(x.quantite), qualite: String(x.qualite || ''),
+    prix_cny: { min: num(x.prix_cny && x.prix_cny.min), max: num(x.prix_cny && x.prix_cny.max) }, vente_gnf: num(x.vente_gnf), volume_m3: num(x.volume_m3),
+    marche: { guinee: String(x.marche && x.marche.guinee || ''), voisins: String(x.marche && x.marche.voisins || ''), demande: String(x.marche && x.marche.demande || ''), preuve: String(x.marche && x.marche.preuve || '') },
+    le: String(x.le || mkMaintenant().slice(0, 10)) };
+  if (c) Object.assign(c, neuf, { maj: mkMaintenant() }); else { c = Object.assign(neuf, { etat: '', qte_moi: 0, note_moi: '' }); L.push(c); }
+  return 1;
+}
+const cxFusionAvant = ctFusion;
+ctFusion = function (imp, appliquer) {
+  const bilan = cxFusionAvant.apply(this, arguments);
+  if (appliquer && Array.isArray(imp.choix_claude)) {
+    const ids = new Set(imp.choix_claude.map(x => String(x.id)));
+    if (imp.choix_claude_remplace) cxListe().forEach(c => { if (!ids.has(c.id)) c.retire = true; });   // Claude a retiré un produit de sa liste
+    imp.choix_claude.forEach(x => { cxPoserChoix(x); const c = cxListe().find(y => y.id === String(x.id)); if (c) delete c.retire; });
+    C.choix_claude_le = imp.choix_claude_le || mkMaintenant().slice(0, 10);
+    if (imp.choix_claude_mot) C.choix_claude_mot = String(imp.choix_claude_mot);
+  }
+  return bilan;
+};
+const cxApercuImportAvant = ctApercuImport;
+ctApercuImport = async function () {
+  await cxApercuImportAvant.apply(this, arguments);
+  const imp = ctImportEnCours, z = document.getElementById('ct_apercu_import');
+  if (imp && z && Array.isArray(imp.choix_claude) && imp.choix_claude.length) {
+    z.insertAdjacentHTML('beforeend', `<p style="margin:6px 0;font-size:16px">⭐ <b>${imp.choix_claude.length} choix de Claude</b> (onglet « Choix de Claude » : vous confirmez ou écartez).</p>`);
+    const bouton = document.getElementById('ct_bouton_import'); if (bouton) bouton.disabled = false;
+  }
+};
+const cxAppliquerImportAvant = ctAppliquerImport;
+ctAppliquerImport = async function () {
+  const imp = ctImportEnCours, avecChoix = !!(imp && Array.isArray(imp.choix_claude) && imp.choix_claude.length);
+  await cxAppliquerImportAvant.apply(this, arguments);
+  if (avecChoix) { allerA('choix'); avertir('⭐ Les choix de Claude sont à jour (' + imp.choix_claude.length + ' produits).', 6000); }
+};
+// Retrouver le fournisseur et le produit d'un choix dans le carnet.
+function cxFournisseur(c) {
+  const L = fournisseursListe();
+  return (c.fid && L.find(f => f.id === c.fid)) || (c.code && L.find(f => f.code === c.code))
+    || (c.societe && L.find(f => normaliserNom(f.societe || '') === normaliserNom(c.societe) || (normaliserNom(c.societe).length > 5 && normaliserNom(f.societe || f.nom || '').includes(normaliserNom(c.societe))))) || null;
+}
+function cxProduit(c) {
+  const f = cxFournisseur(c); if (!f) return null;
+  const cle = ctCleRef(String(c.ref).split('/')[0]);
+  return ctProduits(f).find(p => ctCleRef(p.ref) === cle) || ctProduits(f).find(p => ctCleRef(p.ref).startsWith(cle) || cle.startsWith(ctCleRef(p.ref))) || null;
+}
+function cxQte(c) { return num(c.qte_moi) > 0 ? num(c.qte_moi) : num(c.quantite); }
+// Le coût rendu d'une pièce : prix usine (milieu de la fourchette) + bateau + douane + 5 %, comme dans « + Achat ».
+function cxCout(c) {
+  const t = tauxDe('CNY'), tu = tauxDe('USD') || 8800;
+  const cny = c.prix_cny && (num(c.prix_cny.min) + num(c.prix_cny.max)) / 2 || 0;
+  const prixGnf = t > 0 ? cny * t : cny / 7.1 * tu;
+  const m = (Array.isArray(C.marche_guinee) ? C.marche_guinee : []).find(x => pxMemeArticle(x, c.article)) || null;
+  const d = m && num(m.douane_pct) > 0 ? num(m.douane_pct) / 100 : 0.4485;
+  const p = cxProduit(c);
+  let m3 = num(c.volume_m3);
+  if (!m3 && p && num(p.colisage) > 0 && num(p.dim_l) > 0) m3 = num(p.dim_l) * num(p.dim_la) * num(p.dim_h) / 1e6 / num(p.colisage);
+  if (!m3 && m && num(m.volume_m3) > 0) m3 = num(m.volume_m3);
+  const F = m3 * pxFretM3().gnf;
+  const rendu = prixGnf > 0 ? (prixGnf + F) * (1 + d) + 0.05 * prixGnf : 0;
+  const vente0 = num(c.vente_gnf) || (m && num(m.conseille)) || 0, vente = vente0 * (1 - coRabaisPct() / 100);
+  const regle = margeMinimum() > 0, marge = regle ? margeMinimum() : 35;
+  const max = vente > 0 ? Math.max(0, (vente * (1 - marge / 100) - F * (1 + d)) / (1 + d + 0.05)) : 0;
+  const gain = rendu > 0 && vente > 0 ? vente - rendu : 0, q = cxQte(c);
+  // Riche, 23/10 : « une petite marge sur un produit qu'on achète en gros, ou une grosse marge sur peu de pièces : il faut calculer
+  // des deux côtés ». Gain par pièce, gain du lot, et rendement = gain ÷ argent avancé (ce que rapporte chaque franc immobilisé).
+  return { cny, prixGnf, rendu, vente, affiche: vente0, max, maxCny: t > 0 ? max / t : max / tu * 7.1, margePct: rendu > 0 && vente > 0 ? (vente - rendu) / vente * 100 : 0, m3, usd: tu, t,
+    gain, gainLot: gain * q, avance: rendu * q, rendement: rendu > 0 ? gain / rendu * 100 : 0 };
+}
+function cxUsd(gnf) { const tu = tauxDe('USD') || 8800; return nf(gnf / tu, 0) + ' $'; }
+function cxEtat(id, etat) { const c = cxListe().find(x => x.id === id); if (!c) return; c.etat = c.etat === etat ? '' : etat; c.decide_le = mkMaintenant(); sauverLocal(); dessiner(); }
+function cxQteMoi(id, v) { const c = cxListe().find(x => x.id === id); if (!c) return; c.qte_moi = num(v); sauverLocal(); const z = document.getElementById('cx_tot_' + id); if (z) z.innerHTML = cxTotalHtml(c); cxMajBudget(); }
+function cxNoteMoi(id, v) { const c = cxListe().find(x => x.id === id); if (!c) return; c.note_moi = v; sauverLocal(); }
+function cxTotalHtml(c) { const k = cxCout(c), q = cxQte(c); return k.rendu > 0 && q > 0 ? `<b>${E(gnfStrict(k.rendu * q))}</b> ≈ ${E(cxUsd(k.rendu * q))} rendus pour ${E(nf(q, 0))} pièces${k.gainLot > 0 ? ' · gain du lot <b style="color:#166534">' + E(gnfStrict(k.gainLot)) + '</b>' : ''}` : '<span class="muet">prix à demander</span>'; }
+function cxBudgetChiffres() {
+  const L = cxListe().filter(c => !c.retire && c.etat !== 'ecarte');
+  const tot = (et) => L.filter(c => et === 'pris' ? c.etat === 'pris' : c.etat !== 'pris').reduce((s, c) => s + cxCout(c).rendu * cxQte(c), 0);
+  const gain = L.filter(c => c.etat === 'pris').reduce((s, c) => s + cxCout(c).gainLot, 0);
+  return { pris: tot('pris'), reste: tot('reste'), gain, budget: budgetMarchandiseGnf(), nPris: L.filter(c => c.etat === 'pris').length, nReste: L.filter(c => c.etat !== 'pris').length };
+}
+function cxBudgetHtml() {
+  const b = cxBudgetChiffres();
+  const pct = b.budget > 0 ? Math.min(100, Math.round(b.pris / b.budget * 100)) : 0;
+  return `<div class="cx-budget">
+    <div>✅ Je prends (${b.nPris}) : <b>${E(gnfStrict(b.pris))}</b> ≈ ${E(cxUsd(b.pris))} rendus en Guinée${b.gain > 0 ? ' → gain attendu <b style="color:#166534">' + E(gnfStrict(b.gain)) + '</b> (' + E(nf(b.gain / b.pris * 100, 0)) + ' % de l\'argent avancé)' : ''}</div>
+    <div>⏳ Encore à décider (${b.nReste}) : ${E(gnfStrict(b.reste))} ≈ ${E(cxUsd(b.reste))}</div>
+    ${b.budget > 0 ? `<div class="cx-jauge${b.pris > b.budget ? ' trop' : ''}"><i style="width:${pct}%"></i></div>
+      <div>${b.pris <= b.budget ? 'Il reste <b>' + E(gnfStrict(b.budget - b.pris)) + '</b> ≈ ' + E(cxUsd(b.budget - b.pris)) + ' sur ' + E(gnfStrict(b.budget)) : '⚠ <b>' + E(gnfStrict(b.pris - b.budget)) + ' au-dessus</b> du budget de ' + E(gnfStrict(b.budget))}</div>` : ''}
+    <div style="margin-top:6px"><label style="font-size:14px">Mon budget marchandise (GNF, tout compris : achat + bateau + douane)</label>
+      <input inputmode="numeric" value="${E(b.budget || '')}" placeholder="ex : 300000000" onchange="C.voyage.budget_marchandise_gnf=num(this.value);sauverLocal();dessiner()"></div>
+    <p class="muet" style="font-size:14px;margin:6px 0 0">Coût rendu = prix usine estimé (milieu de la fourchette) + bateau + douane + 5 %. Les vrais prix viennent des réponses des fournisseurs : chaque réponse rangée remplace l'estimation.</p></div>`;
+}
+function cxMajBudget() { const z = document.getElementById('cx_budget'); if (z) z.innerHTML = cxBudgetHtml(); }
+function cxItemHtml(c) {
+  const f = cxFournisseur(c), p = cxProduit(c), k = cxCout(c);
+  const photo = p && p.photo_doc ? `<img class="ct-mini" data-doc="${E(p.photo_doc)}" alt="">` : '<span class="cx-vide">📦</span>';
+  const etat = c.etat || '';
+  const fiab = f && f.classement && f.classement.fiabilite ? ' · fiabilité ' + E(String(f.classement.fiabilite.note)) + '/5' : '';
+  return `<div class="cx-item ${etat}" id="cx_${c.id}">
+    <div class="cx-haut">${photo}<div style="min-width:0;flex:1">
+      <div><span class="cx-rang">n° ${E(c.rang || '?')}</span><span class="cx-type ${c.type}">${c.type === 'valeur' ? '💎 Valeur' : '🚶 Trafic'}</span>${etat === 'pris' ? ' <b style="color:#166534">✅ Je prends</b>' : etat === 'plus_tard' ? ' <b style="color:#854d0e">⏸ Plus tard</b>' : etat === 'ecarte' ? ' <b>❌ Écarté</b>' : ''}</div>
+      <div class="cx-nom">${E(c.ref)} — ${E(c.article)}${c.qualite ? ' <span style="font-weight:600;color:#475569">(' + E(c.qualite) + ')</span>' : ''}</div>
+      <div class="cx-four">${f ? '🏭 ' + E(mkNomFournisseur(f)) + fiab : '🏭 ' + E(c.societe || 'fournisseur à retrouver') + ' <span style="color:#b45309">(pas encore dans le carnet)</span>'}${p && p.page ? ' · ' + E(p.page) : ''}</div></div></div>
+    <div class="cx-pq">💡 ${E(c.pourquoi)}</div>
+    ${c.marche.guinee || c.marche.voisins || c.marche.demande ? `<div class="cx-marche">${c.marche.guinee ? '🇬🇳 ' + E(c.marche.guinee) : ''}${c.marche.voisins ? '<br>🌍 ' + E(c.marche.voisins) : ''}${c.marche.demande ? '<br>📈 ' + E(c.marche.demande) : ''}${c.marche.preuve ? '<br><span style="color:#475569">Preuve : ' + E(c.marche.preuve) + '</span>' : ''}</div>` : ''}
+    <div class="cx-chiffres">
+      <div>Quantité conseillée<br><b>${E(nf(c.quantite, 0))} pièces</b></div>
+      <div><label style="font-size:14px">Ma quantité</label><input inputmode="numeric" value="${E(num(c.qte_moi) > 0 ? c.qte_moi : '')}" placeholder="${E(nf(c.quantite, 0))}" oninput="cxQteMoi('${c.id}',this.value)"></div>
+      <div>Prix usine estimé<br><b>${k.cny > 0 ? E(nf(num(c.prix_cny.min), 0)) + '–' + E(nf(num(c.prix_cny.max), 0)) + ' ¥' : '?'}</b> ${k.cny > 0 ? '≈ ' + E(cxUsd(k.prixGnf)) : ''}</div>
+      <div>À ne pas dépasser<br><b>${k.max > 0 ? E(nf(k.maxCny, 0)) + ' ¥' : '?'}</b> ${k.max > 0 ? '(marge ' + E(nf(margeMinimum() || 35, 0)) + ' %)' : ''}</div>
+      <div>Rendu magasin / pièce<br><b>${k.rendu > 0 ? E(gnfStrict(k.rendu)) : '?'}</b></div>
+      <div>Vente (2ᵉ prix)<br><b>${k.vente > 0 ? E(gnfStrict(k.vente)) : '?'}</b>${k.margePct ? ' → marge ' + E(nf(k.margePct, 0)) + ' %' : ''}</div>
+      <div>Gain par pièce<br><b style="color:${k.gain < 0 ? '#b91c1c' : '#166534'}">${k.rendu > 0 && k.vente > 0 ? (k.gain < 0 ? '⚠ perte ' : '') + E(gnfStrict(Math.abs(k.gain))) : '?'}</b></div>
+      <div>Gain du lot (${E(nf(cxQte(c), 0))} pcs)<br><b style="color:${k.gainLot < 0 ? '#b91c1c' : '#166534'}">${k.rendu > 0 && k.vente > 0 ? (k.gainLot < 0 ? '⚠ perte ' : '') + E(gnfStrict(Math.abs(k.gainLot))) : '?'}</b>${k.gainLot > 0 ? ' ≈ ' + E(cxUsd(k.gainLot)) : k.gainLot < 0 ? ' — au prix estimé, ne passe pas : négocier sous le prix à ne pas dépasser' : ''}</div>
+      <div style="grid-column:1/-1">Argent avancé pour le lot : <b>${k.avance > 0 ? E(gnfStrict(k.avance)) : '?'}</b>${k.rendement > 0 ? ' → rendement <b>' + E(nf(k.rendement, 0)) + ' %</b> (chaque 100 000 GNF avancés en rapportent ' + E(nf(k.rendement * 1000, 0)) + ')' : ''}</div>
+    </div>
+    <div id="cx_tot_${c.id}" style="font-size:15px">${cxTotalHtml(c)}</div>
+    <div class="cx-boutons">
+      <button class="b ${etat === 'pris' ? 'vert' : 'contour'}" onclick="cxEtat('${c.id}','pris')">✅ Je prends</button>
+      <button class="b ${etat === 'plus_tard' ? '' : 'contour'}" onclick="cxEtat('${c.id}','plus_tard')">⏸ Plus tard</button>
+      <button class="b ${etat === 'ecarte' ? 'gris' : 'contour'}" onclick="cxEtat('${c.id}','ecarte')">❌ Écarter</button></div>
+    <div class="cx-liens">
+      ${f ? `<button class="b contour" onclick="ctOuvrirDossier('${f.id}')">👁 Sa fiche et son catalogue</button>
+      <button class="b contour" onclick="cxDemanderPrix('${c.id}')">💰 Demander son prix</button>` : ''}
+      ${f && typeof coNegoPour === 'function' ? `<button class="b contour" onclick="coNegoPour('${f.id}')">🤝 Négocier</button>` : ''}
+      <button class="b contour" onclick="cxVoirNote('${c.id}')">📝 Ma note</button></div>
+    <div class="cx-note" id="cx_note_${c.id}" style="display:${c.note_moi ? 'block' : 'none'};margin-top:6px"><textarea placeholder="ex : vu au stand, demander la version 220 V…" oninput="cxNoteMoi('${c.id}',this.value)">${E(c.note_moi || '')}</textarea></div>
+  </div>`;
+}
+function cxVoirNote(id) { const z = document.getElementById('cx_note_' + id); if (!z) return; z.style.display = z.style.display === 'none' ? 'block' : 'none'; if (z.style.display === 'block') { const t = z.querySelector('textarea'); if (t) t.focus(); } }
+function cxDemanderPrix(id) {
+  const c = cxListe().find(x => x.id === id), f = c && cxFournisseur(c), p = c && cxProduit(c); if (!f) return;
+  pxBoiteDemande(f.id);
+  if (p && pxD) { const l = pxLignesDe(f).find(x => (x.p && x.p.id === p.id) || (x.pc && x.pc.id === p.id)); if (l) { pxD.choix.add(l.cle); pxDessinerDemande(); } }
+}
+function cxFiltrer(c) {
+  if (c.retire) return cxFiltre === 'retires';
+  if (cxType && c.type !== cxType) return false;
+  if (cxFiltre === 'a_decider') return !c.etat;
+  if (cxFiltre === 'tous') return true;
+  if (cxFiltre === 'retires') return false;
+  return c.etat === cxFiltre;
+}
+function ecranChoix() {
+  const L = cxListe(), vis = L.filter(cxFiltrer).sort((a, b) => cxTri === 'gain_lot' ? cxCout(b).gainLot - cxCout(a).gainLot : cxTri === 'gain_piece' ? cxCout(b).gain - cxCout(a).gain
+    : cxTri === 'rendement' ? cxCout(b).rendement - cxCout(a).rendement : (num(a.rang) || 999) - (num(b.rang) || 999));
+  const n = (et) => L.filter(c => !c.retire && (et === 'a_decider' ? !c.etat : et === 'tous' ? true : c.etat === et)).length;
+  const puce = (k, t, on, js) => `<button type="button" class="mk-puce${on ? ' on' : ''}" onclick="${js}">${t}</button>`;
+  const note = `<div class="note-ecran"><span class="ic" aria-hidden="true">i</span><span class="txt">
+    <b>L'espace de Claude.</b> Les produits que je vous conseille d'acheter, d'après vos catalogues, les prix de vente en Guinée (deuxième prix) et chez les
+    voisins, ce qui s'importe le plus, et votre budget. <b>💎 Valeur</b> = bonne marge par pièce ; <b>🚶 Trafic</b> = petit prix qui fait venir et revenir les clients.
+    Vous décidez : <b>✅ Je prends</b>, <b>⏸ Plus tard</b> ou <b>❌ Écarter</b>. La liste se met à jour à chaque fichier de Claude ; vos décisions restent.</span></div>`;
+  if (!L.length) return note + `<div class="carte"><h2>⭐ Les choix de Claude</h2>
+    <p style="font-size:16px;line-height:1.5">Pas encore de liste. Elle arrive dans un fichier <b>KYLO-choix-Claude-….json</b> : ouvrez-le avec
+    <b>Fournisseurs → ➕ Ajouter (fichier de Claude)</b>, comme les catalogues. Les choix se rangent ici tout seuls.</p>
+    <button class="b" onclick="allerA('radar')">Voir l'ancien Radar</button></div>`;
+  return note + `<div class="carte"><h2>⭐ Les choix de Claude</h2>
+    <div class="cx-tete"><span class="n">${L.filter(c => !c.retire).length}</span><span style="font-size:15px">produits conseillés${C.choix_claude_le ? ' · liste du ' + E(mkJour(C.choix_claude_le)) : ''}
+      · ${L.filter(c => !c.retire && c.type === 'valeur').length} 💎 valeur · ${L.filter(c => !c.retire && c.type !== 'valeur').length} 🚶 trafic</span></div>
+    ${C.choix_claude_mot ? `<p style="font-size:15px;line-height:1.45;background:#eff6ff;border-radius:10px;padding:8px">${E(C.choix_claude_mot)}</p>` : ''}
+    <div id="cx_budget">${cxBudgetHtml()}</div></div>
+    <div class="cx-filtres">${puce('a_decider', '⏳ À décider (' + n('a_decider') + ')', cxFiltre === 'a_decider', "cxFiltre='a_decider';dessiner()")}${puce('pris', '✅ Je prends (' + n('pris') + ')', cxFiltre === 'pris', "cxFiltre='pris';dessiner()")}${puce('plus_tard', '⏸ Plus tard (' + n('plus_tard') + ')', cxFiltre === 'plus_tard', "cxFiltre='plus_tard';dessiner()")}${puce('ecarte', '❌ Écartés (' + n('ecarte') + ')', cxFiltre === 'ecarte', "cxFiltre='ecarte';dessiner()")}${puce('tous', 'Tous (' + n('tous') + ')', cxFiltre === 'tous', "cxFiltre='tous';dessiner()")}${L.some(c => c.retire) ? puce('retires', 'Retirés par Claude', cxFiltre === 'retires', "cxFiltre='retires';dessiner()") : ''}</div>
+    <div class="cx-filtres">${puce('', 'Valeur + trafic', !cxType, "cxType='';dessiner()")}${puce('valeur', '💎 Valeur', cxType === 'valeur', "cxType='valeur';dessiner()")}${puce('trafic', '🚶 Trafic', cxType === 'trafic', "cxType='trafic';dessiner()")}</div>
+    <div class="cx-filtres"><span style="font-size:14px;align-self:center;flex:none">Trier :</span>${puce('rang', 'Mon ordre', cxTri === 'rang', "cxTri='rang';dessiner()")}${puce('gain_lot', '💰 Gain du lot', cxTri === 'gain_lot', "cxTri='gain_lot';dessiner()")}${puce('gain_piece', 'Gain par pièce', cxTri === 'gain_piece', "cxTri='gain_piece';dessiner()")}${puce('rendement', 'Rendement', cxTri === 'rendement', "cxTri='rendement';dessiner()")}</div>
+    ${vis.length ? vis.map(cxItemHtml).join('') : '<div class="carte"><p class="muet">Rien dans cette liste.</p></div>'}
+    <div class="carte"><button class="b contour" onclick="allerA('radar')">Voir l'ancien Radar (dessins)</button></div>`;
+}
+// Les décisions de Riche, pour la liste suivante de Claude (« Envoyer à Claude » les ajoute : voir construire-1.9.0.py).
+function cxDecisionsPourClaude() { return cxListe().map(c => ({ id: c.id, ref: c.ref, article: c.article, etat: c.etat || '', qte_moi: num(c.qte_moi) || 0, note_moi: c.note_moi || '', decide_le: c.decide_le || '' })); }
+
+// ---------- 4. Le retour qui revient où on était ----------
+// Riche, 23/10 : « quand on fait le retour, il nous ramène au début ; la liste est longue (80), il faut retrouver où on était,
+// c'est fatigant » ; et « pouvoir faire le retour quand on est en bas de la feuille ». Chaque écran garde sa position ; une
+// fiche ouverte par son nom se referme sur la liste, à la même hauteur ; le bouton « ← Tous les fournisseurs » est aussi en bas.
+const cxPositions = {};
+function cxClePosition(nom) { return nom + (nom === 'dossier' ? ':' + ctDossier : ''); }
+const cxAllerAAvant = allerA;
+allerA = function (nom) {
+  try { cxPositions[cxClePosition(ongletActif)] = window.scrollY; } catch (e) {}
+  const cle = cxClePosition(nom);
+  cxAllerAAvant.apply(this, arguments);
+  const y = cxPositions[cle];
+  if (y > 0 && nom !== 'dossier') { window.scrollTo(0, y); requestAnimationFrame(() => window.scrollTo(0, y)); setTimeout(() => window.scrollTo(0, y), 80); }
+};
+const cxEcranDossierAvant = ecranDossier;
+ecranDossier = function () {
+  const h = cxEcranDossierAvant.apply(this, arguments);
+  if (!mkFournisseur(ctDossier)) return h;
+  return h + `<button class="b gris" style="margin:12px 0 20px;min-height:52px;font-size:16px" onclick="ctDossier=null;allerA('rencontres')">← Tous les fournisseurs (revenir où j'étais)</button>`;
+};
 </script>
 <script>
 

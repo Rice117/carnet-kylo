@@ -121,6 +121,19 @@ bannière des codes-barres claire. Comparer → achat garde fournisseur, photo e
 négociations, achats. Module `coherence-1.8.0.html`, `construire-1.8.0.py` (part de la 1.7.0). Rien de retiré.
 ⚠ Même remarque pour `KYLO-Achats.html`.
 
+Version 1.9.0 — 23/10/2026 : **Les choix de Claude**. Nouvel onglet « ⭐ Choix de Claude » (à la place du Radar, qui reste
+ouvrable) : les produits conseillés arrivent par un fichier `KYLO-choix-Claude-….json` (même bouton que les catalogues),
+chacun avec sa raison, la quantité de départ, le prix usine estimé et à ne pas dépasser, le rendu magasin, le prix de vente
+(2ᵉ prix), la marge, le marché (Guinée, voisins) ; ✅ Je prends / ⏸ Plus tard / ❌ Écarter, ma quantité, ma note, le budget
+qui se remplit ; une nouvelle liste met le texte à jour sans toucher aux décisions (les produits retirés restent visibles à
+part) ; « Envoyer à Claude » emporte les décisions. Demande de prix : UN dossier PDF par fournisseur (fabriqué dans le
+carnet, sans bibliothèque) = page de garde + une page par produit avec SA photo, la grille 3 qualités × quantités et tout ce
+qui manque (carton, poids, délai, matière, couleurs, garantie, certificats), pré-rempli quand on le sait ; l'Excel suit les
+mêmes cases ; un produit du catalogue mis dans Comparer garde sa photo dans la demande ; la réponse expliquée. Questions :
+le français sous chaque question sur l'écran tendu au vendeur, et la clé en français au-dessus du message. Module
+`choix-1.9.0.html`, `construire-1.9.0.py` (part de la 1.8.0). Rien de retiré.
+⚠ Même remarque pour `KYLO-Achats.html`.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

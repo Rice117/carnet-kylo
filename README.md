@@ -134,6 +134,21 @@ le français sous chaque question sur l'écran tendu au vendeur, et la clé en f
 `choix-1.9.0.html`, `construire-1.9.0.py` (part de la 1.8.0). Rien de retiré.
 ⚠ Même remarque pour `KYLO-Achats.html`.
 
+Version 1.10.0 — 24/10/2026 : **L'étude rangée comme la page de Claude**. Dans l'onglet ⭐, une bascule en haut :
+« ⭐ Choix de Claude » (la liste d'avant, inchangée) ou « 📊 Étude du … ». Une étude arrive par des fichiers de Claude
+(clé `etude`, en plusieurs parties : un fichier par groupe), sans nouvelle version du carnet. Elle se range comme la page
+« Achats Chine KYLO » : Groupe 1 à 5 (1er choix…), ✅ Ma liste, ⏳ Plus tard, 🔎 À relever, Tout ; en haut : achat en Chine,
+à payer en plus (bateau, douane, transitaire), frais du voyage, ventes et gain attendus, place sur le bateau, jauge du budget,
+feux ; chaque fiche : photo, nom chinois, feu, prix en Chine, arrivé au magasin, ton prix (+ ta marge), prix affiché par les
+autres et deuxième prix, gain par pièce, contrôle, prix maximum à payer, quantité, ✅ Je prends / ⏳ Plus tard / ❌ Non,
+détail du calcul, chinois à copier pour 1688, sources. « Mes chiffres » (budget, frais du voyage, marge, marchandage,
+bateau, douane, budget tout compris) recalculent tout ; taille du texte Normal / Grand / Très grand. Les chiffres sont
+ceux de la page, à l'unité près. Le gros de l'étude (textes, photos) est dans la réserve du téléphone (IndexedDB) ; le
+carnet ne garde que la liste des études, les décisions et les réglages. Les produits d'une étude déjà arrivés dans ⭐ le
+matin quittent la liste ⭐ en emportant leur décision. « Envoyer à Claude » emporte aussi les décisions des études.
+Module `etude-1.10.0.html`, `construire-1.10.0.py` (part de la 1.9.0). Rien de retiré.
+⚠ Même remarque pour `KYLO-Achats.html`.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

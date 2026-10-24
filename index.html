@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.9.0';
+window.KYLO_APPLICATION = '1.10.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -11835,7 +11835,8 @@ async function fsEnvoyerAClaude(bouton) {
     if (courante.length || !parties.length) parties.push(courante);
     const n = parties.length, enc = new TextEncoder();
     const resume = { format: 'kylo-pour-claude', version: 2, le: mkMaintenant(), application: window.KYLO_APPLICATION, parties: n,
-      nb_fournisseurs: fiches.length, nb_photos: nPhotos, fournisseurs: fiches, choix_claude: typeof cxDecisionsPourClaude === 'function' ? cxDecisionsPourClaude() : [] };
+      nb_fournisseurs: fiches.length, nb_photos: nPhotos, fournisseurs: fiches, choix_claude: typeof cxDecisionsPourClaude === 'function' ? cxDecisionsPourClaude() : [],
+      etudes_choix: typeof etDecisionsPourClaude === 'function' ? etDecisionsPourClaude() : [] };
     const json = enc.encode(JSON.stringify(resume, null, 1));
     clEnvoi = { parties: parties.map((fichiers, i) => {
       const lisezmoi = enc.encode(`Carnet KYLO pour Claude — ${jour} — partie ${i + 1} sur ${n}\n${fiches.length} fournisseurs, ${nPhotos} photos en tout.\n`
@@ -14527,6 +14528,403 @@ ecranDossier = function () {
   if (!mkFournisseur(ctDossier)) return h;
   return h + `<button class="b gris" style="margin:12px 0 20px;min-height:52px;font-size:16px" onclick="ctDossier=null;allerA('rencontres')">← Tous les fournisseurs (revenir où j'étais)</button>`;
 };
+</script>
+<style>
+/* 1.10.0 — l'Étude de Claude, rangée comme sa page « Achats Chine KYLO » (groupes, feu, prix, contrôle). */
+.et-vues{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 10px}
+.et-vues button{border:2px solid var(--lisiere);background:var(--carte);color:var(--noir);border-radius:12px;padding:10px 8px;min-height:58px;font-size:16px;font-weight:700;line-height:1.25;cursor:pointer}
+.et-vues button small{display:block;font-weight:400;color:var(--gris);font-size:14px}
+.et-vues button.on{border-color:var(--bleu);background:var(--bleu-pale)}
+.et-zone{font-size:var(--et-t,16px)}
+.et-zone .et-titre{font-size:1.25em;font-weight:800;margin:0 0 4px}
+.et-zone .et-chap{color:var(--texte-note);margin:6px 0 10px;line-height:1.5}
+.et-tailles{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.et-onglets{display:flex;gap:6px;overflow-x:auto;padding:4px 0 8px;scrollbar-width:thin}
+.et-onglets button{flex:0 0 auto;border:2px solid var(--lisiere);background:var(--carte);color:var(--noir);border-radius:10px;padding:6px 12px;min-height:48px;text-align:left;line-height:1.2;cursor:pointer;font-size:1em}
+.et-onglets button b{display:block;font-size:1em}
+.et-onglets button small{color:var(--gris);font-size:.88em}
+.et-onglets button.on{border-color:var(--bleu);background:var(--bleu-pale)}
+.et-reg{background:var(--carte);border:1px solid var(--lisiere);border-radius:12px;padding:10px 12px;margin:8px 0}
+.et-reg summary{cursor:pointer;font-weight:700;color:var(--bleu);min-height:30px}
+.et-grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:8px}
+.et-grille label{display:flex;flex-direction:column;gap:3px;font-size:.9em;color:var(--gris)}
+.et-grille input{font-size:1em;min-height:44px}
+.et-tc{display:flex;gap:10px;align-items:flex-start;margin-top:10px;font-size:.95em;line-height:1.4}
+.et-tc input{width:24px;height:24px;flex:0 0 auto;margin:0}
+.et-chiffres{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:8px 0}
+.et-chiffre{background:var(--carte);border:1px solid var(--lisiere);border-radius:10px;padding:8px 10px}
+.et-chiffre span{display:block;color:var(--gris);font-size:.88em;text-transform:uppercase;letter-spacing:.04em}
+.et-chiffre b{font-size:1.3em;font-variant-numeric:tabular-nums}
+.et-chiffre i{display:block;font-style:normal;color:var(--gris);font-size:.88em}
+.et-jauge{height:12px;border-radius:6px;background:var(--gris-clair);overflow:hidden;margin:6px 0}
+.et-jauge i{display:block;height:100%;background:var(--bleu-clair)}
+.et-jauge.trop i{background:var(--rouge)}
+.et-feux{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
+.et-feu{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-weight:700;font-size:.9em}
+.et-feu::before{content:"";width:.7em;height:.7em;border-radius:50%;background:currentColor;flex:0 0 auto}
+.et-feu.vert{color:var(--vert);background:var(--vert-pale)}
+.et-feu.jaune{color:var(--ambre);background:var(--ambre-pale)}
+.et-feu.rouge{color:var(--rouge);background:var(--rouge-pale)}
+.et-feu.gris{color:var(--gris);background:var(--gris-clair)}
+.et-filtres{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0 2px}
+.et-filtres select{min-height:44px;font-size:1em;max-width:100%}
+.et-fiche{background:var(--carte);border:1px solid var(--lisiere);border-radius:14px;margin:12px 0;overflow:hidden}
+.et-fiche.vert{border-top:5px solid var(--vert)}.et-fiche.jaune{border-top:5px solid var(--ambre)}
+.et-fiche.rouge{border-top:5px solid var(--rouge)}.et-fiche.gris{border-top:5px solid var(--gris)}
+.et-haut{display:grid;grid-template-columns:120px minmax(0,1fr);gap:10px;padding:10px}
+.et-haut img.ct-mini{width:120px;height:120px;object-fit:contain;background:#fff;border:1px solid var(--lisiere);border-radius:10px;cursor:zoom-in;max-width:100%}
+.et-rang{color:var(--rouge);font-weight:800;font-size:.9em}
+.et-nom{font-weight:700;font-size:1.06em;line-height:1.3;margin:2px 0 3px}
+.et-cn{color:var(--gris);font-size:1em;word-break:break-all}
+.et-etqs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.et-etq{font-size:.88em;border:1px solid var(--lisiere);border-radius:6px;padding:1px 7px;color:var(--gris)}
+.et-etq.valeur{color:var(--bleu);border-color:var(--bleu)}.et-etq.nouveaute{color:var(--rouge);border-color:var(--rouge)}
+.et-etq.ok{color:var(--vert);border-color:var(--vert)}
+.et-tab{padding:0 10px 4px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;font-size:.98em}
+.et-tab dt{color:var(--gris)}
+.et-tab dd{margin:0;text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.et-tab .sep{grid-column:1/-1;border-top:1px dashed var(--lisiere);margin:4px 0}
+.et-tab .fort{font-size:1.05em;color:var(--noir)}
+.et-boite{margin:8px 10px 0;padding:8px 10px;border-radius:8px;background:var(--bleu-pale);font-size:.96em;line-height:1.45}
+.et-boite.attention{background:var(--ambre-pale)}
+.et-boite.controle{background:var(--fond);border:1px solid var(--lisiere)}
+.et-lot{margin:8px 10px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.96em}
+.et-lot input{width:5.5em;min-height:42px;text-align:right;font-size:1em}
+.et-choix{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:10px}
+.et-choix button{border:2px solid var(--lisiere);background:var(--fond);color:var(--noir);border-radius:10px;min-height:48px;font-weight:700;font-size:.95em;cursor:pointer}
+.et-choix button.on.oui{background:var(--vert);border-color:var(--vert);color:#fff}
+.et-choix button.on.plus{background:var(--ambre);border-color:var(--ambre);color:#fff}
+.et-choix button.on.non{background:var(--rouge);border-color:var(--rouge);color:#fff}
+.et-fiche details{border-top:1px solid var(--lisiere)}
+.et-fiche summary{padding:10px;cursor:pointer;color:var(--bleu);font-weight:700}
+.et-det{padding:0 10px 10px;display:grid;gap:8px;font-size:.96em;line-height:1.45}
+.et-det p{margin:0}
+.et-calc{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;font-variant-numeric:tabular-nums}
+.et-calc span:nth-child(even){text-align:right}
+.et-src{word-break:break-word;font-size:.92em}
+.et-vide{border:1px dashed var(--lisiere);border-radius:12px;padding:14px;color:var(--gris);background:var(--carte)}
+</style>
+<script>
+// ---------- 1.10.0 · L'ÉTUDE DE CLAUDE, RANGÉE COMME SA PAGE ----------
+// Riche, 24/10 à 11 h 56 : « tu as fait un très bon boulot, mais dans mon carnet ce n'est pas organisé comme ta page
+// (par groupe, avec les détails et les prix) ; les 63 produits d'hier, pas de souci ; les nouvelles études, il faut qu'elles
+// soient organisées comme tes captures et tes pages ». L'onglet ⭐ garde la liste d'hier (rien n'y change) et gagne
+// un second espace : l'étude, avec ses groupes (1er choix… 5e choix), « À relever », « Ma liste », le feu, les prix, le
+// contrôle, les réglages — les mêmes calculs que la page de Claude, chiffre pour chiffre.
+// Les données d'une étude arrivent par fichier (« etude » dans un fichier de Claude, en plusieurs parties) : AUCUNE
+// nouvelle version n'est nécessaire pour une étude suivante. Le gros (textes et photos) est rangé dans la réserve du
+// téléphone (IndexedDB) ; la mémoire du carnet ne garde que la liste des études, tes décisions et tes réglages.
+const ET_CLE = id => 'etude:' + id;
+const etDonnees = {};                      // id → étude lue dans la réserve
+const etLecture = {};                      // id → promesse en cours
+let cxVue = '';                            // '' = l'étude la plus récente s'il y en a une ; 'choix' = la liste d'hier
+let etOnglet = '1', etRayon = '', etFeuFiltre = '';
+function etListe() { return Array.isArray(C.etudes) ? C.etudes : (C.etudes = []); }
+function etActuelle() { const L = etListe(); return L.find(e => e.id === C.etude_actuelle) || L[L.length - 1] || null; }
+function etChoix(id) { const t = C.etude_choix || (C.etude_choix = {}); return t[id] || (t[id] = {}); }
+function etReg(e) {
+  const t = C.etude_reg || (C.etude_reg = {}); const P = (etDonnees[e.id] && etDonnees[e.id].params) || {};
+  const r = t[e.id] || (t[e.id] = {});
+  return { budget: r.budget != null ? r.budget : num(P.budget_eur) || 20000, voyage: r.voyage != null ? r.voyage : num(P.frais_voyage_pct),
+    marge: r.marge != null ? r.marge : num(P.marge_riche_pct) || 75, marchand: r.marchand != null ? r.marchand : num(P.ecart_marchandage_pct),
+    fret: r.fret != null ? r.fret : num(P.fret_usd_m3) || 375, douane: r.douane != null ? r.douane : num(P.douane_pct) || 44.85,
+    transit: num(P.transitaire_pct) || 5, toutCompris: !!r.toutCompris };
+}
+function etLire(e) {
+  if (etDonnees[e.id]) return Promise.resolve(etDonnees[e.id]);
+  if (!etLecture[e.id]) etLecture[e.id] = ctLire(ET_CLE(e.id)).then(t => { etDonnees[e.id] = t ? JSON.parse(t) : null; return etDonnees[e.id]; })
+    .catch(() => { etDonnees[e.id] = null; return null; });
+  return etLecture[e.id];
+}
+// ---- le calcul : le même que la page « Achats Chine KYLO » (outils/calc.py) ----
+function etCalcule(D, r, p) {
+  const T = D.params.taux, d = r.douane / 100;
+  const achat = p.achat_cny * T.CNY_GNF;
+  const bateau = p.volume_m3 * r.fret * T.USD_GNF;
+  const voyage = achat * r.voyage / 100;
+  const arrive = (achat + bateau) * (1 + d) + achat * r.transit / 100 + voyage;
+  const deuxieme = p.affiche_gnf * (1 - r.marchand / 100);
+  const kylo = arrive * (1 + r.marge / 100);
+  const vente = Math.min(kylo, deuxieme);
+  const mp = deuxieme / arrive - 1;
+  const feu = mp >= r.marge / 100 ? 'vert' : (mp >= 0.35 ? 'jaune' : 'rouge');
+  const k = (1 + d) + (r.transit + r.voyage) / 100;
+  const maxAchat = Math.max(0, (deuxieme / (1 + r.marge / 100) - bateau * (1 + d)) / k) / T.CNY_GNF;
+  return { achat, bateau, douane: (achat + bateau) * d, transit: achat * r.transit / 100, voyage, arrive, deuxieme, kylo, vente, gain: vente - arrive, mp, feu, maxAchat };
+}
+let etFacteur = 1;
+function etQte(e, D, r, p) {
+  const m = etChoix(e.id)[p.id];
+  if (m && m.qte != null) return m.qte;
+  if (p.a_relever) return 0;
+  if (!p.quantite) {
+    if (etCalcule(D, r, p).feu === 'rouge') return 0;
+    const a = p.achat_cny; return a <= 5 ? 100 : a <= 15 ? 50 : a <= 40 ? 30 : a <= 100 ? 20 : a <= 250 ? 10 : a <= 600 ? 5 : 2;
+  }
+  const q = p.quantite * r.budget / (num(D.params.budget_eur) || 20000) * etFacteur;
+  return q >= 100 ? Math.round(q / 10) * 10 : q >= 20 ? Math.round(q / 5) * 5 : Math.max(2, Math.round(q));
+}
+function etMajFacteur(e, D, r, liste) {
+  etFacteur = 1;
+  if (!r.toutCompris || !liste.length) return;
+  const ch = etChoix(e.id); let tot = 0, fixe = 0;
+  liste.forEach(p => { const c = etCalcule(D, r, p), m = ch[p.id];
+    if (m && m.qte != null) fixe += m.qte * (c.arrive - c.voyage); else tot += etQte(e, D, r, p) * (c.arrive - c.voyage); });
+  const reste = r.budget * D.params.taux.EUR_GNF - fixe;
+  etFacteur = tot > 0 ? Math.max(0, reste / tot) : 1;
+}
+function etTotaux(e, D, r, liste) {
+  let achat = 0, arrive = 0, vente = 0, gain = 0, vol = 0, voyage = 0; const feux = { vert: 0, jaune: 0, rouge: 0, gris: 0 };
+  liste.forEach(p => { const c = etCalcule(D, r, p), q = etQte(e, D, r, p); feux[p.a_relever ? 'gris' : c.feu]++;
+    achat += q * c.achat; arrive += q * c.arrive; vente += q * c.vente; gain += q * c.gain; vol += q * p.volume_m3; voyage += q * c.voyage; });
+  const X = D.params.taux.EUR_GNF;
+  return { achat: achat / X, apayer: (arrive - achat - voyage) / X, voyage: voyage / X, vente: vente / X, gain: gain / X, vol, feux };
+}
+function etListeOnglet(e, D, o) {
+  const ch = etChoix(e.id), P = D.liste.map(id => D.produits[id]).filter(Boolean);
+  if (o === 'moi') return P.filter(p => ch[p.id] && ch[p.id].etat === 'oui');
+  if (o === 'plus') return P.filter(p => ch[p.id] && ch[p.id].etat === 'plus');
+  if (o === 'relever') return P.filter(p => p.a_relever);
+  if (o === 'tout') return P;
+  const g = (D.groupes || []).find(x => String(x.numero) === o);
+  return g ? g.produits.map(id => D.produits[id]).filter(Boolean) : [];
+}
+// ---- l'écran ----
+const etEur = v => nf(Math.round(v), 0) + ' €';
+const etGnf = v => nf(Math.round(v / 500) * 500, 0) + ' GNF';
+function etFicheHtml(e, D, r, p) {
+  const c = etCalcule(D, r, p), q = etQte(e, D, r, p), m = etChoix(e.id)[p.id] || {}, ch = m.etat || '', T = D.params.taux;
+  const typ = { trafic: 'Se vend vite', valeur: 'Grosse marge', nouveaute: 'Nouveauté' }[p.type] || '';
+  const feuCl = p.a_relever ? 'gris' : c.feu;
+  const feuTxt = p.a_relever ? 'Prix à relever à Madina' : { vert: 'Bon : ta marge passe', jaune: 'Un peu juste', rouge: 'Trop cher à ce prix' }[c.feu];
+  const fia = { trouve: 'prix trouvé en Guinée', proxy_regional: 'prix d\'un pays voisin', estime: 'prix estimé' }[p.fiabilite] || '';
+  const maxTxt = c.feu === 'vert' ? `Tu peux payer jusqu'à <b>${E(nf(c.maxAchat, 1))} ¥</b> la pièce et garder tes ${E(nf(r.marge, 0))} %.`
+    : c.maxAchat > 0 ? `Pour garder tes ${E(nf(r.marge, 0))} %, il faut l'acheter <b>${E(nf(c.maxAchat, 1))} ¥</b> maximum (au lieu de ${E(nf(p.achat_cny, 1))} ¥).`
+    : 'Même gratuit en Chine, le bateau et la douane le rendent trop cher : à éviter.';
+  const doc = p.photo_doc ? `<img class="ct-mini" data-doc="${E(p.photo_doc)}" alt="${E(p.nom_fr)}" onclick="cxAgrandir('${E(p.photo_doc)}','${E(p.nom_fr.replace(/'/g, ' '))}')">` : '<span class="cx-vide">📦</span>';
+  const lien = (u, t) => /^https?:\/\//.test(u || '') ? `<a href="${E(u)}" target="_blank" rel="noopener">${t}</a>` : E(u || '');
+  return `<div class="et-fiche ${feuCl}" id="et_${E(p.id)}">
+    <div class="et-haut">${doc}<div style="min-width:0">
+      ${p.groupe ? `<div class="et-rang">Groupe ${E(p.groupe)} · n° ${E(p.rang)}</div>` : ''}
+      <div class="et-nom">${E(p.nom_fr)}</div><div class="et-cn" lang="zh">${E(p.nom_cn)}</div>
+      <div class="et-etqs"><span class="et-feu ${feuCl}">${feuTxt}</span>${typ ? `<span class="et-etq ${E(p.type)}">${typ}</span>` : ''}${p.verifie ? '<span class="et-etq ok">✔ Prix vérifiés deux fois</span>' : ''}<span class="et-etq">${E(p.rayon)}</span></div>
+    </div></div>
+    <dl class="et-tab">
+      <dt>Prix en Chine</dt><dd>${E(nf(p.achat_cny, 1))} ¥ <span style="font-weight:400;color:var(--gris)">(${E(nf(p.achat_cny * T.CNY_GNF / T.EUR_GNF, 2))} €)</span></dd>
+      <dt>Arrivé à ton magasin</dt><dd>${E(etGnf(c.arrive))}</dd>
+      <dt>Ton prix (+${E(nf(r.marge, 0))} %)</dt><dd>${E(etGnf(c.kylo))}</dd>
+      <div class="sep"></div>
+      <dt>Les autres affichent</dt><dd>${E(etGnf(p.affiche_gnf))}</dd>
+      <dt>Deuxième prix (après marchandage)</dt><dd>${E(etGnf(c.deuxieme))}</dd>
+      <div class="sep"></div>
+      <dt class="fort">Tu gagnes par pièce</dt><dd class="fort" style="color:var(--${p.a_relever ? 'gris' : c.gain > 0 ? 'vert' : 'rouge'})">${E(etGnf(c.gain))}${p.a_relever ? ' ?' : ''}</dd>
+    </dl>
+    ${p.note_verif ? `<div class="et-boite controle"><b>Contrôle :</b> ${E(p.note_verif)}</div>` : ''}
+    <div class="et-boite">${p.a_relever ? 'Ne pas acheter avant d\'avoir vu le prix à Madina. ' : ''}${maxTxt}</div>
+    ${p.a_verifier && !p.a_relever ? '<div class="et-boite attention">⚠ Écart très grand entre la Chine et la Guinée : vérifie le prix à Madina (même gamme, même taille) avant d\'en acheter beaucoup.</div>' : ''}
+    ${p.moq_trop_haut ? `<div class="et-boite attention">⚠ L'annonce trouvée demande au moins ${E(nf(p.moq, 0))} pièces : chercher un vendeur « 小批量 / 现货 ».</div>` : ''}
+    <div class="et-lot"><label for="etq_${E(p.id)}">Quantité :</label><input id="etq_${E(p.id)}" inputmode="numeric" value="${E(q)}" onchange="etQteMoi('${E(p.id)}',this.value)">
+      <span>= ${E(nf(q * p.achat_cny, 0))} ¥ en Chine · gain ≈ ${E(etEur(q * c.gain / T.EUR_GNF))}</span></div>
+    <div class="et-choix" role="group" aria-label="Ma décision">
+      <button type="button" class="oui${ch === 'oui' ? ' on' : ''}" onclick="etDecider('${E(p.id)}','oui')">✅ Je prends</button>
+      <button type="button" class="plus${ch === 'plus' ? ' on' : ''}" onclick="etDecider('${E(p.id)}','plus')">⏳ Plus tard</button>
+      <button type="button" class="non${ch === 'non' ? ' on' : ''}" onclick="etDecider('${E(p.id)}','non')">❌ Non</button></div>
+    <details><summary>Détail, sources et chinois à copier</summary><div class="et-det">
+      <p>${E(p.pourquoi)}</p>
+      ${p.demande ? `<p><b>Demande en Guinée :</b> ${E(p.demande)}</p>` : ''}
+      ${p.specs ? `<p><b>Modèle :</b> ${E(p.specs)}</p>` : ''}
+      ${p.risques ? `<p><b>Attention :</b> ${E(p.risques)}</p>` : ''}
+      <p><b>Petite quantité :</b> ${E(p.petite_quantite)}${p.moq ? ' · minimum de l\'annonce : ' + E(nf(p.moq, 0)) : ''}</p>
+      <div class="et-calc"><span>Achat ${E(nf(p.achat_cny, 1))} ¥</span><span>${E(etGnf(c.achat))}</span>
+        <span>Bateau (${E(nf(p.volume_m3, 4))} m³)</span><span>${E(etGnf(c.bateau))}</span>
+        <span>Douane ${E(nf(r.douane, 2))} %</span><span>${E(etGnf(c.douane))}</span>
+        <span>Transitaire ${E(nf(r.transit, 0))} %</span><span>${E(etGnf(c.transit))}</span>
+        <span>Frais du voyage ${E(nf(r.voyage, 0))} %</span><span>${E(etGnf(c.voyage))}</span>
+        <span><b>Arrivé au magasin</b></span><span><b>${E(etGnf(c.arrive))}</b></span></div>
+      <p>À taper dans 1688 : <span lang="zh">${E(p.requete_1688)}</span> <button type="button" class="b contour" style="min-height:40px;padding:4px 12px;width:auto" onclick="etCopier(this,'${E(String(p.requete_1688 || '').replace(/'/g, ' '))}')">Copier</button></p>
+      <p class="et-src"><b>Prix en Chine :</b> ${E(p.prix_chine_txt)} — ${lien(p.prix_chine_url, 'voir l\'annonce')}</p>
+      <p class="et-src"><b>Prix en Guinée :</b> ${E(p.prix_guinee_txt)} (${E(fia)}) — ${lien(p.prix_guinee_url, 'voir la source')}</p>
+      ${p.photo_source ? `<p class="et-src">Photo : ${lien(p.photo_source, 'page d\'origine')}</p>` : ''}
+    </div></details></div>`;
+}
+function ecranEtude(e) {
+  const D = etDonnees[e.id];
+  if (D === undefined) { etLire(e).then(() => { if (ongletActif === 'choix') dessiner(); }); return '<div class="carte"><p>⏳ Ouverture de l\'étude…</p></div>'; }
+  if (!D) return `<div class="carte"><h2>📊 ${E(e.titre)}</h2><p>Cette étude n'est pas dans ce téléphone (elle a été ajoutée sur un autre appareil, ou la réserve a été vidée).
+    Ajoutez à nouveau les fichiers de Claude.</p><button class="b vert" onclick="ctBoiteImport()">📥 Ajouter les fichiers de l'étude</button></div>`;
+  const r = etReg(e), ch = etChoix(e.id);
+  const groupes = D.groupes || [];
+  if (!['moi', 'plus', 'relever', 'tout'].includes(etOnglet) && !groupes.some(g => String(g.numero) === etOnglet)) etOnglet = groupes.length ? String(groupes[0].numero) : 'tout';
+  const nb = k => D.liste.filter(id => ch[id] && ch[id].etat === k).length;
+  const ong = groupes.map(g => ({ k: String(g.numero), t: 'Groupe ' + g.numero, s: g.numero === 1 ? '1er choix' : g.numero + 'e choix' }))
+    .concat([{ k: 'moi', t: '✅ Ma liste', s: nb('oui') + ' produit(s)' }, { k: 'plus', t: '⏳ Plus tard', s: nb('plus') + ' produit(s)' },
+      { k: 'relever', t: '🔎 À relever', s: D.liste.filter(id => D.produits[id] && D.produits[id].a_relever).length + ' à Madina' }, { k: 'tout', t: 'Tout', s: D.liste.length + ' produits' }]);
+  const tous = etListeOnglet(e, D, etOnglet);
+  etMajFacteur(e, D, r, etOnglet === 'tout' ? [] : tous);
+  let liste = tous;
+  if (etRayon) liste = liste.filter(p => p.rayon === etRayon);
+  if (etFeuFiltre) liste = liste.filter(p => (p.a_relever ? 'gris' : etCalcule(D, r, p).feu) === etFeuFiltre);
+  const t = etTotaux(e, D, r, tous), g = groupes.find(x => String(x.numero) === etOnglet);
+  const titre = g ? 'Groupe ' + g.numero : { moi: 'Ma liste', plus: 'Plus tard', relever: 'À relever à Madina', tout: 'Tous les produits' }[etOnglet];
+  const nV = tous.filter(p => p.verifie).length;
+  const chap = g ? (g.numero === 1 ? 'Les 30 produits qui passent le mieux le calcul. Si tu ne devais en prendre que 30, ce serait ceux-là.' : 'Ton ' + g.numero + 'e choix : à prendre si tu écartes des produits du groupe ' + (g.numero - 1) + '.')
+      + ` ${nV} produit${nV > 1 ? 's' : ''} sur ${tous.length} ont leurs prix vérifiés deux fois (badge ✔)${nV < tous.length ? ' : pour les autres, vérifie le prix à Madina avant d\'en acheter beaucoup' : ''}.`
+      + (t.feux.rouge >= 15 ? ' Attention : la plupart de ces produits sont trop chers au prix trouvé ; à acheter seulement si le vendeur descend au prix maximum de chaque fiche.' : '')
+    : etOnglet === 'moi' ? 'Les produits marqués « Je prends ». Change les quantités ici : le total se recalcule.'
+    : etOnglet === 'plus' ? 'Les produits gardés pour plus tard.'
+    : etOnglet === 'relever' ? 'Peut-être une belle marge, mais aucun prix guinéen vraiment comparable n\'a été trouvé. Relève leur prix à Madina (même gamme, même taille) avant d\'en acheter : aucun argent n\'est prévu dessus.'
+    : 'Tous les produits de l\'étude, rangés par groupe.';
+  const utilise = r.toutCompris ? t.achat + t.apayer : t.achat, pc = Math.min(100, utilise / (r.budget || 1) * 100);
+  const rayons = [...new Set(tous.map(p => p.rayon))];
+  const taille = num(C.etude_taille) || 16;
+  return `<div class="et-zone" style="--et-t:${taille}px">
+    <div class="carte"><div class="et-titre">📊 ${E(e.titre)}</div>
+      <div style="color:var(--gris);font-size:.9em">${E(nf(D.liste.length, 0))} produits · ${E(groupes.length)} groupes · reçue le ${E(mkJour(e.recue_le || e.le))}${e.parties > 1 && (e.recues || []).length < e.parties ? ' · ⚠ ' + (e.recues || []).length + ' fichier(s) sur ' + e.parties + ' ajoutés' : ''}</div>
+      <div class="et-tailles"><span style="align-self:center;font-size:.9em;color:var(--gris)">Taille du texte :</span>
+        ${[[16, 'Normal'], [18, 'Grand'], [21, 'Très grand']].map(([v, n]) => `<button type="button" class="mk-puce${taille === v ? ' on' : ''}" onclick="C.etude_taille=${v};sauverLocal();dessiner()">${n}</button>`).join('')}</div>
+      <details class="et-reg"><summary>⚙ Mes chiffres (budget, frais du voyage, ma marge…)</summary>
+        <div class="et-grille">
+          ${[['budget', 'Budget des achats en Chine (€)'], ['voyage', 'Frais du voyage (% de l\'achat)'], ['marge', 'Ma marge sur le prix arrivé (%)'],
+             ['marchand', 'Marchandage en Guinée (%)'], ['fret', 'Bateau : dollars par m³'], ['douane', 'Douane en Guinée (%)']].map(([k, l]) =>
+             `<label for="etr_${k}">${l}<input id="etr_${k}" inputmode="decimal" value="${E(String(r[k]).replace('.', ','))}" onchange="etRegler('${k}',this.value)"></label>`).join('')}
+        </div>
+        <label class="et-tc" for="etr_tc"><input type="checkbox" id="etr_tc" ${r.toutCompris ? 'checked' : ''} onchange="etRegler('toutCompris',this.checked)"> Mon budget paie aussi le bateau, la douane et le transitaire (les quantités baissent pour tout faire tenir dans le budget)</label>
+        <p style="font-size:14px;color:var(--gris);margin:8px 0 0">Taux du ${E(D.params.date || '')} (Banque centrale de Guinée) : 1 ¥ = ${E(nf(D.params.taux.CNY_GNF, 0))} GNF · 1 € = ${E(nf(D.params.taux.EUR_GNF, 0))} GNF · 1 $ = ${E(nf(D.params.taux.USD_GNF, 0))} GNF.
+          Arrivé = (achat + bateau) × (1 + douane) + transitaire + frais du voyage. Deuxième prix = prix affiché − marchandage. 🟢 ta marge passe sous le deuxième prix ; 🟡 au moins 35 % ; 🔴 moins.</p>
+      </details>
+    </div>
+    <div class="et-onglets" role="tablist">${ong.map(o => `<button type="button" role="tab" id="eto_${o.k}" class="${etOnglet === o.k ? 'on' : ''}" aria-selected="${etOnglet === o.k}" onclick="etAller('${o.k}')"><b>${E(o.t)}</b><small>${E(o.s)}</small></button>`).join('')}</div>
+    <div class="carte">
+      <div class="et-titre" id="et_titre">${E(titre)}</div><p class="et-chap">${E(chap)}</p>
+      <div class="et-chiffres">
+        <div class="et-chiffre"><span>Achat en Chine</span><b>${E(etEur(t.achat))}</b><i>${r.toutCompris ? 'budget tout compris : ' + E(etEur(r.budget)) : 'sur ' + E(etEur(r.budget)) + ' de budget'}</i></div>
+        <div class="et-chiffre"><span>À payer en plus</span><b>${E(etEur(t.apayer))}</b><i>bateau, douane, transitaire</i></div>
+        <div class="et-chiffre"><span>Frais du voyage</span><b>${E(etEur(t.voyage))}</b><i>${E(nf(r.voyage, 0))} % de l'achat</i></div>
+        <div class="et-chiffre"><span>Ventes attendues</span><b>${E(etEur(t.vente))}</b><i>au deuxième prix ou à ton prix</i></div>
+        <div class="et-chiffre"><span>Gain attendu</span><b style="color:var(--${t.gain >= 0 ? 'vert' : 'rouge'})">${E(etEur(t.gain))}</b><i>ventes moins tous les frais</i></div>
+        <div class="et-chiffre"><span>Place sur le bateau</span><b>${E(nf(t.vol, 1))} m³</b><i>≈ ${E(nf(t.vol / 28 * 100, 0))} % d'un conteneur 20 pieds</i></div>
+      </div>
+      <div class="et-jauge${utilise > r.budget * 1.01 ? ' trop' : ''}"><i style="width:${pc}%"></i></div>
+      <div class="et-feux"><span class="et-feu vert">${t.feux.vert} bons</span><span class="et-feu jaune">${t.feux.jaune} un peu justes</span><span class="et-feu rouge">${t.feux.rouge} trop chers</span>${t.feux.gris ? `<span class="et-feu gris">${t.feux.gris} à relever</span>` : ''}</div>
+      <div class="et-filtres">
+        <select id="et_f_rayon" aria-label="Rayon" onchange="etRayon=this.value;dessiner()"><option value="">Tous les rayons</option>${rayons.map(x => `<option ${x === etRayon ? 'selected' : ''}>${E(x)}</option>`).join('')}</select>
+        <select id="et_f_feu" aria-label="Feu" onchange="etFeuFiltre=this.value;dessiner()"><option value="">Tous les feux</option>${[['vert', 'Bons'], ['jaune', 'Un peu justes'], ['rouge', 'Trop chers'], ['gris', 'À relever']].map(([v, n]) => `<option value="${v}" ${etFeuFiltre === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
+        ${etOnglet === 'moi' && tous.length ? '<button type="button" class="b contour" style="width:auto" onclick="etCopierListe(this)">📋 Copier ma liste (français + chinois)</button>' : ''}
+      </div>
+    </div>
+    ${liste.length ? liste.map(p => etFicheHtml(e, D, r, p)).join('') : `<div class="et-vide">${etOnglet === 'moi' ? 'Rien pour l\'instant. Touchez « ✅ Je prends » sur un produit : il arrive ici avec sa quantité.' : 'Aucun produit avec ces filtres.'}</div>`}
+    ${D.note ? `<p style="color:var(--gris);font-size:14px;margin:16px 4px">${E(D.note)}</p>` : ''}
+  </div>`;
+}
+// ---- les gestes ----
+let etTm = 0;
+function etPlusTard() { clearTimeout(etTm); etTm = setTimeout(() => { if (ongletActif === 'choix') dessiner(); }, 250); }   // le toucher qui a fait quitter le champ arrive d'abord à son bouton
+function etAller(o) { etOnglet = o; etRayon = ''; etFeuFiltre = ''; dessiner(); const z = document.getElementById('et_titre'); if (z) z.scrollIntoView({ block: 'start' }); }
+function etDecider(pid, etat) {
+  const e = etActuelle(); if (!e) return; const ch = etChoix(e.id), m = ch[pid] || (ch[pid] = {});
+  m.etat = m.etat === etat ? '' : etat; m.decide_le = mkMaintenant(); sauverLocal(); dessiner();
+}
+function etQteMoi(pid, v) {
+  const e = etActuelle(); if (!e) return; const ch = etChoix(e.id), m = ch[pid] || (ch[pid] = {});
+  const n = parseInt(String(v).replace(/\s/g, ''), 10); if (Number.isFinite(n) && n >= 0) m.qte = n; else delete m.qte;
+  sauverLocal(); etPlusTard();
+}
+function etRegler(k, v) {
+  const e = etActuelle(); if (!e) return; const t = C.etude_reg || (C.etude_reg = {}), r = t[e.id] || (t[e.id] = {});
+  if (k === 'toutCompris') r.toutCompris = !!v;
+  else { const n = Number(String(v).replace(/\s/g, '').replace(',', '.')); if (Number.isFinite(n) && n >= 0) r[k] = n; }
+  sauverLocal(); etPlusTard();
+}
+function etCopier(b, texte) {
+  const fini = ok => { const a = b.textContent; b.textContent = ok ? '✓ Copié' : 'Copiez à la main'; setTimeout(() => { b.textContent = a; }, 1600); };
+  try { navigator.clipboard.writeText(texte).then(() => fini(true), () => fini(false)); } catch (err) { fini(false); }
+}
+function etCopierListe(b) {
+  const e = etActuelle(), D = e && etDonnees[e.id]; if (!D) return; const r = etReg(e);
+  const L = etListeOnglet(e, D, 'moi');
+  etCopier(b, L.map((p, i) => { const c = etCalcule(D, r, p); return (i + 1) + '. ' + p.nom_fr + ' — ' + p.nom_cn + ' — ' + etQte(e, D, r, p) + ' pièces — prix visé ≤ ' + nf(Math.min(p.achat_cny, c.maxAchat) || p.achat_cny, 1) + ' ¥'; }).join('\n'));
+}
+// ---- l'onglet ⭐ : la liste d'hier OU l'étude ----
+const etEcranChoixAvant = ecranChoix;
+ecranChoix = function () {
+  const e = etActuelle();
+  if (!e) return etEcranChoixAvant.apply(this, arguments);
+  const vue = cxVue || 'etude';
+  const nCx = cxListe().filter(c => !c.retire).length;
+  const bascule = `<div class="et-vues">
+    <button type="button" class="${vue === 'choix' ? 'on' : ''}" onclick="cxVue='choix';dessiner()">⭐ Choix de Claude<small>${E(nf(nCx, 0))} produits${C.choix_claude_le ? ' · liste du ' + E(mkJour(C.choix_claude_le)) : ''}</small></button>
+    <button type="button" class="${vue === 'etude' ? 'on' : ''}" onclick="cxVue='etude';dessiner()">📊 ${E(e.titre)}<small>${E(nf(e.nb || 0, 0))} produits · par groupes</small></button></div>`;
+  return bascule + (vue === 'choix' ? etEcranChoixAvant.apply(this, arguments) : ecranEtude(e));
+};
+// ---- l'arrivée d'une étude par fichier de Claude ----
+async function etRanger(imp, suivi) {
+  const x = imp.etude, id = String(x.id);
+  const avant = await ctLire(ET_CLE(id)).catch(() => null);
+  const D = avant ? JSON.parse(avant) : { id, titre: x.titre, le: x.le, produits: {}, liste: [] };
+  D.titre = x.titre || D.titre; D.le = x.le || D.le; D.params = x.params || D.params; D.groupes = x.groupes || D.groupes; D.note = x.note || D.note;
+  if (Array.isArray(x.ordre)) D.liste = x.ordre.slice();
+  let n = 0; const tot = (x.produits || []).length;
+  for (const p of x.produits || []) {
+    const q = Object.assign({}, p); delete q.photo;
+    if (typeof p.photo === 'string' && p.photo.startsWith('data:image')) {
+      const doc = 'det' + id + '-' + String(p.id).replace(/[^a-z0-9]/gi, '');
+      await ctEcrire(doc, p.photo);
+      const mini = mkReduire(await trImage(p.photo), 420, 0.74);
+      await ctEcrire(doc + '~m', mini); ctMiniCache[doc] = mini; q.photo_doc = doc;
+    } else if (D.produits[p.id] && D.produits[p.id].photo_doc) q.photo_doc = D.produits[p.id].photo_doc;
+    D.produits[p.id] = q; if (!D.liste.includes(p.id)) D.liste.push(p.id);
+    n++; if (suivi) suivi(n, tot);
+  }
+  await ctEcrire(ET_CLE(id), JSON.stringify(D));
+  etDonnees[id] = D; delete etLecture[id];
+  const L = etListe(); let e = L.find(y => y.id === id);
+  if (!e) { e = { id, titre: x.titre, le: x.le, recues: [] }; L.push(e); }
+  e.titre = x.titre || e.titre; e.le = x.le || e.le; e.parties = num(x.parties) || 1; e.nb = D.liste.length; e.recue_le = mkMaintenant();
+  if (x.partie && !e.recues.includes(x.partie)) e.recues.push(x.partie);
+  C.etude_actuelle = id;
+  // Les produits de cette étude déjà arrivés le matin dans la liste ⭐ (fichiers « groupe 1 sur 5 »…) : on les range ici,
+  // avec la décision et la quantité déjà prises, et on les retire de la liste d'hier pour ne pas les voir deux fois.
+  const ch = etChoix(id), conv = { pris: 'oui', plus_tard: 'plus', ecarte: 'non' };
+  cxListe().forEach(c => {
+    const m = String(c.id).match(/^cx(\d{4})-(.+)$/);
+    if (!m || m[1] !== id || !D.produits[m[2]]) return;
+    if (c.etat && !(ch[m[2]] && ch[m[2]].etat)) ch[m[2]] = Object.assign(ch[m[2]] || {}, { etat: conv[c.etat] || '', decide_le: c.decide_le || mkMaintenant() });
+    if (num(c.qte_moi) > 0 && !(ch[m[2]] && ch[m[2]].qte != null)) (ch[m[2]] || (ch[m[2]] = {})).qte = num(c.qte_moi);
+    c.retire = true;
+  });
+  return { n, id };
+}
+const etAppliquerImportAvant = ctAppliquerImport;
+ctAppliquerImport = async function () {
+  const imp = ctImportEnCours;
+  if (!(imp && imp.etude && Array.isArray(imp.etude.produits))) return etAppliquerImportAvant.apply(this, arguments);
+  const bouton = document.getElementById('ct_bouton_import');
+  if (bouton) { bouton.disabled = true; bouton.textContent = '⏳ Rangement de l\'étude…'; }
+  let r = null;
+  try { r = await etRanger(imp, (n, t) => { if (bouton) bouton.textContent = '⏳ Rangement de l\'étude : ' + n + ' / ' + t; }); }
+  catch (err) { avertir('⚠ L\'étude n\'a pas pu être rangée (mémoire pleine ?) : ' + (err && err.message || err), 8000); if (bouton) { bouton.disabled = false; bouton.textContent = '✅ Ajouter au carnet'; } return; }
+  const e = etListe().find(y => y.id === r.id);
+  delete imp.etude;   // le reste du fichier (s'il y en a) suit le chemin habituel
+  if ((imp.fournisseurs || []).length || (imp.choix_claude || []).length) await etAppliquerImportAvant.apply(this, arguments);
+  else { trFichierImport = ''; sauverLocal(); ctImportEnCours = null; fermerBoite(); }
+  sauverLocal();
+  cxVue = 'etude'; allerA('choix');
+  const manque = e && e.parties > 1 ? e.parties - (e.recues || []).length : 0;
+  avertir('📊 ' + (e ? e.titre : 'Étude') + ' : ' + r.n + ' produit(s) rangé(s) avec leur photo.' + (manque > 0 ? ' Il reste ' + manque + ' fichier(s) à ajouter.' : ' Tout est là.'), 7000);
+};
+const etApercuImportAvant = ctApercuImport;
+ctApercuImport = async function () {
+  await etApercuImportAvant.apply(this, arguments);
+  const imp = ctImportEnCours, z = document.getElementById('ct_apercu_import');
+  if (imp && z && imp.etude && Array.isArray(imp.etude.produits)) {
+    const x = imp.etude;
+    z.insertAdjacentHTML('beforeend', `<p style="margin:6px 0;font-size:16px">📊 <b>${E(x.titre)}</b>${x.parties > 1 ? ' — fichier ' + E(x.partie) + ' sur ' + E(x.parties) : ''} :
+      <b>${E(x.produits.length)} produits</b> avec leur photo (onglet ⭐, rangés par groupe comme la page de Claude).</p>`);
+    const bouton = document.getElementById('ct_bouton_import'); if (bouton) bouton.disabled = false;
+  }
+};
+// « Envoyer à Claude » emporte aussi les décisions prises dans les études (pour la liste suivante).
+function etDecisionsPourClaude() { const t = C.etude_choix || {}; return Object.keys(t).map(id => ({ etude: id, choix: t[id] })); }
 </script>
 <script>
 

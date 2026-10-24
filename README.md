@@ -173,6 +173,14 @@ F. « 🚢 Cargo et contrôle » (Fournisseurs et étude) : cargos de la recherc
 notée, comparaison en € par m³, « ⭐ Je choisis » → bateau, douane et transitaire de l'étude, entrepôt dans les contrats ;
 contrôle (V-Trust, QIMA, cargo) ; vérifier la société avant l'acompte (licence, gsxt.gov.cn, message chinois).
 Corrigée le 24/10 au soir (même numéro) : un prénom seul près du numéro (« Rosy ») devient le contact ; une marque qui contient « boss » n'est plus prise pour un poste.
+Corrigée le 25/10 (même numéro, partie G — ce qu'ont appris les 6 vrais catalogues reçus sur WeChat) : familles Valise, Sac à dos,
+Poubelle, Égouttoir, Salle de bain, Parapluie, Gourde, Parfum d'intérieur, Table d'appoint, Stylos et coffrets (avant « Téléphones »
+pour un sac, « Alimentaire » pour une poubelle) ; une pièce détachée (« ABS-704 ») n'est plus un modèle ; cartes : « Contact » /
+« Email » ne sont plus pris pour un nom, un bout de phrase de catalogue n'est plus une société (mais « Co. Ltd » et « Arts and
+Crafts » restent des sociétés), e-mail et site corrigés seulement d'après un nom très proche ; la remarque du fournisseur (la
+vérification de Claude) se lit en haut de SA fiche ; « Qui le vend ? » montre le modèle et sa photo quand un fournisseur a
+plusieurs modèles reliés au même produit ; un fichier de Claude remplit aussi le nom chinois de la société, le 2e site, le
+2e e-mail, le 2e numéro et le lien du catalogue.
 Fichiers `suivi-1.11.0-*.js` + `suivi-1.11.0.css`, `construire-1.11.0.py` (part de la 1.10.0). Rien de retiré.
 ⚠ Même remarque pour `KYLO-Achats.html`.
 

@@ -15024,6 +15024,10 @@ function etDecisionsPourClaude() { const t = C.etude_choix || {}; return Object.
 
 .rp-bas{position:sticky;bottom:0;background:var(--carte,#fff);padding:8px 0;display:flex;gap:8px}
 .rp-bas .b{flex:1;min-height:50px;margin:0}
+.ctg-rem { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 10px; padding: 10px 12px; margin: 10px 0; font-size: 15px; line-height: 1.45; white-space: pre-line; color: #3f2d00; }
+.ctg-eo-img { width: 56px; height: 56px; object-fit: contain; background: #fff; border-radius: 8px; flex: none; }
+.ctg-eo-img + div { flex: 1; min-width: 0; }
+.ctg-mod { display: inline-block; font-size: 15px; font-weight: 700; color: #1e3a8a; background: #e0e7ff; border-radius: 6px; padding: 0 6px; }
 </style>
 <script>
 // ===================== 1.11.0 — LES CARTES, LES RÉPONSES, L'AGENT, LE CARGO (24/10/2026) =====================
@@ -15159,7 +15163,7 @@ function lcEmails(texte, brut, nomContact, domainesSites) {
   // Le domaine corrigé d'après le site de la carte (« algril.de » quand le site est « allgrill.de »).
   const brutSansEspace = String(brut || '').replace(/\s+/g, '').toLowerCase();
   garde.forEach(v => {
-    const site = (domainesSites || []).includes(v.dom) ? '' : (domainesSites || []).find(d => lcLev(d, v.dom) <= 2 && !LC_PUBLICS.test(v.dom));
+    const site = (domainesSites || []).includes(v.dom) ? '' : (domainesSites || []).find(d => lcProche(d, v.dom) && !LC_PUBLICS.test(v.dom));
     if (site) { v.doute = 'corrigé d\'après son site (« ' + v.dom + ' » lu sur la carte)'; v.dom = site; v.e = v.loc + '@' + site; }
     else if (!brutSansEspace.includes(v.e)) v.doute = 'réparé par le carnet (le texte lu était abîmé) : vérifiez';
   });
@@ -15186,6 +15190,8 @@ function lcSocietes(texte) {
   const cnOk = cn.filter(x => LC_VILLES_CN.test(x) || x.length >= 9).sort((a, b) => b.length - a.length)[0] || '';
   return { lat: laT, cn: cnOk, cnCoupe: !cnOk && cn.length ? cn.sort((a, b) => b.length - a.length)[0] : '' };
 }
+// « allgril.de » ≈ « allgrill.de » (même fin, nom presque pareil) ; mais « kingsons.com » et « kingsons.cn » sont deux vrais domaines.
+function lcProche(a, b) { const pa = String(a).split('.'), pb = String(b).split('.'); const ta = pa.slice(1).join('.'), tb = pb.slice(1).join('.'); return a !== b && ta === tb && lcLev(pa[0], pb[0]) <= 2; }
 function lcDomaine(u) { const m = String(u || '').toLowerCase().match(/^(?:https?:\/\/)?(?:www\.)?([a-z0-9.-]+\.[a-z]{2,})/); return m ? m[1] : ''; }
 function lcMarqueDuDomaine(dom, texte) {
   const nomD = String(dom || '').split('.')[0]; if (!nomD || nomD.length < 3) return '';
@@ -15195,7 +15201,7 @@ function lcMarqueDuDomaine(dom, texte) {
   const vu = mots.find(w => w.replace(/[^A-Za-z]/g, '').toLowerCase() === nomD);
   return vu || nomD.toUpperCase();
 }
-const LC_PAS_NOM = /^(?:sales|manager|director|export|import|imp|exp|dept|department|ningbo|china|road|tower|building|floor|room|city|province|district|street|limited|company|group|holdings?|trading|factory|catalog|catalogue|scan|read|our|retail|english|mit|grillen|welcome|best|quality|leidenschaft|the|and|for|with)$/i;
+const LC_PAS_NOM = /^(?:email|e-mail|mail|phone|mobile|mob|tel|fax|address|add|website|web|wechat|whatsapp|contact|name|skype|zip|code|attn|http|www|sales|manager|director|export|import|imp|exp|dept|department|ningbo|china|road|tower|building|floor|room|city|province|district|street|limited|company|group|holdings?|trading|factory|catalog|catalogue|scan|read|our|retail|english|mit|grillen|welcome|best|quality|leidenschaft|the|and|for|with)$/i;
 function lcContact(texte) {
   const lignes = texte.split('\n').map(l => l.trim()).filter(Boolean);
   let latin = '', cn = '';
@@ -15293,6 +15299,13 @@ function lcCompleter(r, texte, brut) {
   }
   if (addCn) r.adresse_cn = addCn.replace(/\s+/g, '');
   if (r.adresse && r.adresse.length > 140) r.adresse = r.adresse.split(', ').filter((x, i, a) => a.indexOf(x) === i).join(', ').slice(0, 160);
+  // Une « société » qui est un bout de phrase (« equipments. The company », lu dans le texte de présentation d'un catalogue) : refusée.
+  // (« Co. Ltd », « Mfg. Co. » ne sont pas des fins de phrase ; « Arts and Crafts » est un vrai nom de société)
+  const phrase = t => { const u = String(t || '').replace(/\b(co|ltd|inc|corp|mfg|ind|intl|int|no|st|tech|elec|imp|exp)\.\s*/gi, ' ');
+    return /\.\s+[A-Z]|^[a-z]|\b(the|has|have|is|are|our|we|with|which|that)\b/.test(u) || u.split(/\s+/).filter(Boolean).length > 9; };
+  if (r.societe && /[A-Za-z]/.test(r.societe) && phrase(r.societe)) { delete r.societe; if (soc.cn) r.societe = soc.cn; }
+  if (r.poste && (/\.\s/.test(r.poste) || r.poste.length > 45)) delete r.poste;
+  if (r.contact && LC_PAS_NOM.test(String(r.contact).split(/\s+/)[0])) delete r.contact;
   // Un « poste » qui n'est pas un poste (la marque « BOSSTECH » lue « BossYECH » contient « boss ») : effacé.
   if (r.poste && !/\b(sales|manager|director|representative|president|ceo|export|marketing|engineer|merchandiser|assistant|boss|owner|general|purchas\w*|buyer|account)\b|经理|总监|业务|销售|主管|老板|代表|总裁|董事/i.test(r.poste)) delete r.poste;
   // Un prénom seul sur sa ligne (« Rosy ») juste au-dessus ou au-dessous d'un numéro : c'est le contact.
@@ -15404,10 +15417,10 @@ function lcCorrigerParFiche(f, r) {
   if (!f || !r) return;
   const fiables = [f.site, f.site2, f.catalogue_lien, f.alibaba].map(lcDomaine).filter(Boolean);
   if (!fiables.length) return;
-  ['site', 'site2'].forEach(k => { const d = lcDomaine(r[k]); if (d && !fiables.includes(d) && fiables.some(x => lcLev(x, d) <= 2)) delete r[k]; });
+  ['site', 'site2'].forEach(k => { const d = lcDomaine(r[k]); if (d && !fiables.includes(d) && fiables.some(x => lcProche(x, d))) delete r[k]; });
   ['email', 'email2'].forEach(k => {
     if (!r[k]) return; const [loc, dom] = String(r[k]).split('@'); if (!dom || fiables.includes(dom) || LC_PUBLICS.test(dom)) return;
-    const x = fiables.find(y => lcLev(y, dom) <= 2);
+    const x = fiables.find(y => lcProche(y, dom));
     if (x) { const v = loc + '@' + x; (r.doute || (r.doute = {}))[v] = 'corrigé d\'après le QR ou le site de sa carte (« ' + dom + ' » lu sur la photo)'; r[k] = v; }
   });
   if (r.societe && r.doute && r.doute[r.societe] && /nom de son site/.test(r.doute[r.societe])) {
@@ -16576,6 +16589,59 @@ ecranEtude = function (e) {
   const h = cgEcranEtudeAvant.apply(this, arguments);
   const x = C.cargo_choisi && cgListe().find(c => c.id === C.cargo_choisi);
   return h.replace('<details class="et-reg">', `<button type="button" class="b contour" style="margin:4px 0 6px;min-height:50px" onclick="cgOuvrir()">🚢 Cargo et contrôle${x ? ' · ⭐ ' + E(x.nom) : ' : comparer et choisir'}</button><details class="et-reg">`);
+};
+// =====================================================================================================
+//  CARNET 1.11.0 — G. CE QU'ONT APPRIS LES VRAIS CATALOGUES (24/10/2026, nuit)
+//  Riche a envoyé 6 vrais catalogues reçus sur WeChat (poubelles et égouttoirs Wenqun, sacs et valises Kingsons, stylos Le Tian,
+//  tables XINBO…). Passés dans « 📥 Fichier reçu sur WeChat », ils ont montré : des familles fausses (« Alimentaire » pour des
+//  poubelles — « PET FOOD BIN » —, « Téléphones » pour des sacs — « phone pocket »), parce que la liste des familles ne connaissait
+//  ni les poubelles, ni les égouttoirs, ni les valises, ni les parapluies… Ces familles sont ajoutées EN TÊTE de la liste (les mots
+//  précis gagnent sur « phone » ou « food »).
+// =====================================================================================================
+[['🧳', 'Valise', ['luggage', 'suitcase', 'trolley case', 'hardside', 'valise', 'cabin case', '行李箱', '拉杆箱']],
+ ['🎒', 'Sac à dos et sacoche', ['backpack', 'laptop bag', 'school bag', 'sling bag', 'crossbody', 'duffel', 'sac a dos', 'sacoche', 'cartable', '双肩包', '书包', '电脑包']],
+ ['🗑️', 'Poubelle', ['pedal bin', 'trash bin', 'waste bin', 'dustbin', 'touch bin', 'sensor bin', 'recycle bin', 'rubbish bin', 'food bin', 'outdoor bin', 'laundry bin', 'poubelle', '垃圾桶', '脚踏桶']],
+ ['🍽️', 'Égouttoir à vaisselle', ['dish rack', 'dish drainer', 'drying rack', 'drain rack', 'egouttoir', '碗架', '沥水架']],
+ ['🛁', 'Salle de bain', ['toilet brush', 'bathroom set', 'bathroom accessories', 'soap dispenser', 'salle de bain', '马桶刷', '卫浴']],
+ ['☂️', 'Parapluie', ['umbrella', 'parapluie', '雨伞']],
+ ['🥤', 'Gourde et thermos', ['tumbler', 'vacuum flask', 'thermos', 'insulated bottle', 'water bottle', 'sport bottle', 'gourde', '保温杯', '水杯']],
+ ['🕯️', 'Parfum d\'intérieur', ['reed diffuser', 'scented candle', 'room spray', 'aroma diffuser', 'home fragrance', 'diffuseur', 'bougie parfumee', '香薰', '香氛', '蜡烛']],
+ ['🪑', 'Table d\'appoint', ['side table', 'end table', 'coffee table', 'nesting table', 'accent table', 'bar cart', 'table d\'appoint', 'table gigogne', '边几', '茶几']],
+ ['✒️', 'Stylos et coffrets cadeaux', ['ballpoint', 'gel pen', 'signature pen', 'pen set', 'gift set', 'corporate gift', 'stylo', 'coffret cadeau', '礼品', '笔']]
+].reverse().forEach(x => { if (!CT_FAMILLES.some(y => y[1] === x[1])) CT_FAMILLES.unshift(x); });
+// Une pièce détachée n'est pas un produit : « Foot nails: ABS-704 » (les pieds d'une valise) était rangé comme un modèle.
+const ctgPdfAvant = fwLirePdf;
+fwLirePdf = async function () {
+  const r = await ctgPdfAvant.apply(this, arguments);
+  if (r && Array.isArray(r.produits)) r.produits = r.produits.filter(p => !/^(ABS|PU|PC|PP|PE|PVC|TPU|EVA|POM|PET|PA|PS|TPR|EPE)-?\d{2,4}$/i.test(String(p.ref || '')));
+  return r;
+};
+// Les fichiers de Claude (catalogues vérifiés) apportent aussi le nom chinois de la société (pour le contrat), le 2e site, le 2e e-mail,
+// le 2e numéro et le lien du catalogue : ils remplissent ces cases quand elles sont vides (jamais ce que Riche a tapé).
+['societe_cn', 'site2', 'email2', 'mobile2', 'tel_fixe2', 'catalogue_lien'].forEach(k => { if (!CT_CHAMPS_IMPORT.includes(k)) CT_CHAMPS_IMPORT.push(k); });
+// La remarque (la vérification de Claude : « demande sa licence », « liquides : demande au cargo »…, ou ce que Riche a noté) se lit
+// en haut de SA fiche, plus seulement dans la liste des fournisseurs ou dans « Voir et corriger ».
+const ctgDossierAvant = ecranDossier;
+ecranDossier = function () {
+  const h = ctgDossierAvant.apply(this, arguments);
+  const f = mkFournisseur(ctDossier), r = f && String(f.remarque || '').trim();
+  if (!r || h.indexOf('<div class="ct-liens">') < 0) return h;
+  return h.replace('<div class="ct-liens">', `<div class="ctg-rem">📝 ${E(r)}</div><div class="ct-liens">`);
+};
+// « Qui le vend ? » : quand un fournisseur a plusieurs modèles reliés au même produit de l'étude (les 6 égouttoirs de Wenqun),
+// chaque ligne montre SON modèle (référence + petite photo de son catalogue), pas 6 fois le même nom.
+const ctgEoAvant = eoHtml;
+eoHtml = function (e, D, r, p) {
+  const h = ctgEoAvant.apply(this, arguments);
+  const offres = eoOffres(eoCle(e, p)).sort((a, b) => (eoPrixCny(a.o, D) || 1e9) - (eoPrixCny(b.o, D) || 1e9));
+  let i = 0;
+  return h.replace(/<div class="eo-o( absent)?"><div><b>([^<]*)<\/b>/g, (m, abs, nom) => {
+    const x = offres[i++]; if (!x) return m;
+    const pr = x.f && x.o.produit_id ? ctProduit(x.f, x.o.produit_id) : null;
+    const doc = x.o.photo_doc || (pr && pr.photo_doc) || '';
+    const mod = x.o.modele || (pr && pr.ref) || '';
+    return `<div class="eo-o${abs || ''}">${doc ? `<img class="ct-mini ctg-eo-img" data-doc="${E(doc)}" alt="">` : ''}<div><b>${nom}</b>${mod ? ` <span class="ctg-mod">${E(mod)}</span>` : ''}`;
+  });
 };
 </script>
 <script>

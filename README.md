@@ -149,6 +149,32 @@ matin quittent la liste ⭐ en emportant leur décision. « Envoyer à Claude »
 Module `etude-1.10.0.html`, `construire-1.10.0.py` (part de la 1.9.0). Rien de retiré.
 ⚠ Même remarque pour `KYLO-Achats.html`.
 
+Version 1.11.0 — 24/10/2026 : **Les cartes bien lues, les réponses en photos, l'agent, le cargo**.
+A. Cartes de visite : 2e regard sur la photo (plus grande, plus contrastée, en négatif pour les bandeaux) ; TOUS les numéros
+(2e portable, 2e fixe, « M.T. »), tous les e-mails (2e e-mail ; un portable écrit en e-mail n'efface plus le portable),
+les 2 sites ; e-mails réparés (« _ » lu comme une espace, « © », domaine corrigé d'après le site ou le QR) et signalés ;
+société « … LTD. / HOLDINGS », nom chinois complet à part (contrat), sinon la marque de son site (signalée) ; nom pinyin
+(« Luo Jin Qi ») ; QR d'un catalogue → « 📖 Son catalogue en ligne » (plus pris pour un site ou un WeChat), QR doré lu par le
+canal bleu. « Voir et corriger » : photo de la carte, cases lues (jaune) et douteuses (rouge, avec la raison), tout le texte lu
+à copier, « Lecture de l'iPhone (Texte en direct) » qui remplace ce que le carnet avait lu. « 🔁 Relire mes cartes ».
+B. « Fichier reçu sur WeChat » : le carnet dit à QUI il pense que c'est et pourquoi (numéro dans le fichier, nom dans le
+nom du fichier, page de demande de prix), sinon il DEMANDE (ceux à qui on a demandé des prix en premier) avant de ranger.
+C. « 📸 Sa réponse en photos » (sa fiche) : ses photos gardées ; sa photo au-dessus des cases (3 qualités × quantités) de
+chaque produit de la demande ; message collé lu (« 3 = 28 ¥ — Xidi ») ; « Il ne l'a pas » ; c'est aussi « corriger sa liste ».
+Chaque page de demande de prix porte un QR « KYLO F05 3 » : la page renvoyée en photo va toute seule au bon produit.
+Une capture de tableau de prix (ITEM NO / QTY / RMB EXW / FOB / USD / MEAS / CBM) devient des prix sur ses modèles.
+D. Étude : « 🏭 Qui le vend ? » sur chaque fiche (prix reçus des fournisseurs et de l'agent, comparés au prix maximum),
+« Peut-être chez » (modèles de ses catalogues qui ressemblent), « ➕ Le demander à un fournisseur » (photo et nom chinois de
+l'étude dans SA demande), « 📍 Où le chercher » (marchés de gros et usines en chinois, « Montrer au chauffeur », Plans).
+Un fichier de Claude peut relier un modèle de catalogue à un produit de l'étude (`produits[].etude` / `offres[].etude`).
+E. « ✅ Ma liste » → PDF pour l'agent (photo, n°, français + chinois, quantité, prix visé, MAXIMUM ; sans prix de vente)
+et PDF complet pour moi ; l'agent a sa fiche, sa réponse se range comme celle d'un fournisseur.
+F. « 🚢 Cargo et contrôle » (Fournisseurs et étude) : cargos de la recherche du 24/10, 10 questions (FR / 中文+EN), réponse
+notée, comparaison en € par m³, « ⭐ Je choisis » → bateau, douane et transitaire de l'étude, entrepôt dans les contrats ;
+contrôle (V-Trust, QIMA, cargo) ; vérifier la société avant l'acompte (licence, gsxt.gov.cn, message chinois).
+Fichiers `suivi-1.11.0-*.js` + `suivi-1.11.0.css`, `construire-1.11.0.py` (part de la 1.10.0). Rien de retiré.
+⚠ Même remarque pour `KYLO-Achats.html`.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

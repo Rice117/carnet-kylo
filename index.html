@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.10.0';
+window.KYLO_APPLICATION = '1.11.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -14927,6 +14927,1644 @@ ctApercuImport = async function () {
 };
 // « Envoyer à Claude » emporte aussi les décisions prises dans les études (pour la liste suivante).
 function etDecisionsPourClaude() { const t = C.etude_choix || {}; return Object.keys(t).map(id => ({ etude: id, choix: t[id] })); }
+</script>
+<style>
+/* ===== 1.11.0 — cartes bien lues, réponses en photos, liste pour l'agent, cargo ===== */
+.lc-cartes{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
+.lc-cartes img{width:calc(50% - 4px);max-width:220px;aspect-ratio:16/10;object-fit:cover;border-radius:10px;border:2px solid var(--bleu-pale,#dbe6f7);cursor:zoom-in}
+.lc-aide{font-size:15px;color:var(--gris,#5a6b85);margin:4px 0 8px;line-height:1.4}
+.lc-tag{display:inline-block;font-size:14px;font-weight:700;color:#7a5600;background:#fff4d6;border-radius:6px;padding:0 6px}
+.lc-tag.rouge{color:#9b1c1c;background:#fde2e2}
+.lc-champ{margin:0 0 4px;padding:2px 0}
+.lc-champ.lu input{border-color:#e0b04a;background:#fffaf0}
+.lc-champ.doute input{border-color:#d64545;background:#fff5f5;box-shadow:0 0 0 2px #fde2e2}
+.lc-pourquoi{font-size:15px;color:#9b1c1c;margin:4px 2px 8px;line-height:1.35}
+.lc-brut-d summary{font-size:16px;font-weight:700;min-height:44px;display:flex;align-items:center}
+.lc-brut{white-space:pre-wrap;word-break:break-word;font-size:16px;line-height:1.45;background:#f6f8fb;border:1px solid #d7e1f0;border-radius:10px;padding:10px;margin:6px 0;-webkit-user-select:text;user-select:text;max-height:320px;overflow:auto}
+.lc-alerte{background:#fde2e2;color:#7f1d1d;border-radius:10px;padding:10px 12px;margin:8px 0;font-size:15px;font-weight:600;line-height:1.4}
+
+/* B. à qui est ce fichier */
+.aq{border-radius:12px;padding:10px 12px;margin:0 0 10px;font-size:16px;line-height:1.4;background:#eef4ff;border:1px solid #c9d8f2}
+.aq.ok{background:#ecfdf3;border-color:#a7e3bd}
+.aq.att{background:#fff7e6;border-color:#f0c36d}
+.aq small{font-size:14px;color:var(--gris,#5a6b85)}
+.aq .mk-lien{font-size:15px;min-height:44px}
+.aq-liste{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.aq-c{display:flex;gap:10px;align-items:center;text-align:left;background:#fff;border:1px solid #d7e1f0;border-radius:10px;padding:8px;min-height:56px;font-size:15px;width:100%;color:inherit;cursor:pointer}
+.aq-c small{font-size:14px;color:var(--gris,#5a6b85)}
+.aq-c img,.aq-v{width:64px;height:42px;object-fit:cover;border-radius:6px;flex:none;display:flex;align-items:center;justify-content:center;font-size:22px;background:#f1f5f9}
+.aq-tous summary{min-height:44px;display:flex;align-items:center;font-size:15px}
+.aq-rp{background:#ecfdf3;border:1px solid #a7e3bd;border-radius:12px;padding:10px;margin:0 0 10px;font-size:16px;line-height:1.4}
+.aq-rp .b{margin-top:8px}
+/* C. ses prix en photos */
+.rp-dlg .rp-vue{position:sticky;top:-2px;z-index:3;background:#0f172a;border-radius:12px;margin:0 0 8px}
+.rp-vue img{display:block;width:100%;height:34vh;object-fit:contain;border-radius:12px 12px 0 0;cursor:zoom-in}
+.rp-vue .px-aide{color:#e2e8f0}
+.rp-vue-b{display:flex;align-items:center;justify-content:space-between;color:#fff;font-size:15px;padding:0 4px}
+.rp-vue-b button{min-width:56px;min-height:44px;font-size:20px;background:transparent;color:#fff;border:0;cursor:pointer}
+.rp-l{border:1px solid #d7e1f0;border-radius:12px;padding:10px;margin:10px 0;background:#fff}
+.rp-t{display:flex;gap:10px;align-items:center}
+.rp-n{background:#d32f2f;color:#fff;font-weight:800;border-radius:50%;min-width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:17px;flex:none}
+.rp-t img,.rp-t .px-vide{width:56px;height:56px;object-fit:cover;border-radius:8px;flex:none}
+.rp-nom{font-size:16px;font-weight:700;min-width:0;line-height:1.3}
+.rp-nom .mk-lien{font-size:15px;font-weight:600;min-height:40px}
+.rp-grille{display:grid;gap:4px;margin-top:8px;align-items:center}
+.rp-grille b{font-size:14px;text-align:center;color:var(--gris,#5a6b85);font-weight:700}
+.rp-grille b.rp-q{text-align:left;color:var(--noir,#16233a)}
+.rp-grille input{font-size:16px;min-height:44px;padding:4px 2px;width:100%;min-width:0;text-align:center;margin:0}
+.rp-grille input.rp-lu{background:#fff4d6;border-color:#e0b04a}
+.rp-absent{display:flex;gap:8px;align-items:center;font-size:15px;margin-top:6px;min-height:44px}
+.rp-absent input{width:22px;height:22px}
+.rp-deja{font-size:14px;color:#166534;margin-top:2px}
+.rp-lu-t{font-size:14px;color:#7a5600}
+.rp-minis{display:flex;gap:6px;flex-wrap:wrap}.rp-minis img{width:76px;height:76px;object-fit:cover;border-radius:8px;cursor:zoom-in}
+.rp-msg summary{min-height:44px;display:flex;align-items:center;font-size:16px;font-weight:700}
+.rp-msg textarea{font-size:16px;width:100%}
+/* D. qui le vend, où chercher */
+.eo{border:1px solid #c9d8f2;background:#f5f8fe;border-radius:12px;padding:10px;margin:10px 0}
+.eo-t{font-weight:800;font-size:1em;margin-bottom:4px}
+.eo-o{display:flex;gap:8px;align-items:center;justify-content:space-between;border-top:1px solid #dbe6f7;padding:8px 0}
+.eo-o:first-of-type{border-top:0}
+.eo-o .b{width:auto;min-height:44px;padding:6px 12px;font-size:15px;flex:none}
+.eo-o.absent{opacity:.6}
+.eo-px{font-size:1.1em}
+.eo-g{font-size:14px;color:var(--gris,#5a6b85)}
+.eo-v{display:inline-block;font-size:14px;font-weight:700;border-radius:6px;padding:1px 6px;margin:2px 0}
+.eo-v.ok{background:#dcfce7;color:#166534}.eo-v.non{background:#fde2e2;color:#9b1c1c}.eo-v.att{background:#f1f5f9;color:#475569}
+.eo-s{margin-top:6px}
+.eo-b{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.eo-b .b{flex:1 1 140px;min-height:46px;font-size:15px}
+.eo-ou{margin-top:8px}
+.ou-l{border-top:1px solid #dbe6f7;padding:8px 0;font-size:15px;line-height:1.4}
+.ou-cn{font-size:22px;font-weight:800;color:#0d3f85;margin:2px 0}
+.ou-g{color:#334155}
+.ou-b{display:flex;gap:6px;margin-top:6px}.ou-b .b{flex:1;min-height:44px;font-size:15px}
+.ou-grand{max-width:96vw}.ou-grand-t{font-size:56px;font-weight:800;line-height:1.25;text-align:center;padding:24px 8px;color:#0d3f85;word-break:break-all}
+/* E. listes PDF */
+.ag-b{display:flex;flex-direction:column;gap:8px;width:100%;margin:6px 0}
+.ag-b .b{min-height:50px}
+.ag-quoi{background:#eef4ff;border-radius:10px;padding:10px;font-size:15px;line-height:1.45;margin-bottom:10px}
+.ag-apercu{display:flex;gap:6px;overflow-x:auto;margin-top:8px}.ag-apercu img{height:180px;border:1px solid #d7e1f0;border-radius:6px;cursor:zoom-in}
+/* F. cargo et contrôle */
+.cg-entree{display:flex;flex-direction:column;gap:8px;margin:0 0 12px}.cg-entree .b{min-height:50px;font-size:16px}
+.cg-c{border:1px solid #d7e1f0;border-radius:12px;padding:10px;margin:10px 0;background:#fff;font-size:15px;line-height:1.45}
+.cg-c.choisi{border:2px solid #16a34a;background:#f0fdf4}
+.cg-t{font-size:18px}
+.cg-q,.cg-l{margin:3px 0}
+.cg-att{color:#92400e}
+.cg-s{font-size:14px;color:var(--gris,#5a6b85)}
+.cg-b{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.cg-b .b{flex:1 1 150px;min-height:46px;font-size:15px}
+.cg-rep summary,.cg-aj summary{min-height:44px;display:flex;align-items:center;font-weight:700;font-size:16px}
+.cg-g{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.cg-g label,.cg-rep label{font-size:14px;display:block}
+.cg-g input,.cg-g select,.cg-rep textarea{font-size:16px;width:100%}
+.cg-chiffre{background:#eef4ff;border-radius:8px;padding:8px;margin:8px 0;font-size:15px}
+.cg-tab{background:#f5f8fe;border:1px solid #c9d8f2;border-radius:12px;padding:10px;margin:8px 0;font-size:15px}
+.cg-tab div{display:flex;justify-content:space-between;gap:8px;border-top:1px solid #dbe6f7;padding:6px 0}
+
+.rp-bas{position:sticky;bottom:0;background:var(--carte,#fff);padding:8px 0;display:flex;gap:8px}
+.rp-bas .b{flex:1;min-height:50px;margin:0}
+</style>
+<script>
+// ===================== 1.11.0 — LES CARTES, LES RÉPONSES, L'AGENT, LE CARGO (24/10/2026) =====================
+window.KYLO_SUIVI = '1.11.0';
+// =====================================================================================================
+//  CARNET 1.11.0 — A. LES CARTES BIEN LUES (24/10/2026)
+//  Riche, 24/10 à 13 h 35 : « quand on prend la photo de la carte, il ne prend pas toutes les informations : il prend
+//  souvent mal les e-mails ; s'il y a deux numéros, il prend seulement un numéro, le second il le laisse ». 13 h 43 :
+//  « les cartes sont différentes l'une de l'autre : certaines ont le QR de leur site, d'autres le QR de leur catalogue ».
+//  13 h 44 : « le nom des entreprises aussi, il se trompe, il ne l'écrit pas ».
+//  Essayé sur SES photos (Ningbo ETDZ, CCGrass recto/verso, ALLGRILL) : la lecture de la 1.10.0 ratait le portable
+//  (« M.T. : 139… »), le fixe, le 2e e-mail, la société (« … HOLDINGS LTD. », lettres blanches sur un bandeau vert),
+//  le nom (« Luo Jin Qi »), et prenait le QR d'un catalogue PDF pour un site. Ce module :
+//   1. relit la carte une 2e fois, plus grande et plus contrastée (petites lettres pâles), et en négatif (bandeaux) ;
+//   2. garde TOUS les numéros (2e portable, 2e fixe), TOUS les e-mails (2e e-mail), les 2 sites ;
+//      un portable écrit comme e-mail (« 13957888850@163.com ») n'efface plus le portable : il le confirme ;
+//   3. répare les e-mails mal lus (« lefter wang@… » → « lefter_wang@… », « algril.de » corrigé d'après le site) et le dit ;
+//   4. trouve la société (« … LTD. », « HOLDINGS », le nom chinois complet à part), sinon la marque de son site ;
+//   5. le QR d'un catalogue va dans « Son catalogue en ligne » (pas dans le site ni le WeChat) ;
+//   6. l'écran « Voir et corriger » montre la photo de la carte, ce que le téléphone a lu, et marque les cases douteuses.
+// =====================================================================================================
+const LC_PUBLICS = /^(qq|163|126|139|188|189|sina|sohu|gmail|hotmail|outlook|live|yahoo|foxmail|aliyun|yeah|vip\.163|vip\.qq|icloud|me|msn|china|21cn|tom)\.(com|cn|net)(\.cn)?$/i;
+const LC_RE_MAIL = /[A-Z0-9][A-Z0-9._%+-]*@[A-Z0-9-]+(?:\.[A-Z0-9-]+)*\.[A-Z]{2,}/gi;
+function lcLev(a, b) {
+  a = String(a || ''); b = String(b || '');
+  if (Math.abs(a.length - b.length) > 3) return 9;
+  const d = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prec = d[0]; d[0] = i;
+    for (let j = 1; j <= b.length; j++) { const t = d[j]; d[j] = Math.min(d[j] + 1, d[j - 1] + 1, prec + (a[i - 1] === b[j - 1] ? 0 : 1)); prec = t; }
+  }
+  return d[b.length];
+}
+// ---------- 1. Le texte lu, nettoyé ----------
+// Dans un morceau qui ressemble à un numéro : O → 0, l / I / | → 1, S → 5, B → 8 (le lecteur confond).
+function lcChiffresOcr(ligne) {
+  return ligne.replace(/(?:\+|\(\+?)?[\dOoIl|SB][\dOoIl|SB\s().\-]{6,}[\dOoIl|SB]/g, m => {
+    const vrais = (m.match(/\d/g) || []).length, faux = (m.match(/[OoIl|SB]/g) || []).length;
+    if (vrais < 7 || faux === 0 || faux > 2 || faux > vrais / 4) return m;
+    return m.replace(/[Oo]/g, '0').replace(/[Il|]/g, '1').replace(/S/g, '5').replace(/B/g, '8');
+  });
+}
+function lcPreparer(t) {
+  let s = String(t || '').replace(/\r/g, '').replace(/＠/g, '@').replace(/：/g, ':');
+  s = s.replace(/[©®]/g, '@').replace(/\(@\)|\[@\]/g, '@').replace(/@\s*@/g, '@');
+  s = s.replace(/([A-Za-z0-9._-])\s*\(a\)\s*([A-Za-z0-9])/g, '$1@$2');
+  s = s.split('\n').map(lcChiffresOcr).join('\n');
+  s = s.replace(/([A-Za-z0-9])\s+@/g, '$1@').replace(/@\s+([A-Za-z0-9])/g, '@$1');                        // « lefter_wang @ccgrass », « 13957888850@ 163.com »
+  s = s.replace(/(@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*)\s*[.,]\s*(com|cn|net|org|de|hk|co|fr|it|es|uk|us)\b/gi, '$1.$2');
+  s = s.replace(/(@[A-Za-z0-9-]{2,})\s+(com|cn|net)\b/gi, '$1.$2');
+  s = s.replace(/(@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*)\.(?:c[o0]rn|c0m|con|corn)\b/gi, '$1.com');
+  // le « _ » lu comme une espace : « Email: lefter wang@ccgrass.com » → « lefter_wang@… »
+  s = s.replace(/((?:e-?\s?mail|email|邮箱|mail)\s*[:.]?\s*)([a-z][a-z0-9]{1,15})\s([a-z0-9][a-z0-9._-]*@)/gi, (m, a, b, c) => a + b + '_' + c);
+  // « 13957888850 163.com » (le @ oublié devant un domaine connu)
+  s = s.replace(/\b([a-z0-9][a-z0-9._-]{2,})\s(qq|163|126|139|sina|gmail|hotmail|outlook|yahoo|foxmail|aliyun)\.(com|net|cn)\b/gi, '$1@$2.$3');
+  // un site lu « www.allgrill-de » ou « WWW.ccgrass.com »
+  s = s.replace(/\b(www\.[a-z0-9-]+)-(com|de|cn|net|org|fr)\b/gi, '$1.$2').replace(/\bWWW\./g, 'www.').replace(/\bHttp:/g, 'http:');
+  return s;
+}
+// ---------- 2. Les numéros : tous ----------
+const LC_RE_NUM = /(?:\+|00)?\(?\s?\+?\s?\d[\d\s().\-]{5,}\d/g;
+function lcComplet(d) { return /^(?:86)?1[3-9]\d{9}$/.test(d); }
+// Un morceau de chiffres peut contenir DEUX numéros collés par le lecteur (« 139 5788 8850 138 1234 5678 ») : on coupe.
+function lcDecouper(m) {
+  const groupes = m.split(/[^\d]+/).filter(Boolean);
+  const plus = /^\s*\(?\s*(\+|00)/.test(m);
+  const tous = groupes.join('');
+  if (tous.length <= 15 && !(tous.length >= 22 && lcComplet(tous.slice(0, 11)))) return [{ d: tous, plus }];
+  const res = []; let cur = '';
+  groupes.forEach(g => {
+    if (cur && (lcComplet(cur) || (cur + g).length > 15)) { res.push({ d: cur, plus: !res.length && plus }); cur = g; }
+    else cur += g;
+  });
+  if (cur) res.push({ d: cur, plus: !res.length && plus });
+  return res;
+}
+function lcNumero(x) {
+  const d = x.d.replace(/^00/, '');
+  if (d.length < 7 || d.length > 15) return null;
+  const sans86 = d.replace(/^86(?=\d{9,})/, '');
+  if (/^1[3-9]\d{9}$/.test(sans86)) return { v: '+86' + sans86, type: 'portable' };
+  if (/^1[3-9]\d{8}$/.test(sans86) || /^1[3-9]\d{10}$/.test(sans86)) return { v: '+86' + sans86, type: 'portable', doute: sans86.length === 10 ? 'il manque peut-être un chiffre (un portable chinois en a 11)' : 'un chiffre de trop ? (un portable chinois en a 11)' };
+  if (/^86/.test(d) || x.plus) return { v: '+' + d, type: /^86/.test(d) ? 'fixe' : 'etranger' };
+  if (/^0\d{9,11}$/.test(d)) return { v: '+86' + d.slice(1), type: 'fixe' };
+  if (d.length >= 9) return { v: d, type: 'autre' };
+  return null;
+}
+function lcNumeros(texte) {
+  const res = [];
+  const lignes = texte.split('\n');
+  lignes.forEach((l, i) => {
+    if (/fax|传真|邮编|p\.?\s?c\.?\s*[:：]|zip|post\s*code|qq\s*[:：]/i.test(l) && !/mob|tel|手机|电话|m\.?\s?t\.?/i.test(l)) return;
+    const etiquette = l + ' ' + (/[:：]\s*$/.test(l) ? '' : '');
+    const suite = /[:：]\s*$/.test(l) ? (lignes[i + 1] || '') : '';
+    (l.match(LC_RE_NUM) || []).concat(suite ? (suite.match(LC_RE_NUM) || []) : []).forEach(m => {
+      if (/^\s*\d{4}[-.\/]\d{1,2}[-.\/]\d{1,2}\s*$/.test(m)) return;     // une date
+      lcDecouper(m).forEach(x => {
+        const n = lcNumero(x); if (!n) return;
+        const pos = l.indexOf(m), avant = pos >= 0 ? l.slice(Math.max(0, pos - 14), pos) : l;
+        if (/fax|传真/i.test(avant)) return;
+        n.wa = /whats\s*app|\bwa\b|w\/a/i.test(etiquette);
+        n.mob = /\b(mob(?:ile)?|cell(?:phone)?|m\.?\s?t\.?|m\s*[:：]|phone)|手机|移动电话/i.test(avant) || n.type === 'portable';
+        n.tel = /\b(tel|t\s*[:：]|office)|电话|座机/i.test(avant);
+        res.push(n);
+      });
+    });
+  });
+  return res;
+}
+// ---------- 3. Les e-mails : tous, réparés ----------
+function lcEmails(texte, brut, nomContact, domainesSites) {
+  const vus = [];
+  (texte.match(LC_RE_MAIL) || []).forEach(m => {
+    let e = m.replace(/^(?:e-?mail|email|mail)[:.]?(?=[a-z0-9])/i, '').replace(/[.,;:]+$/, '').toLowerCase();
+    const [loc, dom] = e.split('@'); if (!loc || !dom || loc.length < 2) return;
+    vus.push({ e, loc, dom });
+  });
+  // Les doubles mal lus (« luojinqi » et « luojingi » sur le même domaine) : on garde le plus vu, sinon celui qui ressemble
+  // le plus au nom de la personne, sinon le premier.
+  const nom = normaliserNom(nomContact || '').replace(/[^a-z]/g, '');
+  const groupes = [];
+  vus.forEach(v => {
+    const g = groupes.find(x => (x[0].dom === v.dom && lcLev(x[0].loc, v.loc) <= 2 && Math.min(x[0].loc.length, v.loc.length) >= 4)
+      || (x[0].loc === v.loc && lcLev(x[0].dom, v.dom) <= 2));
+    if (g) g.push(v); else groupes.push([v]);
+  });
+  const garde = groupes.map(g => {
+    const compte = {}; g.forEach(v => { compte[v.e] = (compte[v.e] || 0) + 1; });
+    const proche = v => nom ? lcLev(v.loc.replace(/[^a-z]/g, ''), nom) : 0;
+    const choix = g.slice().sort((a, b) => compte[b.e] - compte[a.e] || proche(a) - proche(b))[0];
+    return Object.assign({}, choix);
+  });
+  // Le domaine corrigé d'après le site de la carte (« algril.de » quand le site est « allgrill.de »).
+  const brutSansEspace = String(brut || '').replace(/\s+/g, '').toLowerCase();
+  garde.forEach(v => {
+    const site = (domainesSites || []).includes(v.dom) ? '' : (domainesSites || []).find(d => lcLev(d, v.dom) <= 2 && !LC_PUBLICS.test(v.dom));
+    if (site) { v.doute = 'corrigé d\'après son site (« ' + v.dom + ' » lu sur la carte)'; v.dom = site; v.e = v.loc + '@' + site; }
+    else if (!brutSansEspace.includes(v.e)) v.doute = 'réparé par le carnet (le texte lu était abîmé) : vérifiez';
+  });
+  return garde;
+}
+// ---------- 4. La société, le nom, les sites ----------
+const LC_FIN_SOC = /\b(?:CO\.?\s*,?\s*LTD\.?|COMPANY(?:\s+LIMITED)?|LIMITED|LTD\.?|INC\.?|CORP(?:ORATION)?\.?|GROUP|HOLDINGS?(?:\s+LTD\.?)?|FACTORY|INDUSTR(?:Y|IAL)(?:\s+CO\.?)?|TRADING(?:\s+CO\.?)?|MANUFACTUR\w*|ELECTRIC(?:AL)?(?:\s+APPLIANCES?)?|TECHNOLOGY|APPLIANCES?|GMBH|S\.?A\.?R\.?L\.?)\s*\.?\s*$/i;
+const LC_VILLES_CN = /^(?:广东|广州|深圳|浙江|宁波|义乌|佛山|东莞|揭阳|汕头|中山|顺德|江门|潮州|惠州|厦门|泉州|杭州|苏州|温州|台州|金华|慈溪|余姚|上海|北京|天津|重庆|江苏|福建|山东|河北|河南|湖南|湖北|安徽|江西|四川|南京|青岛|无锡|常州|珠海|永康|临沂|阳江|汕尾|肇庆|清远|韶关|梅州|河源|云浮|茂名|湛江|黑龙江)/;
+function lcSocietes(texte) {
+  const lat = [], cn = [];
+  texte.split('\n').forEach(l0 => {
+    const l = l0.replace(/^[^A-Za-z一-鿿]+/, '').replace(/\s+/g, ' ').trim();
+    if (l.length < 5 || l.length > 80 || /@|www\.|http|\d{5,}/i.test(l)) return;
+    const m = l.match(/([A-Z][A-Za-z0-9&.,'’()\- ]{2,}?)\s*$/);
+    if (m && LC_FIN_SOC.test(l) && (l.match(/[A-Za-z]{2,}/g) || []).length >= 2) {
+      const propre = l.replace(/^(?:[A-Za-z]{1,2}\s+)+(?=[A-Z]{3,})/, '').replace(/\s+([.,])/g, '$1');
+      if (!/^(add|address|tel|mob|email|road|room|floor)\b/i.test(propre)) lat.push(propre);
+    }
+    const c = l.replace(/\s+/g, '').match(/([一-鿿]{2,}(?:股份有限公司|有限公司|集团公司|公司|工厂|厂|商行|集团))/);
+    if (c && !/^厂/.test(c[1])) cn.push(c[1]);
+  });
+  const score = s => (LC_FIN_SOC.test(s) ? 10 : 0) + (s === s.toUpperCase() ? 3 : 0) + Math.min(s.length, 60) / 10;
+  const laT = lat.sort((a, b) => score(b) - score(a))[0] || '';
+  const cnOk = cn.filter(x => LC_VILLES_CN.test(x) || x.length >= 9).sort((a, b) => b.length - a.length)[0] || '';
+  return { lat: laT, cn: cnOk, cnCoupe: !cnOk && cn.length ? cn.sort((a, b) => b.length - a.length)[0] : '' };
+}
+function lcDomaine(u) { const m = String(u || '').toLowerCase().match(/^(?:https?:\/\/)?(?:www\.)?([a-z0-9.-]+\.[a-z]{2,})/); return m ? m[1] : ''; }
+function lcMarqueDuDomaine(dom, texte) {
+  const nomD = String(dom || '').split('.')[0]; if (!nomD || nomD.length < 3) return '';
+  // La marque telle qu'elle est écrite sur la carte (« CCGrass », « ALL'GRILL »), sinon le nom du site en majuscules.
+  const sansLiens = String(texte || '').replace(LC_RE_MAIL, ' ').replace(/(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/\S*)?/gi, ' ');
+  const mots = sansLiens.match(/[A-Za-z][A-Za-z'’&-]{2,}/g) || [];
+  const vu = mots.find(w => w.replace(/[^A-Za-z]/g, '').toLowerCase() === nomD);
+  return vu || nomD.toUpperCase();
+}
+const LC_PAS_NOM = /^(?:sales|manager|director|export|import|imp|exp|dept|department|ningbo|china|road|tower|building|floor|room|city|province|district|street|limited|company|group|holdings?|trading|factory|catalog|catalogue|scan|read|our|retail|english|mit|grillen|welcome|best|quality|leidenschaft|the|and|for|with)$/i;
+function lcContact(texte) {
+  const lignes = texte.split('\n').map(l => l.trim()).filter(Boolean);
+  let latin = '', cn = '';
+  for (const l of lignes) {
+    const m = l.match(/^(?:[^A-Za-z一-鿿]*)([A-Z][a-z]{1,10}(?:\s+[A-Z][a-z]{1,10}){1,2})\s*$/);
+    if (m && !latin && m[1].split(/\s+/).every(w => !LC_PAS_NOM.test(w)) && !TR_LIEUX.test(m[1] + ' ')) latin = m[1];
+    const c = l.replace(/[^一-鿿]/g, '');
+    if (!cn && /^[一-鿿]{2,4}$/.test(c) && AS_NOMS_CN.includes(c[0]) && l.replace(/[\s一-鿿]/g, '').length <= 8
+      && !/公司|有限|经理|总监|主管|销售|业务|地址|电话|手机|邮箱|网址|传真|微信|工厂|厂|中国|进出口|部/.test(c)) cn = c;
+  }
+  return [cn, latin].filter(Boolean).join(' ');
+}
+function lcSites(texte) {
+  const s = [], vus = {};
+  (texte.replace(LC_RE_MAIL, ' ').match(/(?:https?:\/\/)?(?:www\.)?[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.(?:com\.cn|com|cn|net|org|hk|co|shop|de|fr|it|es|cc|top|vip)(?:\/[^\s]*)?/gi) || [])
+    .forEach(x => {
+      if (/^\d/.test(x) || /alibaba|1688|made-in-china/i.test(x)) return;
+      const d = lcDomaine(x); if (!d || LC_PUBLICS.test(d)) return;
+      vus[d] = (vus[d] || 0) + 1;
+      if (s.some(y => lcDomaine(y) === d)) return;
+      s.push(/^https?:/i.test(x) ? x.replace(/^http:\/\//i, 'https://') : 'https://' + x.replace(/^www\./i, 'www.'));
+    });
+  // « allgril.de » (1 fois) et « allgrill.de » (2 fois) : le même site mal lu → on garde le plus vu.
+  const garde = [];
+  s.forEach(u => {
+    const d = lcDomaine(u), i = garde.findIndex(g => { const e = lcDomaine(g); return e.split('.').pop() === d.split('.').pop() && lcLev(e, d) <= 2 && Math.min(e.length, d.length) >= 6; });
+    if (i < 0) garde.push(u); else if ((vus[d] || 0) > (vus[lcDomaine(garde[i])] || 0)) garde[i] = u;
+  });
+  return garde;
+}
+// ---------- 5. Tout ensemble : ce qui manquait à la lecture d'avant ----------
+function lcCompleter(r, texte, brut) {
+  const doute = r.doute || (r.doute = {});
+  // Les sites (2 au plus) — avant les e-mails, pour corriger un domaine mal lu.
+  const sites = lcSites(texte);
+  if (sites[0] && (!r.site || lcDomaine(r.site) === lcDomaine(sites[0]))) r.site = sites[0];
+  const autre = sites.find(x => lcDomaine(x) !== lcDomaine(r.site)); if (autre) r.site2 = autre;
+  // Le nom (avant les e-mails : il aide à choisir entre deux lectures d'un même e-mail).
+  const nomLu = lcContact(texte);
+  if (nomLu && (!r.contact || r.contact.length < 3 || /[^A-Za-z一-鿿 .'-]/.test(r.contact) || (nomLu.length > r.contact.length && nomLu.includes(r.contact)))) r.contact = nomLu;
+  // Les e-mails.
+  const doms = sites.map(lcDomaine).filter(Boolean);
+  const mails = lcEmails(texte, brut, r.contact, doms);
+  if (mails.length) {
+    const premier = r.email && mails.find(v => v.e === String(r.email).toLowerCase()) || mails[0];
+    r.email = premier.e; if (premier.doute) doute[premier.e] = premier.doute;
+    const second = mails.find(v => v.e !== premier.e);
+    if (second) { r.email2 = second.e; if (second.doute) doute[second.e] = second.doute; }
+  }
+  // Les numéros : tous, dans l'ordre de la carte.
+  const nums = lcNumeros(texte);
+  // Un portable écrit comme e-mail (« 13957888850@163.com ») est un vrai portable : il compte (et ne s'efface plus).
+  [r.email, r.email2].filter(Boolean).forEach(e => { const loc = e.split('@')[0]; if (/^1[3-9]\d{9}$/.test(loc)) nums.push({ v: '+86' + loc, type: 'portable', mob: true, depuisMail: true }); });
+  const cle = v => String(v || '').replace(/\D/g, '').slice(-9);
+  const portables = [], fixes = [];
+  nums.forEach(n => {
+    const liste = n.type === 'portable' || (n.mob && !n.tel) ? portables : fixes;
+    if (portables.concat(fixes).some(x => cle(x.v) === cle(n.v))) return;
+    liste.push(n);
+  });
+  if (portables.length) {
+    const p1 = r.mobile && portables.find(x => cle(x.v) === cle(r.mobile)) || portables[0];
+    r.mobile = p1.v; if (p1.doute) doute[p1.v] = p1.doute;
+    const p2 = portables.find(x => x !== p1); if (p2) { r.mobile2 = p2.v; if (p2.doute) doute[p2.v] = p2.doute; }
+  }
+  const fx = fixes.filter(x => !portables.some(p => cle(p.v) === cle(x.v)));
+  if (fx.length) {
+    const f1 = r.tel_fixe && fx.find(x => cle(x.v) === cle(r.tel_fixe)) || fx[0];
+    r.tel_fixe = f1.v; const f2 = fx.find(x => x !== f1); if (f2) r.tel_fixe2 = f2.v;
+  } else if (r.tel_fixe && portables.some(p => cle(p.v) === cle(r.tel_fixe))) delete r.tel_fixe;
+  const wa = nums.find(n => n.wa); if (wa && !r.whatsapp) r.whatsapp = wa.v;
+  // La société : la formule légale en lettres latines ; le nom chinois complet à part (contrat, vérification de la licence).
+  const soc = lcSocietes(texte);
+  const socActuelleCoupee = r.societe && /[一-鿿]/.test(r.societe) && !LC_VILLES_CN.test(r.societe.replace(/\s/g, '')) && r.societe.replace(/\s/g, '').length < 9;
+  if (soc.lat && (!r.societe || socActuelleCoupee || !/[A-Za-z]{3}/.test(r.societe) || soc.lat.length > r.societe.length)) r.societe = soc.lat;
+  const remplacee = soc.lat && r.societe === soc.lat;
+  if (soc.cn) { r.societe_cn = soc.cn; if (!r.societe || (socActuelleCoupee && !remplacee)) r.societe = soc.cn; }
+  else if (socActuelleCoupee && !remplacee) delete r.societe;
+  if (!r.societe) {
+    const dom = lcDomaine(r.site) || (r.email && !LC_PUBLICS.test(r.email.split('@')[1]) ? r.email.split('@')[1] : '');
+    const marque = dom ? lcMarqueDuDomaine(dom, texte) : '';
+    if (marque) { r.societe = marque; doute[marque] = 'la société n\'est pas écrite en toutes lettres sur la carte : c\'est le nom de son site'; }
+  }
+  const adds = texte.split('\n').map(l => l.trim()).filter(l => /^(?:add(?:ress)?|adr|地\s*址)\s*[:.：]/i.test(l))
+    .map(l => l.replace(/^(?:add(?:ress)?|adr|地\s*址)\s*[:.：]\s*/i, '').replace(/\s+(?:邮编|P\.?C\.?).*$/i, '').trim());
+  const addLat = adds.filter(a => /[A-Za-z]{3}/.test(a)).sort((a, b) => b.length - a.length)[0], addCn = adds.filter(a => /[一-鿿]{3}/.test(a) && !/[A-Za-z]{4}/.test(a)).sort((a, b) => b.length - a.length)[0];
+  if (addLat) r.adresse = addLat; else if (addCn) r.adresse = addCn;
+  else if (r.adresse && r.adresse.split(', ').length > 3) {
+    // des morceaux d'adresse lus plusieurs fois, coupés : on garde les morceaux distincts les plus longs, et on le dit.
+    const parts = r.adresse.split(', ').map(x => x.trim()).filter(x => x.length >= 6 && !/^(no\.?\s?\d+\s+imp|p\.?c\.?)/i.test(x));
+    const lat = parts.filter(x => /[A-Za-z]{3}/.test(x)), base = lat.length ? lat : parts;
+    const uniques = []; base.sort((a, b) => b.length - a.length).forEach(x => { if (!uniques.some(u => u.includes(x) || lcLev(u.slice(-x.length), x) <= 3)) uniques.push(x); });
+    r.adresse = uniques.slice(0, 3).join(', ');
+    if (r.adresse) doute[r.adresse] = 'adresse recollée à partir de morceaux mal lus : comparez avec la carte';
+  }
+  if (addCn) r.adresse_cn = addCn.replace(/\s+/g, '');
+  if (r.adresse && r.adresse.length > 140) r.adresse = r.adresse.split(', ').filter((x, i, a) => a.indexOf(x) === i).join(', ').slice(0, 160);
+  if (!Object.keys(doute).length) delete r.doute;
+  return r;
+}
+const lcLireAvant = trLireTexteCarte;
+trLireTexteCarte = function (texteBrut) {
+  const propre = lcPreparer(texteBrut);
+  const r = lcLireAvant(propre);
+  return lcCompleter(r, propre, texteBrut);
+};
+const lcCtLireAvant = ctLireTexteCarte;
+ctLireTexteCarte = function (texte) {
+  const propre = lcPreparer(texte);
+  const r = lcCtLireAvant(propre);
+  return lcCompleter(r, propre, texte);
+};
+// ---------- 6. Le 2e regard sur la photo : plus grand, plus contrasté, et en négatif ----------
+function lcToile(img, cote, deg, filtre) {
+  const l = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  const e = Math.min(2.6, cote / Math.max(l, h));
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(l * e)); c.height = Math.max(1, Math.round(h * e));
+  const g = c.getContext('2d', { willReadFrequently: true }); g.imageSmoothingQuality = 'high'; if (filtre) g.filter = filtre;
+  g.drawImage(img, 0, 0, c.width, c.height);
+  return deg ? trTourner(c, deg) : c;
+}
+let lcDernierTexte = '';
+const lcOcrAvant = asOcrCarte;
+asOcrCarte = async function (img, qrs) {
+  const o = await lcOcrAvant.apply(this, arguments);
+  if (!o) return o;
+  if (o.score >= 4) {
+    try {
+      const r2 = await trOcrLire(lcToile(img, 2400, o.deg, 'grayscale(1) contrast(1.8)'), 'eng+chi_sim', '3');
+      o.texte += '\n' + r2.texte;
+      const l2 = trLireTexteCarte(o.texte);
+      if (!l2.societe || !l2.mobile) {       // les lettres blanches sur un bandeau de couleur : en négatif
+        const r3 = await trOcrLire(lcToile(img, 2000, o.deg, 'grayscale(1) invert(1) contrast(1.6)'), 'eng+chi_sim', '11');
+        o.texte += '\n' + r3.texte;
+      }
+    } catch (e) {}
+  }
+  lcDernierTexte = o.texte;
+  return o;
+};
+// Le QR doré ou de couleur pâle (le bas du QR d'ALLGRILL est jaune) : on regarde le canal bleu, où le jaune devient foncé.
+function lcCanalBleu(src, cote) {
+  const c = mkToile(src, cote), g = c.getContext('2d', { willReadFrequently: true });
+  const d = g.getImageData(0, 0, c.width, c.height), a = d.data;
+  let mn = 255, mx = 0;
+  for (let i = 0; i < a.length; i += 4) { const v = Math.min(a[i], a[i + 1], a[i + 2]); a[i] = a[i + 1] = a[i + 2] = v; if (v < mn) mn = v; if (v > mx) mx = v; }
+  const k = 255 / Math.max(1, mx - mn); for (let i = 0; i < a.length; i += 4) { const v = (a[i] - mn) * k; a[i] = a[i + 1] = a[i + 2] = v; }
+  g.putImageData(d, 0, 0); return c;
+}
+const lcQrAvant = trLireTousQR;
+trLireTousQR = async function (source, fouiller, opts) {
+  let res = await lcQrAvant.apply(this, arguments);
+  if (!res.length) {
+    try {
+      const Z = await mkChargerZXing();
+      for (const t of [1600, 1100, 2200]) {
+        const c = lcCanalBleu(source, t), r = mkZXingLire(Z, c);
+        if (r) { const q = { texte: r.texte, image: mkDecouperQR(c, r.points) }; if (opts && opts.points) q.pts = r.points.map(p => ({ x: p.x / c.width, y: p.y / c.height })); res = [q]; break; }
+      }
+    } catch (e) {}
+  }
+  return res;
+};
+// ---------- 7. Le QR d'un catalogue n'est pas un site, ni un WeChat ----------
+const LC_RE_CATALOGUE = /\.pdf(\?|#|$)|catalog|katalog|目录|画册|brochure|flipbook|fliphtml5|anyflip|issuu|yumpu|clewm\.net|qr71\.cn|cli\.im|h5\.|wenku|docs\.qq\.com|kdocs\.cn|ecatalog|e-catalog|ebook/i;
+const lcAnalyserAvant = mkAnalyserQR;
+mkAnalyserQR = function (brut) {
+  const r = lcAnalyserAvant.apply(this, arguments);
+  if (r.type === 'lien' && r.champs && r.champs.site) {
+    const u = r.champs.site;
+    if (LC_RE_CATALOGUE.test(u)) { r.type = 'catalogue'; r.champs = { catalogue_lien: u }; const d = lcDomaine(u); if (d && !/clewm|qr71|cli\.im|fliphtml5|anyflip|issuu|yumpu|qq\.com|kdocs/.test(d)) r.champs.site = 'https://' + d; }
+    else if (/alibaba\.com|1688\.com/i.test(u)) { r.type = 'alibaba'; r.champs = { alibaba: u }; }
+  }
+  return r;
+};
+// ---------- 8. Ranger sur la fiche : jamais en double, jamais à la place de ce que Riche a écrit ----------
+const LC_LIBELLES = { societe_cn: 'Société en chinois', mobile2: '2e portable', tel_fixe2: '2e téléphone fixe', email2: '2e e-mail', site2: '2e site', catalogue_lien: 'Son catalogue en ligne (QR)' };
+Object.assign(CT_LIBELLES, LC_LIBELLES);
+function lcCleDe(k) { return /mobile|tel|whatsapp/.test(k) ? (v => String(v || '').replace(/\D/g, '').slice(-9)) : /site/.test(k) ? lcDomaine : (v => String(v || '').trim().toLowerCase()); }
+function lcRangerPaire(f, k1, k2, valeurs, remplis) {
+  const cle = lcCleDe(k1);
+  valeurs.filter(Boolean).forEach(v => {
+    if ([f[k1], f[k2]].some(x => String(x || '').trim() && cle(x) === cle(v))) return;
+    const k = !String(f[k1] || '').trim() ? k1 : !String(f[k2] || '').trim() ? k2 : '';
+    if (k) { f[k] = v; remplis.push(k); }
+  });
+}
+function lcPoserDoutes(f, r, remplis) {
+  if (!r || !r.doute) return;
+  remplis.forEach(k => { const v = f[k]; if (v && r.doute[v]) (f.lu_doute || (f.lu_doute = {}))[k] = r.doute[v]; });
+}
+// Ce qui est sûr sur la fiche (le lien d'un QR, un site déjà vérifié) corrige ce que la photo a mal lu.
+function lcCorrigerParFiche(f, r) {
+  if (!f || !r) return;
+  const fiables = [f.site, f.site2, f.catalogue_lien, f.alibaba].map(lcDomaine).filter(Boolean);
+  if (!fiables.length) return;
+  ['site', 'site2'].forEach(k => { const d = lcDomaine(r[k]); if (d && !fiables.includes(d) && fiables.some(x => lcLev(x, d) <= 2)) delete r[k]; });
+  ['email', 'email2'].forEach(k => {
+    if (!r[k]) return; const [loc, dom] = String(r[k]).split('@'); if (!dom || fiables.includes(dom) || LC_PUBLICS.test(dom)) return;
+    const x = fiables.find(y => lcLev(y, dom) <= 2);
+    if (x) { const v = loc + '@' + x; (r.doute || (r.doute = {}))[v] = 'corrigé d\'après le QR ou le site de sa carte (« ' + dom + ' » lu sur la photo)'; r[k] = v; }
+  });
+  if (r.societe && r.doute && r.doute[r.societe] && /nom de son site/.test(r.doute[r.societe])) {
+    const d = fiables[0], m = d ? lcMarqueDuDomaine(d, '') : '';
+    if (m && lcLev(m.toLowerCase(), r.societe.toLowerCase().replace(/[^a-z]/g, '')) <= 2) { const t = r.doute[r.societe]; delete r.doute[r.societe]; r.societe = m; r.doute[m] = t; }
+  }
+}
+const lcAppliquerAvant = trAppliquerCarte;
+trAppliquerCarte = function (f, r) {
+  lcCorrigerParFiche(f, r);
+  const remplis = lcAppliquerAvant.apply(this, arguments) || [];
+  lcRangerPaire(f, 'mobile', 'mobile2', [r.mobile, r.mobile2], remplis);
+  lcRangerPaire(f, 'tel_fixe', 'tel_fixe2', [r.tel_fixe, r.tel_fixe2], remplis);
+  lcRangerPaire(f, 'email', 'email2', [r.email, r.email2], remplis);
+  lcRangerPaire(f, 'site', 'site2', [r.site, r.site2], remplis);
+  ['societe_cn', 'catalogue_lien'].forEach(k => { if (r[k] && !String(f[k] || '').trim()) { f[k] = r[k]; remplis.push(k); } });
+  if (!f.tel && (f.mobile || f.tel_fixe)) f.tel = f.mobile || f.tel_fixe;
+  const neufs = [...new Set(remplis)];
+  if (neufs.length) { f.lu_auto = [...new Set([...(Array.isArray(f.lu_auto) ? f.lu_auto : []), ...neufs])]; delete f.ct_neuf; trSynchroNomAuto(f); }
+  lcPoserDoutes(f, r, neufs);
+  return neufs;
+};
+// Un QR (catalogue, Alibaba) se range dans la bonne case.
+const lcAppliquerQRAvant = trAppliquerQR;
+trAppliquerQR = function (f, qrs) {
+  const autres = [], remplis = [];
+  (qrs || []).forEach(q => {
+    const a = mkAnalyserQR(q.texte);
+    if (a.type === 'catalogue' || a.type === 'alibaba') {
+      Object.keys(a.champs).forEach(k => { if (!String(f[k] || '').trim()) { f[k] = a.champs[k]; remplis.push(k); } });
+      if (a.type === 'catalogue') f.qr_catalogue = q.image || f.qr_catalogue;
+    } else autres.push(q);
+  });
+  const r = lcAppliquerQRAvant.call(this, f, autres) || [];
+  if (remplis.length) { f.lu_auto = [...new Set([...(f.lu_auto || []), ...remplis])]; delete f.ct_neuf; }
+  return r.concat(remplis);
+};
+// Le texte collé depuis l'iPhone (« Texte en direct », lecture plus sûre) REMPLACE ce que le carnet avait lu tout seul ;
+// ce que Riche a tapé ne bouge jamais.
+const lcCtAppliquerAvant = ctAppliquerCarte;
+ctAppliquerCarte = function (fid) {
+  const f = mkFournisseur(fid), t = document.getElementById('ct_texte_carte');
+  if (f && t && t.value.trim()) {
+    const r = ctLireTexteCarte(t.value), lus = Array.isArray(f.lu_auto) ? f.lu_auto : [];
+    Object.keys(CT_LIBELLES).forEach(k => { if (r[k] && lus.includes(k) && String(f[k] || '') !== r[k]) f[k] = ''; });
+    const remplis = [];
+    lcRangerPaire(f, 'mobile', 'mobile2', [r.mobile, r.mobile2], remplis);
+    lcRangerPaire(f, 'tel_fixe', 'tel_fixe2', [r.tel_fixe, r.tel_fixe2], remplis);
+    lcRangerPaire(f, 'email', 'email2', [r.email, r.email2], remplis);
+    lcRangerPaire(f, 'site', 'site2', [r.site, r.site2], remplis);
+    if (f.lu_doute) remplis.forEach(k => { delete f.lu_doute[k]; });
+    lcPoserDoutes(f, r, remplis);
+  }
+  return lcCtAppliquerAvant.apply(this, arguments);
+};
+// Le texte brut lu sur chaque carte est gardé (Riche peut y copier un numéro que le carnet n'a pas su ranger).
+const lcLireDocAvant = trLireDoc;
+trLireDoc = async function (f, d) {
+  lcDernierTexte = '';
+  const res = await lcLireDocAvant.apply(this, arguments);
+  if (lcDernierTexte && d && (d.type === 'carte' || d.face)) d.texte_lu = lcPreparer(lcDernierTexte).split('\n').map(l => l.trim()).filter(l => l.replace(/[^A-Za-z0-9一-鿿]/g, '').length >= 2)
+    .filter((l, i, a) => a.indexOf(l) === i).join('\n').slice(0, 4000);
+  return res;
+};
+// Les fixes chinois lisibles : « +86 574 8719 0836 », « +86 25 6955 5191 ».
+const lcTelLisibleAvant = ctTelLisible;
+ctTelLisible = function (t) {
+  const d = ctTelPropre(t);
+  let m = /^\+?86(10|2\d)(\d{4})(\d{4})$/.exec(d); if (m) return '+86 ' + m[1] + ' ' + m[2] + ' ' + m[3];
+  m = /^\+?86([3-9]\d{2})(\d{3,4})(\d{4})$/.exec(d); if (m) return '+86 ' + m[1] + ' ' + m[2] + ' ' + m[3];
+  return lcTelLisibleAvant.apply(this, arguments);
+};
+// Un même fournisseur reconnu aussi par son 2e numéro ou son 2e e-mail.
+const lcTrouverAvant = ctTrouverFournisseur;
+ctTrouverFournisseur = function (x) {
+  const f = lcTrouverAvant.apply(this, arguments); if (f || !x) return f;
+  const L = fournisseursListe(), cle = v => String(v || '').replace(/\D/g, '').slice(-9);
+  const tels = [x.mobile, x.mobile2, x.tel, x.tel_fixe, x.tel_fixe2, x.whatsapp].map(cle).filter(t => t.length >= 8);
+  const mails = [x.email, x.email2].map(e => String(e || '').trim().toLowerCase()).filter(Boolean);
+  return L.find(g => tels.length && [g.mobile, g.mobile2, g.tel, g.tel_fixe, g.tel_fixe2, g.whatsapp].map(cle).some(t => t.length >= 8 && tels.includes(t)))
+    || L.find(g => mails.length && [g.email, g.email2].some(e => mails.includes(String(e || '').trim().toLowerCase()))) || null;
+};
+// ---------- 9. « Voir et corriger » : la photo de la carte, ce que le téléphone a lu, les cases douteuses ----------
+const LC_CHAMPS = [['nom', 'Nom affiché (marque — contact)', 'ex : Star — Lily'], ['societe', 'Société', ''], ['societe_cn', 'Société en chinois (contrat, vérification de la licence)', '例：宁波……有限公司'],
+  ['contact', 'Contact', 'ex : Lily'], ['poste', 'Poste', 'ex : Sales Manager'], ['mobile', 'Portable (souvent aussi son WeChat)', '+86…'], ['mobile2', '2e portable', ''],
+  ['tel_fixe', 'Téléphone fixe', ''], ['tel_fixe2', '2e téléphone fixe', ''], ['whatsapp', 'WhatsApp', ''], ['email', 'E-mail', ''], ['email2', '2e e-mail', ''],
+  ['wechat', 'WeChat (identifiant)', ''], ['site', 'Site', ''], ['site2', '2e site', ''], ['catalogue_lien', 'Son catalogue en ligne (lien du QR)', ''], ['alibaba', 'Boutique Alibaba', ''],
+  ['allee', 'Stand (hall, numéro)', 'ex : 11.2 C23'], ['adresse', 'Adresse de l\'usine', ''], ['certifications', 'Certifications', 'CE, RoHS…']];
+function lcMaj(fid, k, v) {
+  const f = mkFournisseur(fid); if (!f) return;
+  ctMajChamp(fid, k, v);
+  if (f.lu_doute && f.lu_doute[k]) { delete f.lu_doute[k]; const z = document.getElementById('lcd_' + k); if (z) z.remove(); const b = document.getElementById('lcb_' + k); if (b) b.classList.remove('doute'); }
+}
+function lcToutVerifie(fid) { const f = mkFournisseur(fid); if (!f) return; delete f.lu_auto; delete f.lu_doute; sauverLocal(); dessiner(); }
+ctChampsHtml = function (f) {
+  const cartes = ctDocs(f).filter(d => d.type === 'carte');
+  const lus = Array.isArray(f.lu_auto) ? f.lu_auto : [], dt = f.lu_doute || {};
+  const montrer = LC_CHAMPS.filter(([k]) => !['mobile2', 'tel_fixe2', 'email2', 'site2', 'societe_cn', 'catalogue_lien'].includes(k) || String(f[k] || '').trim() || k === 'societe_cn');
+  const remplis = LC_CHAMPS.filter(([k]) => String(f[k] || '').trim()).length;
+  const nDoute = Object.keys(dt).filter(k => String(f[k] || '').trim()).length;
+  const brut = cartes.map(d => d.texte_lu).filter(Boolean).join('\n— — —\n');
+  return `<details${remplis < 3 || nDoute ? ' open' : ''}><summary style="font-size:16px;font-weight:800;min-height:44px;display:flex;align-items:center">✏️ Voir et corriger les coordonnées (${remplis})${nDoute ? ' · <span style="color:var(--rouge)">⚠ ' + nDoute + ' à vérifier</span>' : ''}</summary>
+    ${cartes.length ? `<div class="lc-cartes">${cartes.map(d => `<img class="ct-mini" data-doc="${E(d.id)}" alt="Sa carte" onclick="ctVoirDoc('${f.id}','${d.id}')">`).join('')}</div>
+      <p class="lc-aide">Touchez la carte pour la voir en grand et comparer avec les cases. Les cases <span class="lc-tag">lues</span> viennent de la photo ; <span class="lc-tag rouge">⚠</span> = à vérifier.</p>` : ''}
+    ${montrer.map(([k, l, ph]) => `<div class="lc-champ${lus.includes(k) && String(f[k] || '').trim() ? ' lu' : ''}${dt[k] && String(f[k] || '').trim() ? ' doute' : ''}" id="lcb_${k}">
+      <label for="ctc_${k}">${E(l)}${lus.includes(k) && String(f[k] || '').trim() ? ' <span class="lc-tag">lu sur la carte</span>' : ''}</label>
+      <input id="ctc_${k}" value="${E(/^https?:/i.test(f[k] || '') && k === 'wechat' ? '' : f[k])}" placeholder="${E(ph)}"${/mobile|tel|whatsapp/.test(k) ? ' inputmode="tel"' : ''}${/email|site|alibaba|wechat|catalogue/.test(k) ? ' autocapitalize="off" autocorrect="off"' : ''}
+        oninput="lcMaj('${f.id}','${k}',this.value)">
+      ${dt[k] && String(f[k] || '').trim() ? `<div class="lc-pourquoi" id="lcd_${k}">⚠ ${E(dt[k])}</div>` : ''}</div>`).join('')}
+    ${brut ? `<details class="lc-brut-d"><summary>🔎 Tout ce que le téléphone a lu sur la carte</summary>
+      <p class="lc-aide">Un numéro, un e-mail ou un nom manque dans les cases ? Il est peut-être ici : appuyez longuement pour le copier, puis collez-le dans la bonne case.</p>
+      <pre class="lc-brut">${E(brut)}</pre></details>` : ''}
+    <div class="mk-deux" style="margin-top:10px">
+      <button type="button" class="b contour" onclick="ctBoiteTexteCarte('${f.id}')">📋 Lecture de l'iPhone (Texte en direct) : plus précise</button>
+      ${lus.length || nDoute ? `<button type="button" class="b vert" onclick="lcToutVerifie('${f.id}')">✓ J'ai tout vérifié</button>` : ''}</div>
+  </details>`;
+};
+// En haut de sa fiche : le 2e numéro, le 2e e-mail, le catalogue en ligne ; ce qui est à vérifier.
+const lcEcranDossierAvant = ecranDossier;
+ecranDossier = function () {
+  let h = lcEcranDossierAvant.apply(this, arguments);
+  const f = mkFournisseur(ctDossier); if (!f) return h;
+  const plus = [f.mobile2 && '📞 ' + E(ctTelLisible(f.mobile2)), f.tel_fixe2 && '☎️ ' + E(ctTelLisible(f.tel_fixe2))].filter(Boolean).join(' · ');
+  if (plus) h = h.replace(/(<p class="ct-sous">📞 [^<]*<\/p>)/, '$1<p class="ct-sous">' + plus + '</p>');
+  if (f.email2) h = h.replace(/(<p class="ct-sous">✉️ [^<]*<\/p>)/, '$1<p class="ct-sous">✉️ ' + E(f.email2) + '</p>');
+  if (f.societe_cn && f.societe_cn !== f.societe) h = h.replace(/(<p class="ct-sous">[^<]*<\/p>)/, '$1<p class="ct-sous" lang="zh">' + E(f.societe_cn) + '</p>');
+  const btn = [f.mobile2 ? `<button class="b contour" onclick="location.href='tel:${E(ctTelPropre(f.mobile2))}'">📞 Son 2e numéro</button>` : '',
+    f.catalogue_lien ? `<button class="b contour" onclick="lcOuvrirCatalogue('${f.id}')">📖 Son catalogue en ligne</button>` : ''].join('');
+  if (btn) h = h.replace('<div class="ct-liens">', '<div class="ct-liens">' + btn);
+  const dt = f.lu_doute ? Object.keys(f.lu_doute).filter(k => String(f[k] || '').trim()) : [];
+  if (dt.length) h = h.replace('<div class="ct-entree">', `<div class="lc-alerte">⚠ À vérifier sur sa carte : ${E(dt.map(k => ((LC_CHAMPS.find(c => c[0] === k) || [k, k])[1]).split(' (')[0].toLowerCase()).join(', '))} — ouvrez « ✏️ Voir et corriger les coordonnées ».</div><div class="ct-entree">`);
+  return h;
+};
+function lcOuvrirCatalogue(fid) {
+  const f = mkFournisseur(fid); if (!f || !f.catalogue_lien) return;
+  avertir('📖 Son catalogue s\'ouvre dans Safari. Pour le ranger dans le carnet : ⋯ (ou l\'icône de partage) → « Enregistrer dans Fichiers », puis sur sa fiche « 📥 Fichier reçu sur WeChat ».', 9000);
+  setTimeout(() => ctNouvelOnglet(f.catalogue_lien), 400);
+}
+// Relire toutes les cartes avec la nouvelle lecture : ce qui manquait s'ajoute ; ce que Riche a tapé ne bouge pas.
+function lcRelireToutes() {
+  let n = 0;
+  fournisseursListe().forEach(f => ctDocs(f).forEach(d => { if (d.type === 'carte' && !d.a_lire) { d.lu_qr = false; d.lu_ocr = false; d.a_lire = true; d.relire = true; delete d.lu_erreur; n++; } }));
+  if (!n) { avertir('Aucune photo de carte à relire.'); return; }
+  sauverLocal(); dessiner();
+  avertir(trOcrEtat.pret === true ? '🔁 ' + n + ' carte(s) à relire, l\'une après l\'autre (quelques secondes chacune ; vous pouvez continuer). Les 2es numéros, 2es e-mails et sociétés manquants s\'ajoutent ; ce que vous avez tapé reste.'
+    : '🔁 Les cartes seront relues dès que la lecture sera prête (ouvrez le carnet une fois avec Internet).', 8000);
+  setTimeout(trLancerLectures, 60);
+}
+// =====================================================================================================
+//  CARNET 1.11.0 — B. « À QUI EST CE FICHIER ? » (24/10/2026)
+//  Riche, 13 h 35 : « quand ils envoient leur catalogue sur WeChat, comment faire pour distinguer que ceci appartient à ce
+//  fournisseur ? » — Une photo ou une capture de prix ne dit pas de qui elle vient : la 1.10.0 créait alors un « nouveau
+//  fournisseur » vide. Maintenant, avant de ranger, le carnet dit à qui il pense que c'est, et POURQUOI (son numéro est dans le
+//  fichier, son nom est dans le nom du fichier, c'est la page de demande de prix envoyée à F05…) ; s'il ne sait pas, il DEMANDE
+//  (les fournisseurs à qui on a demandé des prix en premier, avec la photo de leur carte) et ne range rien avant la réponse.
+// =====================================================================================================
+const AQ_MOTS_VIDES = /^(guangzhou|guangdong|shenzhen|zhejiang|ningbo|yiwu|foshan|zhongshan|china|co|ltd|limited|company|trading|electric|electrical|appliance|appliances|technology|industrial|industry|group|holdings|factory|import|export|international|catalogue|catalog|price|list|new|the|and|kylo)$/i;
+function aqEnAttente(f) { return !!(f.px_demande && !(f.prix_recus_le && f.prix_recus_le >= f.px_demande.le)); }
+function aqCandidats() {
+  return fournisseursListe().filter(f => !ctFournisseurVide(f))
+    .sort((a, b) => (aqEnAttente(b) - aqEnAttente(a)) || String(b.px_demande ? b.px_demande.le : b.vu_le || '').localeCompare(String(a.px_demande ? a.px_demande.le : a.vu_le || '')));
+}
+// Les mots qui désignent un fournisseur (sa marque, son code F05, les mots de sa société).
+function aqMotsDe(f) {
+  const mots = new Set();
+  [trMarque(f.societe), f.nom, f.societe, String(f.site || '').replace(/^https?:\/\/(www\.)?/, '').split('.')[0]].forEach(t =>
+    normaliserNom(t || '').split(/[^a-z0-9]+/).forEach(m => { if (m.length >= 4 && !AQ_MOTS_VIDES.test(m)) mots.add(m); }));
+  return mots;
+}
+function aqParNomDeFichier(noms) {
+  const n = normaliserNom(noms.join(' '));
+  const code = (n.match(/\bf(\d{2,3})\b/) || [])[1];
+  if (code) { const f = fournisseursListe().find(x => String(x.code || '').toUpperCase() === 'F' + code); if (f) return { f, pourquoi: 'son code ' + f.code + ' est dans le nom du fichier' }; }
+  let meilleur = null;
+  fournisseursListe().forEach(f => { aqMotsDe(f).forEach(m => { if (n.includes(m) && (!meilleur || m.length > meilleur.m.length)) meilleur = { f, m }; }); });
+  return meilleur ? { f: meilleur.f, pourquoi: '« ' + meilleur.m + ' » est dans le nom du fichier' } : null;
+}
+// Qui, et pourquoi : la réponse la plus sûre d'abord.
+function aqQui() {
+  if (fwEtat.forceNouveau) return { f: null, pourquoi: 'vous avez choisi : nouveau fournisseur', choisi: true };
+  if (fwEtat.fid) { const f = mkFournisseur(fwEtat.fid); return { f, pourquoi: fwEtat.aqChoisi ? 'vous l\'avez choisi' : 'fichier ajouté depuis sa fiche', choisi: true }; }
+  const sel = document.getElementById('fw_four');
+  if (sel && sel.value) return { f: mkFournisseur(sel.value), pourquoi: 'vous l\'avez choisi dans la liste', choisi: true };
+  for (const r of fwEtat.resultats) {
+    if (r.kylo) { const f = mkFournisseur(r.kylo.fid) || fournisseursListe().find(x => r.kylo.code && x.code === r.kylo.code); if (f) return { f, pourquoi: 'c\'est le tableau de prix que vous lui avez envoyé' }; }
+    if (r.kyloPage) { const f = mkFournisseur(r.kyloPage.fid); if (f) return { f, pourquoi: 'c\'est la page n° ' + r.kyloPage.n + ' de votre demande de prix (son code est sur la page)' }; }
+  }
+  const c = Object.assign({}, ...fwEtat.resultats.map(r => r.contacts || {}));
+  const parCles = (typeof trTrouverParCles === 'function' ? trTrouverParCles(c) : null) || ctTrouverFournisseur(c);
+  if (parCles) {
+    const tel = [c.mobile, c.mobile2, c.tel_fixe, c.whatsapp].filter(Boolean).find(t => [parCles.mobile, parCles.mobile2, parCles.tel, parCles.tel_fixe, parCles.whatsapp].some(x => x && ctCleTel(x) === ctCleTel(t)));
+    return { f: parCles, pourquoi: tel ? 'son numéro ' + ctTelLisible(tel) + ' est dans le fichier' : c.email && [parCles.email, parCles.email2].includes(c.email) ? 'son e-mail est dans le fichier' : 'sa société est écrite dans le fichier' };
+  }
+  const parNom = aqParNomDeFichier(fwEtat.resultats.map(r => r.nom || ''));
+  if (parNom) return parNom;
+  const assez = c.societe || c.mobile || c.email || c.contact;
+  return { f: null, pourquoi: assez ? 'pas encore dans le carnet : ses coordonnées sont dans le fichier' : '', inconnu: !assez };
+}
+const aqCibleAvant = fwFournisseurCible;
+fwFournisseurCible = function () {
+  if (fwEtat.forceNouveau) return null;
+  const q = aqQui();
+  return q.f || (q.inconnu ? null : aqCibleAvant.apply(this, arguments));
+};
+function aqCandidatHtml(f) {
+  const carte = ctDocs(f).find(d => d.type === 'carte');
+  const etat = aqEnAttente(f) ? '✉️ prix demandés le ' + mkJour(f.px_demande.le) + ', pas encore reçus' : f.vu_le ? 'vu le ' + mkJour(f.vu_le) : '';
+  return `<button type="button" class="aq-c" onclick="aqChoisir('${f.id}')">${carte ? `<img class="ct-mini" data-doc="${E(carte.id)}" alt="">` : '<span class="aq-v">🏭</span>'}
+    <span><b>${E(mkNomFournisseur(f))}</b>${f.contact ? '<br>' + E(f.contact) : ''}${etat ? '<br><small>' + E(etat) + '</small>' : ''}</span></button>`;
+}
+function aqChoisir(fid) { fwEtat.fid = fid; fwEtat.aqChoisi = true; fwEtat.forceNouveau = false; fwEtat.aqOuvert = false; fwApercu(); }
+function aqNouveau() { fwEtat.fid = ''; fwEtat.forceNouveau = true; fwEtat.aqOuvert = false; fwApercu(); }
+function aqChanger() { fwEtat.aqOuvert = true; fwApercu(); }
+const aqApercuAvant = fwApercu;
+fwApercu = function () {
+  aqApercuAvant.apply(this, arguments);
+  const z = document.getElementById('fw_res'), ok = document.getElementById('fw_ok'); if (!z || !fwEtat.resultats.length) return;
+  const q = aqQui(), images = fwEtat.resultats.filter(r => r.type === 'image' && !r.erreur && !r.tableau);
+  const liste = fwEtat.aqOuvert || (!q.f && q.inconnu && !q.choisi);
+  const cands = aqCandidats().slice(0, 8);
+  let h = '';
+  if (q.f && !liste) h = `<div class="aq ok">🏭 Ce fichier est à <b>${E(mkNomFournisseur(q.f))}</b><br><small>Pourquoi : ${E(q.pourquoi)}.</small>
+      ${q.choisi && fwEtat.fid && !fwEtat.aqChoisi ? '' : `<button type="button" class="mk-lien" onclick="aqChanger()">Ce n'est pas lui</button>`}</div>`;
+  else if (!q.f && !q.inconnu && !liste) h = `<div class="aq">🆕 ${fwEtat.forceNouveau ? 'Un nouveau fournisseur sera créé.' : 'Nouveau fournisseur (' + E(q.pourquoi) + ').'} <button type="button" class="mk-lien" onclick="aqChanger()">C'est un fournisseur déjà dans le carnet</button></div>`;
+  else h = `<div class="aq att">❓ <b>À quel fournisseur est ce fichier ?</b><br><small>${q.inconnu ? 'Le fichier ne dit pas de qui il vient (pas de nom ni de numéro dedans).' : 'Choisissez :'} Ceux à qui vous avez demandé des prix sont en premier.</small>
+      <div class="aq-liste">${cands.map(aqCandidatHtml).join('')}</div>
+      <details class="aq-tous"><summary>Voir tous les fournisseurs (${fournisseursListe().length})</summary>
+        <select onchange="if(this.value)aqChoisir(this.value)" style="font-size:17px"><option value="">— choisir —</option>${aqCandidats().map(f => `<option value="${f.id}">${E(mkNomFournisseur(f))}</option>`).join('')}</select></details>
+      <button type="button" class="b contour" style="margin-top:8px" onclick="aqNouveau()">🆕 C'est un nouveau fournisseur</button>
+      <p class="lc-aide" style="margin-top:8px">💡 La prochaine fois : ouvrez d'abord SA fiche, puis « 📥 Fichier reçu » — le fichier va directement chez lui. Et donnez-lui son code comme nom dans WeChat (ex. « F05 Star Lily ») : vous saurez toujours de qui vient un fichier.</p></div>`;
+  // Des photos ou captures de prix pour un fournisseur à qui on a demandé des prix : on les note produit par produit.
+  if (q.f && images.length && !liste && typeof rpOuvrir === 'function')
+    h += `<div class="aq-rp">📸 ${images.length > 1 ? 'Ce sont' : 'C\'est'} ses prix (écrits sur vos pages, ou une photo de sa liste) ?
+      <button type="button" class="b vert" onclick="rpDepuisImport('${q.f.id}')">📸 Noter ses prix produit par produit, sa photo sous les yeux</button></div>`;
+  z.insertAdjacentHTML('afterbegin', h);
+  if (typeof ctRemplirMinis === 'function') ctRemplirMinis();
+  if (ok && liste) { ok.disabled = true; ok.style.display = ''; ok.textContent = '⬆ Choisissez d\'abord à qui est ce fichier'; }
+};
+// La boîte « Fichier reçu sur WeChat » : le conseil, dès l'ouverture.
+const aqBoiteAvant = fwBoite;
+fwBoite = function (fid) {
+  aqBoiteAvant.apply(this, arguments);
+  fwEtat.forceNouveau = false; fwEtat.aqChoisi = false; fwEtat.aqOuvert = false;
+  if (!fid) {
+    const sel = document.getElementById('fw_four');
+    if (sel && sel.options[0]) sel.options[0].textContent = '🔎 Le carnet cherche à qui il est (et vous demande s\'il ne sait pas)';
+  }
+};
+// =====================================================================================================
+//  CARNET 1.11.0 — C. SES PRIX RENVOYÉS EN PHOTOS (24/10/2026)
+//  Riche, 13 h 35 : « hier quand j'ai envoyé la liste à un fournisseur pour noter le prix, il a noté le prix, il l'a envoyé en
+//  photos, mais je n'ai pas pu transférer ça sur sa fiche pour corriger cette liste ». La 1.10.0 n'avait que « ✏️ Noter ses prix »
+//  produit par produit, SANS sa photo sous les yeux. Maintenant :
+//   1. Sa fiche → « 📸 Sa réponse en photos » : ses photos sont gardées sur sa fiche ; un écran montre, en haut, SA photo
+//      (agrandissable) et, dessous, la liste envoyée (n° 1, 2, 3… avec votre photo du produit) et les cases des 3 qualités ;
+//      quand vous tapez le prix du n° 3, sa photo n° 3 s'affiche. Ce que le carnet a pu lire est pré-rempli (en jaune) ;
+//      ce qui est déjà noté peut être corrigé : c'est aussi « corriger la liste ».
+//   2. Les pages de la demande de prix portent désormais un petit QR (fournisseur + n° du produit) : une page photographiée
+//      et renvoyée est reconnue toute seule (à qui, quel produit).
+//   3. Une CAPTURE de sa liste de prix (tableau ITEM NO / QTY / RMB EXW / RMB FOB / USD FOB / MEAS / CBM, comme celle de SOKANY)
+//      reçue par « 📥 Fichier reçu sur WeChat » : chaque ligne devient un prix sur son modèle (prix en ¥ et en $, pièces par
+//      carton, carton, volume).
+// =====================================================================================================
+// ---------- 1. Une capture de tableau de prix → des prix ----------
+const RP_COLS = [
+  ['prix', /(RMB|CNY|USD|US\$)\s*(EXW|FOB|CIF|DDP)?|(EXW|FOB|CIF)\s*(RMB|USD|PRICE)?|UNIT\s*PRICE|单价|价格|出厂价/gi],
+  ['qty', /\bQTY\b|PCS\s*\/\s*CTN|CTN\s*QTY|装箱数?|每箱/gi],
+  ['moq', /\bMOQ\b|起订量?/gi],
+  ['meas', /\bMEAS(?:UREMENT)?\b|CTN\s*SIZE|CARTON\s*SIZE|外箱尺寸/gi],
+  ['cbm', /\bCBM\b|体积/gi],
+  ['gw', /\bG\.?\s?W\.?\b|毛重/gi],
+  ['nw', /\bN\.?\s?W\.?\b|净重/gi]];
+function rpColonnes(entete) {
+  const vus = [];
+  RP_COLS.forEach(([k, re]) => { re.lastIndex = 0; let m; while ((m = re.exec(entete))) vus.push({ k, i: m.index, t: m[0] }); });
+  vus.sort((a, b) => a.i - b.i);
+  return vus.filter((v, j) => !vus.some((w, l) => l < j && w.i <= v.i && w.i + w.t.length > v.i));
+}
+function rpTableauOcr(texte) {
+  const lignes = String(texte || '').split('\n').map(l => trDemi ? trDemi(l) : l);
+  const iE = lignes.findIndex(l => (l.match(/ITEM|MODEL|型号|货号|QTY|MOQ|RMB|USD|EXW|FOB|PRICE|单价|MEAS|CBM|G\.?W|毛重/gi) || []).length >= 3);
+  if (iE < 0) return [];
+  const cols = rpColonnes(lignes[iE]); if (!cols.some(c => c.k === 'prix')) return [];
+  const res = [];
+  lignes.slice(iE + 1).forEach(l => {
+    const refs = fwRefsDans(fwCorrigerOcr(l)); if (!refs.length) return;
+    const ref = refs[0].ref, pos = l.toUpperCase().indexOf(ref.split(/[-\s]/)[0]);
+    const apres = l.slice(Math.max(0, pos) + ref.length).replace(/(\d),(\d{3})\b/g, '$1$2');
+    const nums = (apres.match(/\d+(?:[.,]\d+)?/g) || []).map(x => Number(x.replace(',', '.'))).filter(x => x > 0);
+    if (nums.length < 2) return;
+    const r = { ref, desc: '', prix: [], moq: 0, colisage: 0, carton: null, gw: '' };
+    let k = 0;
+    cols.forEach(c => {
+      if (k >= nums.length) return;
+      if (c.k === 'meas') { if (k + 2 < nums.length) { r.carton = [nums[k], nums[k + 1], nums[k + 2]]; k += 3; } return; }
+      const v = nums[k++];
+      if (c.k === 'prix') r.prix.push({ v, devise: /USD|US\$/i.test(c.t) ? 'USD' : 'CNY', label: c.t.replace(/\s+/g, ' ').trim(), type: '', qte: 0 });
+      else if (c.k === 'qty') r.colisage = v;
+      else if (c.k === 'moq') r.moq = v;
+      else if (c.k === 'cbm') r.cbm = v;
+      else if (c.k === 'gw') r.gw = String(v);
+    });
+    if (r.prix.length) res.push(r);
+  });
+  return res;
+}
+// « 📥 Fichier reçu sur WeChat » : une photo ou capture est relue en « tableau » (plus grande) et son QR KYLO est cherché.
+const rpLireImageAvant = fwLireImage;
+fwLireImage = async function (fichier) {
+  const r = await rpLireImageAvant.apply(this, arguments);
+  try {
+    const img = await trImage(r.pages[0].src);
+    const qrs = await trLireTousQR(img, false);
+    const k = qrs.map(q => rpCodePage(q.texte)).find(Boolean); if (k) r.kyloPage = k;
+    if (await trOcrDispo()) {
+      const o = await trOcrLire(mkToile(img, 2000), 'eng+chi_sim', '4');
+      const t = rpTableauOcr(o.texte);
+      if (t.length) { r.prix = t; r.tableau = true; r.texte_tableau = o.texte; r.texte = ''; }
+      else r.texte = [r.texte, o.texte].filter(Boolean).join('\n');
+      trOcrLiberer();
+    }
+  } catch (e) {}
+  return r;
+};
+// ---------- 2. Le petit QR sur chaque page de la demande de prix ----------
+// Le code de la page : « KYLO F05 3 » (le code du fournisseur et le n° du produit) — court, donc un QR à gros carrés, facile à relire.
+function rpCodePage(t) {
+  const m = String(t || '').trim().match(/^KYLO\s+(F\d{1,4})\s+(\d{1,3})$/i);
+  if (!m) return null;
+  const f = fournisseursListe().find(x => String(x.code || '').toUpperCase() === m[1].toUpperCase());
+  return { fid: f ? f.id : '', code: m[1].toUpperCase(), n: Number(m[2]) };
+}
+const rpPagesAvant = cxPagesProduits;
+cxPagesProduits = async function (f, lignes, paliers) {
+  const res = await rpPagesAvant.apply(this, arguments);
+  try {
+    const Z = await mkChargerZXing();
+    for (let i = 0; i < res.length; i++) {
+      const p = res[i], img = await trImage(p.src), BAS = 170;
+      const c = document.createElement('canvas'); c.width = p.w; c.height = p.h + BAS;
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0);
+      // Une bande en bas (rien n'est caché) : le code de la page, en QR et en clair.
+      const code = 'KYLO ' + (f.code || 'F0') + ' ' + (i + 1);
+      const qr = Z.QRCodeEncoder.encode(code, Z.QRCodeDecoderErrorCorrectionLevel.M, new Map());
+      const m = qr.getMatrix(), n = m.getWidth(), k = Math.max(4, Math.floor(150 / (n + 6))), cote = k * (n + 6), x0 = p.w - cote - 16, y0 = p.h + (BAS - cote) / 2;
+      g.strokeStyle = '#cbd5e1'; g.lineWidth = 2; g.beginPath(); g.moveTo(24, p.h + 6); g.lineTo(p.w - 24, p.h + 6); g.stroke();
+      g.fillStyle = '#fff'; g.fillRect(x0, y0, cote, cote); g.fillStyle = '#000';
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (m.get(x, y) === 1) g.fillRect(x0 + (x + 3) * k, y0 + (y + 3) * k, k, k);
+      g.fillStyle = '#16233a'; g.textAlign = 'left';
+      trTexteAjuste(g, '本页编码 Page code : ' + code, 36, p.h + 70, x0 - 60, 28, true);
+      trTexteAjuste(g, '请拍整页发回 · Please send back a photo of the whole page', 36, p.h + 116, x0 - 60, 24, false);
+      res[i] = { src: c.toDataURL('image/jpeg', 0.88), w: p.w, h: p.h + BAS };
+    }
+  } catch (e) { /* sans QR, la page reste utilisable */ }
+  return res;
+};
+// ---------- 3. L'écran « Ses prix en photos » ----------
+let rpE = null;
+function rpLignes(f) {
+  const d = f.px_demande;
+  if (d && Array.isArray(d.lignes) && d.lignes.length) return d.lignes.map(x => { const l = pxTrouverLigne(f, x.cle) || { cle: x.cle, nom: x.nom }; return Object.assign({}, l, { n: x.n, nom: x.nom || l.nom }); });
+  return pxLignesDe(f).filter(l => l.o || l.interesse).map((l, i) => Object.assign({}, l, { n: i + 1 }));
+}
+function rpPhotosDe(f) { return ctDocs(f).filter(d => d.type === 'reponse'); }
+function rpOuvrir(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  ctToutDeSuite();
+  const deja = rpPhotosDe(f);
+  mkBoite(`<div class="mk-dlg ct-champs">
+    <h3>📸 Ses prix en photos — ${E(mkNomFournisseur(f))}</h3>
+    <p class="px-aide">Il a écrit ses prix sur vos pages, ou il a envoyé une photo / une capture de sa liste ? Enregistrez ses photos (appui long dans WeChat →
+      « Enregistrer »), puis choisissez-les ici. Le carnet les garde sur sa fiche et vous montre, produit par produit, <b>sa photo au-dessus des cases</b>.</p>
+    <label class="fw-choisir" for="rp_fichiers">🖼️ Choisir ses photos</label>
+    <input type="file" id="rp_fichiers" multiple accept="image/*" class="champ-cache" onchange="rpLire('${f.id}', this)">
+    <div id="rp_etat" role="status"></div>
+    ${deja.length ? `<p class="px-aide" style="margin-top:12px">Ses photos déjà gardées (${deja.length}) :</p><div class="rp-minis">${deja.map(d => `<img class="ct-mini" data-doc="${E(d.id)}" alt="" onclick="cxAgrandir('${d.id}','Sa réponse')">`).join('')}</div>` : ''}
+    <details class="rp-msg"${f.agent ? ' open' : ''}><summary>💬 Ou collez son message (WhatsApp, WeChat)</summary>
+      <textarea id="rp_texte" rows="5" placeholder="3 = 28 ¥ — Xidi Er Malu&#10;4 = 15 ¥&#10;5 高档 45元 / 中档 38元"></textarea>
+      <button type="button" class="b contour" onclick="ctColler('rp_texte')">📋 Coller</button></details>
+    <div class="mk-boutons">
+      <button class="b ${deja.length ? 'vert' : 'contour'}" onclick="rpEcran('${f.id}', null, (document.getElementById('rp_texte') || {}).value || '')">✏️ ${deja.length ? 'Noter / corriger ses prix avec ses photos' : 'Noter / corriger ses prix (sans photo)'}</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+  if (typeof ctRemplirMinis === 'function') ctRemplirMinis();
+}
+// Ranger des photos de réponse (choisies ici, ou venues de « 📥 Fichier reçu ») et les lire.
+async function rpRanger(f, sources, suivi) {
+  const ids = [];
+  for (let i = 0; i < sources.length; i++) {
+    if (suivi) suivi('Photo ' + (i + 1) + ' sur ' + sources.length + ' : rangement et lecture…');
+    const img = await trImage(sources[i]);
+    const id = idUnique('d');
+    await ctEcrire(id, mkReduire(img, 2200, 0.84)); const mini = mkReduire(img, 560, 0.74); await ctEcrire(id + '~m', mini); ctMiniCache[id] = mini;
+    const d = { id, type: 'reponse', le: mkMaintenant() };
+    try {
+      const qrs = await trLireTousQR(img, false); const k = qrs.map(q => rpCodePage(q.texte)).find(c => c && (!c.fid || c.fid === f.id)); if (k) d.n = k.n;
+      if (await trOcrDispo()) {
+        const o = await trOcrLire(mkToile(img, 2000), 'eng+chi_sim', '4');
+        d.texte = String(o.texte || '').slice(0, 6000);
+        const m = trDemi(d.texte).match(/第\s*(\d{1,3})\s*[\/／]\s*(\d{1,3})\s*个产品/); if (m && !d.n) d.n = Number(m[1]);
+      }
+    } catch (e) {}
+    if (!Array.isArray(f.docs)) f.docs = [];
+    f.docs.push(d); ids.push(id);
+  }
+  trOcrLiberer();
+  f.reponse_photos_le = mkMaintenant(); delete f.ct_neuf;
+  sauverLocal();
+  return ids;
+}
+async function rpLire(fid, input) {
+  const f = mkFournisseur(fid); const fichiers = Array.from((input && input.files) || []); if (input) input.value = '';
+  if (!f || !fichiers.length) return;
+  const z = document.getElementById('rp_etat');
+  try {
+    const srcs = []; for (const fi of fichiers) srcs.push(mkReduire(await mkLireFichier(fi), 2600, 0.86));
+    const ids = await rpRanger(f, srcs, t => { if (z) z.innerHTML = '<div class="fw-prog">⏳ ' + E(t) + '</div>'; });
+    rpEcran(fid, ids);
+  } catch (e) { if (z) z.innerHTML = '<div class="alerte a-rouge">⚠ ' + E(e.message || e) + '</div>'; }
+}
+async function rpDepuisImport(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const srcs = fwEtat.resultats.filter(r => r.type === 'image' && !r.erreur).flatMap(r => (r.pages || []).map(p => p.src));
+  const z = document.getElementById('fw_res'); if (z) z.insertAdjacentHTML('afterbegin', '<div class="fw-prog" id="rp_prog">⏳ Rangement de ses photos…</div>');
+  const ids = await rpRanger(f, srcs, t => { const p = document.getElementById('rp_prog'); if (p) p.textContent = '⏳ ' + t; });
+  rpEcran(fid, ids);
+}
+// Ce que le carnet a pu lire : « 3 = 45 », « 3. 高档 45元 / 中档 38元 », « No.3 ¥45 (MOQ 500) », ou une ligne de tableau.
+function rpLireTexte(texte, lignes, notes) {
+  const res = {};
+  const t = trDemi(String(texte || ''));
+  t.split('\n').forEach(l0 => {
+    const l = l0.replace(/[|]/g, ' ').trim();
+    const m = l.match(/^(?:no\.?\s*|#\s*|第\s*)?(\d{1,3})\s*(?:[.、:=#)\]]|号|\s-\s|\s)\s*(.+)$/i); if (!m) return;
+    const n = Number(m[1]); if (!lignes.some(x => x.n === n) || res[n]) return;
+    const morceaux = m[2].split(/[\/;；|，,]/), qs = [];
+    morceaux.forEach((p, i) => {
+      const prix = (p.match(/[¥￥$]\s*(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s*(?:元|块|rmb|yuan|¥)/i) || []);
+      const v = Number(String(prix[1] || prix[2] || '').replace(',', '.')); if (!(v > 0 && v < 100000)) return;
+      const moq = (p.match(/(?:起订|moq|min\.?)\s*(\d+)|(\d+)\s*(?:个|pcs|只|台|件)\s*(?:起|以上)?/i) || []);
+      qs.push({ niveau: pxNiveauDe(p) || (morceaux.length >= 2 ? (PX_NIV[i] || {}).k : 'moyenne'), prix: v, moq: Number(moq[1] || moq[2] || 0), paliers: [] });
+    });
+    if (!qs.length) {     // « 3 = 28 » ou « 3. 28 — Xidi » : un nombre seul après le numéro = le prix
+      const nu = m[2].match(/^\s*(\d+(?:[.,]\d+)?)\s*(?:¥|元|rmb|yuan)?(?=\s|$|[—–-])/i);
+      if (nu) { const v = Number(nu[1].replace(',', '.')); if (v > 0 && v < 100000) qs.push({ niveau: 'moyenne', prix: v, moq: 0, paliers: [] }); }
+    }
+    if (qs.length) res[n] = qs;
+    const ou = m[2].split(/\s[—–-]\s|\s[—–]/).slice(1).join(' — ').trim();
+    if (notes && ou && /[A-Za-z一-鿿]{3}/.test(ou)) notes[n] = ou.slice(0, 120);
+  });
+  return res;
+}
+function rpTableauVersLignes(texte, lignes) {
+  const res = {};
+  rpTableauOcr(texte).forEach(r => {
+    const k = ctCleRef(r.ref);
+    const l = lignes.find(x => [x.nom, x.o && x.o.modele, x.p && x.p.ref, x.pc && x.pc.ref].some(v => v && ctCleRef(v).includes(k)));
+    if (l && !res[l.n]) res[l.n] = { qs: [{ niveau: 'moyenne', prix: (r.prix.find(p => p.devise === 'CNY') || r.prix[0]).v, moq: r.moq, paliers: [] }], carton: r.carton, pcs: r.colisage };
+  });
+  return res;
+}
+function rpEcran(fid, nouveaux, texteColle) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const L = rpLignes(f), photos = rpPhotosDe(f);
+  const recentes = nouveaux && nouveaux.length ? photos.filter(d => nouveaux.includes(d.id)) : photos.slice(-Math.max(1, Math.min(photos.length, L.length || 1)));
+  // Quelle photo pour quel produit : le QR ou le « 第 3 / 12 » de la page ; sinon dans l'ordre ; une seule photo = pour tous.
+  const attrib = {};
+  recentes.forEach(d => { if (d.n && L.some(l => l.n === d.n)) attrib[d.n] = d.id; });
+  const libres = recentes.filter(d => !d.n);
+  if (libres.length === 1 && recentes.length === 1) L.forEach(l => { if (!attrib[l.n]) attrib[l.n] = libres[0].id; });
+  else { let j = 0; L.forEach(l => { if (!attrib[l.n] && j < libres.length) attrib[l.n] = libres[j++].id; }); }
+  // Ce que le carnet a lu.
+  const lu = {}, notes = {};
+  if (texteColle) { Object.assign(lu, rpLireTexte(texteColle, L, notes)); }
+  recentes.forEach(d => { const t = d.texte || ''; Object.assign(lu, rpLireTexte(t, L)); Object.entries(rpTableauVersLignes(t, L)).forEach(([n, v]) => { if (!lu[n]) lu[n] = v.qs; }); });
+  const paliers = ((f.px_demande && f.px_demande.paliers) || (C.voyage && C.voyage.px_paliers) || [20, 50, 100]).slice(0, 3);
+  rpE = { fid, attrib, paliers, photos: recentes.map(d => d.id), toutes: photos.map(d => d.id), vue: '', notes };
+  const vide = (o) => !o || !pxQualites(o).length;
+  const val = (q, k) => q && num(q[k]) ? String(num(q[k])).replace('.', ',') : '';
+  const cartes = L.map(l => {
+    const off = l.o || (l.p && (C.comparaisons || []).flatMap(c => (c.offres || []).map(x => x)).find(x => x.produit_id === l.p.id && x.fournisseur_id === f.id)) || null;
+    const qs = off ? pxQualites(off) : [], luQ = !qs.length ? (lu[l.n] || []) : [];
+    const doc = l.doc || (l.o && l.o.photo_doc) || (l.p && l.p.photo_doc) || (l.pc && l.pc.photo_doc) || '';
+    const img = l.photo ? `<img src="${l.photo}" alt="">` : doc ? `<img class="ct-mini" data-doc="${E(doc)}" alt="">` : '<span class="px-vide">📦</span>';
+    return `<div class="rp-l" id="rpl_${l.n}" data-n="${l.n}">
+      <div class="rp-t"><span class="rp-n">${l.n}</span>${img}<div class="rp-nom">${E(String(l.nom || '').split(' / ').pop())}
+        <br><button type="button" class="mk-lien" onclick="rpMontrer(${l.n})">📷 ${rpE.attrib[l.n] ? 'Sa photo pour ce produit' : 'Choisir sa photo'}</button></div></div>
+      <div class="rp-grille" role="group" aria-label="Prix du n° ${l.n}" style="grid-template-columns:64px repeat(${2 + paliers.length},minmax(0,1fr))">
+        <span></span><b>Dès (pcs)</b><b>Prix ¥</b>${paliers.map(p => `<b>${E(nf(p))} pcs</b>`).join('')}
+        ${PX_NIV.map(nv => { const q = qs.find(x => x.niveau === nv.k), ql = luQ.find(x => x.niveau === nv.k), src = q || ql, cl = !q && ql ? ' rp-lu' : '';
+          return `<b class="rp-q">${E(nv.court)}</b><input class="${cl}" inputmode="numeric" id="rp_${l.n}_${nv.k}_moq" value="${val(src, 'moq')}" onfocus="rpVoir(${l.n})" aria-label="${E(nv.court)} dès">
+            <input class="${cl}" inputmode="decimal" id="rp_${l.n}_${nv.k}_prix" value="${val(src, 'prix')}" onfocus="rpVoir(${l.n})" aria-label="${E(nv.court)} prix">
+            ${paliers.map((p, i) => { const t = src && (src.paliers || []).find(x => num(x.qte) === p); return `<input class="${cl}" inputmode="decimal" id="rp_${l.n}_${nv.k}_p${i}" value="${t ? String(num(t.prix)).replace('.', ',') : ''}" onfocus="rpVoir(${l.n})" aria-label="${E(nv.court)} ${p} pièces">`; }).join('')}`; }).join('')}
+      </div>
+      <label class="rp-absent"><input type="checkbox" id="rp_${l.n}_absent" ${off && off.absent ? 'checked' : ''}> Il ne l'a pas</label>
+      ${!qs.length && luQ.length ? '<div class="rp-lu-t">En jaune : lu sur sa photo — vérifiez.</div>' : ''}
+      ${vide(off) ? '' : `<div class="rp-deja">✓ Déjà noté : ${E(mkPrixCourt(off))}${off.cotation_le ? ' (' + E(mkJour(off.cotation_le)) + ')' : ''} — vous pouvez corriger.</div>`}
+    </div>`;
+  }).join('');
+  mkBoite(`<div class="mk-dlg ct-champs rp-dlg">
+    <div class="rp-vue" id="rp_vue">${rpE.photos.length ? '<img id="rp_img" alt="Sa réponse" onclick="rpZoom()"><div class="rp-vue-b"><button type="button" onclick="rpTourner(-1)" aria-label="Photo précédente">◀</button><span id="rp_leg"></span><button type="button" onclick="rpTourner(1)" aria-label="Photo suivante">▶</button></div>'
+      : '<p class="px-aide" style="padding:8px">Pas de photo de sa réponse : notez ses prix à la main (ou « 🖼️ Choisir ses photos » d\'abord).</p>'}</div>
+    <h3 style="margin-top:8px">📸 Ses prix — ${E(mkNomFournisseur(f))}</h3>
+    <p class="px-aide">${L.length} produit(s) de votre demande${f.px_demande ? ' du ' + E(mkJour(f.px_demande.le)) : ''}. Touchez une case : sa photo pour ce produit s'affiche en haut (touchez-la pour l'agrandir). Prix en <b>yuans</b> ; remplissez seulement ce qu'il a écrit.</p>
+    ${L.length ? cartes : '<p class="px-aide">Aucune demande de prix envoyée à ce fournisseur : « 💰 Demander ses prix » d\'abord.</p>'}
+    <div class="mk-boutons rp-bas">
+      <button class="b vert" onclick="rpGarder()">✅ Ranger ses prix</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+  if (typeof ctRemplirMinis === 'function') ctRemplirMinis();
+  rpVoir(L[0] ? L[0].n : 0);
+}
+async function rpAfficher(id) {
+  const im = document.getElementById('rp_img'); if (!im || !id) return;
+  rpE.vue = id;
+  try { const src = await ctLire(id); if (src && rpE && rpE.vue === id) im.src = src; } catch (e) {}
+  const i = rpE.toutes.indexOf(id), leg = document.getElementById('rp_leg');
+  const pour = Object.keys(rpE.attrib).filter(n => rpE.attrib[n] === id);
+  if (leg) leg.textContent = (pour.length === 1 ? 'Sa photo du n° ' + pour[0] + ' · ' : '') + (i + 1) + ' sur ' + rpE.toutes.length;
+}
+function rpVoir(n) { if (!rpE) return; const id = rpE.attrib[n] || rpE.photos[0]; if (id && id !== rpE.vue) rpAfficher(id); }
+function rpMontrer(n) {
+  if (!rpE) return;
+  if (!rpE.attrib[n] && rpE.toutes.length) rpE.attrib[n] = rpE.vue || rpE.toutes[0];
+  rpAfficher(rpE.attrib[n]); const v = document.getElementById('rp_vue'); if (v) v.scrollIntoView({ block: 'start' });
+}
+function rpTourner(pas) {
+  if (!rpE || !rpE.toutes.length) return;
+  const i = (rpE.toutes.indexOf(rpE.vue) + pas + rpE.toutes.length) % rpE.toutes.length;
+  rpAfficher(rpE.toutes[i]);
+  // La photo affichée devient celle du produit dont on remplit les cases.
+  const a = document.activeElement, l = a && a.closest && a.closest('.rp-l'); if (l) rpE.attrib[Number(l.dataset.n)] = rpE.toutes[i];
+}
+function rpZoom() { const im = document.getElementById('rp_img'); if (im && im.src) mkApercu(im.src, 'Sa réponse — pincez pour agrandir'); }
+function rpGarder() {
+  const f = mkFournisseur(rpE && rpE.fid); if (!f) return;
+  const v = id => (document.getElementById(id) || {}).value || '';
+  let n = 0, absents = 0;
+  rpLignes(f).forEach(l => {
+    const qualites = PX_NIV.map(nv => ({ niveau: nv.k, moq: v(`rp_${l.n}_${nv.k}_moq`), prix: v(`rp_${l.n}_${nv.k}_prix`),
+      paliers: rpE.paliers.map((p, i) => ({ qte: p, prix: v(`rp_${l.n}_${nv.k}_p${i}`) })) }));
+    const absent = (document.getElementById(`rp_${l.n}_absent`) || {}).checked;
+    const ok = pxNormaliserQualites(qualites).length;
+    if (!ok && !absent) return;
+    let li = pxTrouverLigne(f, l.cle); if (!li) li = pxNouvelleLigne(f, l.nom || ('Produit ' + l.n));
+    const r = ok ? pxAppliquer(f, li, { qualites, devise: 'CNY' }, 'photo') : pxOffrePour(f, li);
+    const o = r.o;
+    if (rpE.attrib[l.n]) o.reponse_doc = rpE.attrib[l.n];
+    if (rpE.notes && rpE.notes[l.n] && String(o.note || '').indexOf(rpE.notes[l.n]) < 0) o.note = [o.note, (f.agent ? 'agent : ' : '') + rpE.notes[l.n]].filter(Boolean).join(' · ');
+    if (absent) { o.absent = true; if (String(o.note || '').indexOf('n\'a pas ce produit') < 0) o.note = [o.note, 'n\'a pas ce produit (' + mkJour(mkMaintenant()) + ')'].filter(Boolean).join(' · '); absents++; }
+    else delete o.absent;
+    if (ok) n++;
+  });
+  if (n) f.prix_recus_le = mkMaintenant();
+  sauverLocal(); fermerBoite(); dessiner();
+  avertir(n || absents ? '✅ ' + n + ' produit(s) avec ses prix' + (absents ? ', ' + absents + ' qu\'il n\'a pas' : '') + ', rangés chez ' + mkNomFournisseur(f) + '.\nSa fiche → « 🛒 Ses produits et ses prix » (ses photos restent sur sa fiche).' : 'Aucun prix tapé : rien n\'a changé.', 6500);
+}
+// Sa fiche : le bouton, à côté de « 📥 Sa réponse (fichier Excel) ».
+const rpSectionAvant = pxSectionHtml;
+pxSectionHtml = function (f) {
+  const h = rpSectionAvant.apply(this, arguments);
+  const n = rpPhotosDe(f).length;
+  return h.replace(`<button type="button" class="b contour" onclick="fwBoite('${f.id}')">📥 Sa réponse (fichier Excel)</button>`,
+    `<button type="button" class="b vert" onclick="rpOuvrir('${f.id}')">📸 Sa réponse en photos${n ? ' (' + n + ')' : ''} : ses prix, sa photo sous les yeux</button>
+     <button type="button" class="b contour" onclick="fwBoite('${f.id}')">📥 Sa réponse (fichier Excel ou PDF)</button>`);
+};
+// =====================================================================================================
+//  CARNET 1.11.0 — D. L'ÉTUDE ET LES FOURNISSEURS : QUI LE VEND, À QUEL PRIX, ET OÙ CHERCHER SINON (24/10/2026)
+//  Riche, 13 h 01 : « les produits que j'ai choisis… si ce fournisseur l'a, je le contacte directement en lui demandant le prix,
+//  en discutant le montant, et le contrat pour cette commande ; et si ce n'est pas le cas, l'endroit où on doit chercher ».
+//  13 h 38 : « nous avons nos fournisseurs contactés dans le carnet : qu'on puisse comparer aussi ».
+//  Sur chaque fiche de l'étude : « 🏭 Qui le vend ? » — les prix reçus (fournisseurs, agent) comparés au PRIX MAXIMUM de la fiche,
+//  les modèles de ses fournisseurs qui y ressemblent (« 🔗 C'est ce produit »), « ➕ Le demander à un fournisseur » (le produit
+//  part dans SA demande de prix, avec la photo et le nom chinois de l'étude), et « 📍 Où le chercher » (marchés de gros, usines,
+//  sites), d'après la recherche du 24/10 (sources et limites dans le rapport).
+// =====================================================================================================
+// ---------- 1. Où chercher, par rayon (recherche du 24/10/2026 ; horaires non vérifiés — évitez le dimanche) ----------
+const OU_LIEUX = {
+  tel: [{ nom: 'Huaqiangbei (Shenzhen)', cn: '深圳华强北', ou: 'Huaqiang North Road et Zhenhua Road, Futian — 2 h de Canton en train', gros: 'Vrai pôle de gros (des boutiques font aussi le détail) ; petites quantités possibles dans les boutiques de stock.' },
+    { nom: 'Xidi Er Malu (Canton)', cn: '广州西堤二马路', ou: 'Yuexiu, Canton', gros: 'Plus petit, tourné vers l\'export.' }],
+  inf: [{ nom: 'Huaqiangbei (Shenzhen)', cn: '深圳华强北', ou: 'Futian, Shenzhen', gros: 'Gros : ordinateurs, tablettes, accessoires.' },
+    { nom: 'Dashatou (Canton) — occasion', cn: '盛贤大沙头旧货交易市场', ou: 'Canton', gros: 'Gros et détail, surtout de l\'occasion : vérifiez chaque pièce.' }],
+  cui: [{ nom: 'Shunde (Foshan) : Beijiao, Ronggui, Leliu', cn: '佛山顺德 北滘 / 容桂 / 勒流', ou: 'Foshan, 1 h de Canton', gros: 'Usines (souvent 500 pièces et plus). Foshan fait une grosse part des cuiseurs à riz du monde.' },
+    { nom: 'Zhongshan : Dongfeng, Xiaolan', cn: '中山 东凤镇 / 小榄镇', ou: 'Zhongshan, 1 h 30 de Canton', gros: 'Usines de petit électroménager. Pour 10 à 100 pièces : grossistes de stock, ou 1688 par un agent.' }],
+  gro: [{ nom: 'Shunde (Foshan)', cn: '佛山顺德', ou: 'Foshan', gros: 'Usines et marques (Midea, Hisense…). Très volumineux : faites le calcul du bateau avant.' },
+    { nom: 'Zhongshan : Huangpu (fours, micro-ondes) et ventilateurs', cn: '中山 黄圃镇', ou: 'Zhongshan', gros: 'Usines. Exigez 220 V / 50 Hz et la prise européenne (C/F).' }],
+  deco: [{ nom: 'Lecong (Foshan, Shunde)', cn: '佛山顺德乐从', ou: 'Foshan', gros: 'Usines et salles d\'exposition : panneaux PVC/WPC, faux plafonds, lambris. Vu sur Made-in-China : panneaux WPC 1 à 2,10 $ le mètre (dès 500 à 1 000 m).' }],
+  bea: [{ nom: 'Meibo Cheng (Canton)', cn: '广州美博城 · 广园西路121号', ou: '121 Guangyuan Xilu, Yuexiu, Canton', gros: 'Marché de gros et d\'échantillons de la beauté. Liquides : vérifiez que votre cargo les accepte.' }],
+  bri: [{ nom: 'Rue Yongfu (Canton) — auto, moto', cn: '广州永福路汽配城', ou: 'Yongfu Lu, Yuexiu : Yongfu Qipei Cheng (n° 45), Jinyongfu (n° 48), Fuyi (n° 49)', gros: 'Vrai pôle de gros ; « petit lot » possible.' },
+    { nom: 'Outillage, solaire, jardin', cn: '', ou: '', gros: 'Pas de marché de gros vérifié à Canton : catalogues de la Foire (phase 1), 1688 par un agent, ou Made-in-China.' }],
+  mai: [{ nom: 'Articles de maison', cn: '', ou: '', gros: 'Pas de marché de gros vérifié à Canton : Foire de Canton (phase 2, articles de maison, jusqu\'au 27/10), 1688 par un agent, Yiwugo (Yiwu).' }]
+};
+const OU_EN_LIGNE = '1688 par un agent (ex. « achat assisté » de Colis224), livré à l\'entrepôt du cargo · Alibaba.com avec Trade Assurance (le plus protégé pour acheter seul) · Made-in-China (électroménager, matériaux) · DHgate pour dépanner.';
+function ouRayon(p) { return String(p.id || '').split('-')[0]; }
+function ouHtml(p) {
+  const L = OU_LIEUX[ouRayon(p)] || [];
+  return `${L.map(l => `<div class="ou-l"><b>${E(l.nom)}</b>${l.cn ? `<div class="ou-cn" lang="zh">${E(l.cn)}</div>` : ''}${l.ou ? '<div>' + E(l.ou) + '</div>' : ''}<div class="ou-g">${E(l.gros)}</div>
+      ${l.cn ? `<div class="ou-b"><button type="button" class="b contour" onclick="ouChauffeur(${E(JSON.stringify(l.cn.split(' · ')[0]))})">🚕 Montrer au chauffeur</button>
+        <button type="button" class="b contour" onclick="window.open('https://maps.apple.com/?q=' + encodeURIComponent(${E(JSON.stringify(l.cn.split(' · ')[0].split(' ')[0]))}),'_blank')">🗺️ Plans</button></div>` : ''}</div>`).join('')}
+    <div class="ou-l"><b>Sur Internet</b><div class="ou-g">${E(OU_EN_LIGNE)}</div>
+      ${p.requete_1688 ? `<div class="ou-g">À taper dans 1688 : <span lang="zh">${E(p.requete_1688)}</span></div>` : ''}</div>
+    <p class="lc-aide">D'après la recherche du 24/10 (rapport dans la conversation). Horaires non vérifiés : allez-y tôt, évitez le dimanche.</p>`;
+}
+function ouChauffeur(cn) {
+  const d = document.createElement('dialog'); d.className = 'mk-apercu ou-grand';
+  d.innerHTML = `<div class="ou-grand-t" lang="zh">${E(cn)}</div><div class="leg">请带我去这里，谢谢！<br>(Emmenez-moi ici, merci)</div><button type="button" class="b gris">Fermer</button>`;
+  document.body.appendChild(d); d.querySelector('button').onclick = () => { try { d.close(); } catch (e) {} d.remove(); };
+  if (typeof d.showModal === 'function') d.showModal(); else d.setAttribute('open', '');
+}
+// ---------- 2. Les prix reçus pour un produit de l'étude ----------
+function eoCle(e, p) { return e.id + ':' + p.id; }
+function eoOffres(cle) {
+  const res = [];
+  (C.comparaisons || []).forEach(c => (c.offres || []).forEach(o => { if (o.etude_cle === cle) res.push({ c, o, f: o.fournisseur_id ? mkFournisseur(o.fournisseur_id) : null }); }));
+  return res;
+}
+function eoPrixCny(o, D) {
+  const pr = num(o.prix); if (!(pr > 0)) return 0;
+  const d = o.devise || 'CNY', T = D.params.taux;
+  if (d === 'CNY') return pr;
+  if (d === 'USD') return pr * T.USD_GNF / T.CNY_GNF;
+  if (d === 'EUR') return pr * T.EUR_GNF / T.CNY_GNF;
+  const t = tauxDe(d); return t > 0 ? pr * t / T.CNY_GNF : 0;
+}
+// Le nom chinois de l'étude suit le produit dans la demande de prix (titre de la page, message, Excel).
+const EO_CN = {};
+const eoNomChinoisAvant = pxNomChinois;
+pxNomChinois = function (nom) { const k = normaliserNom(nom); return EO_CN[k] || eoNomChinoisAvant.apply(this, arguments); };
+function eoRetenirCn() { (C.comparaisons || []).forEach(c => (c.offres || []).forEach(o => { if (o.nom_cn) EO_CN[normaliserNom(c.article)] = o.nom_cn; })); }
+// ---------- 3. Les modèles de ses fournisseurs qui ressemblent au produit ----------
+const EO_VIDES = new Set('avec pour sans pièce pieces piece lot boite boîte paire paires grand grande petit petite noir blanc couleur modèle type usage maison neuf simple double mini plus kit set chine'.split(' '));
+function eoMots(t) { return normaliserNom(t || '').split(/[^a-z0-9]+/).filter(m => m.length >= 4 && !EO_VIDES.has(m) && !/^\d+$/.test(m)); }
+function eoCn(t) { return String(t || '').split(/[\s,，、/]+/).filter(m => /[一-鿿]{2,}/.test(m) && !/批发|厂家|直销|现货|小批量/.test(m)); }
+let eoIndex = null;
+const eoRacine = m => m.replace(/(?:es|s|x)$/, '');
+function eoConstruireIndex() {
+  const ent = [];
+  const ajouter = (x, textes, cn) => { x.mots = new Set(normaliserNom(textes.join(' ')).split(/[^a-z0-9]+/).filter(m => m.length >= 3).map(eoRacine)); x.cn = cn; ent.push(x); };
+  fournisseursListe().forEach(f => {
+    ctProduits(f).forEach(p => ajouter({ f, p }, [p.ref, p.categorie, p.caracteristiques], [p.ref, p.categorie, p.caracteristiques, p.nom_cn].join(' ')));
+    mkOffresDe(f).forEach(({ c, o }) => { if (!o.produit_id && !o.etude_cle) ajouter({ f, c, o }, [c.article, o.modele, o.note], [c.article, o.nom_cn || ''].join(' ')); });
+  });
+  eoIndex = ent;
+}
+function eoSuggestions(p, deja) {
+  if (!eoIndex) eoConstruireIndex();
+  const mots = eoMots(p.nom_fr).map(eoRacine), cns = eoCn(p.nom_cn);
+  if (!mots.length && !cns.length) return [];
+  const res = [];
+  eoIndex.forEach(x => {
+    if (deja.has(x.o ? 'o:' + x.o.id : 'p:' + x.p.id)) return;
+    let s = 0;
+    mots.forEach(m => { if (x.mots.has(m)) s += 1; });
+    cns.forEach(m => { if (x.cn.includes(m)) s += 2; });
+    if (s >= 2) res.push({ x, s });
+  });
+  return res.sort((a, b) => b.s - a.s).slice(0, 3).map(r => r.x);
+}
+function eoVerdictHtml(e, D, r, p, prixCny) {
+  const c = etCalcule(D, r, p);
+  if (!(prixCny > 0)) return '<span class="eo-v att">⏳ prix pas encore reçu</span>';
+  const a = etCalcule(D, r, Object.assign({}, p, { achat_cny: prixCny }));
+  const ok = prixCny <= c.maxAchat + 1e-9;
+  return `<span class="eo-v ${ok ? 'ok' : 'non'}">${ok ? '✅ sous ton prix maximum' : '⛔ au-dessus de ton maximum'} (${E(nf(c.maxAchat, 1))} ¥)</span>
+    <span class="eo-g">À ce prix : arrivé ${E(etGnf(a.arrive))} · gain ${E(etGnf(a.gain))} par pièce${ok ? '' : ' · propose ' + E(nf(Math.max(0, c.maxAchat * 0.92), 1)) + ' ¥'}</span>`;
+}
+function eoHtml(e, D, r, p) {
+  const cle = eoCle(e, p), offres = eoOffres(cle);
+  const lies = new Set(offres.map(({ o }) => o.produit_id ? 'p:' + o.produit_id : 'o:' + o.id));
+  const sugg = eoSuggestions(p, lies);
+  offres.sort((a, b) => (eoPrixCny(a.o, D) || 1e9) - (eoPrixCny(b.o, D) || 1e9));
+  return `<div class="eo">
+    <div class="eo-t">🏭 Qui le vend ?${offres.length ? ' (' + offres.length + ')' : ''}</div>
+    ${offres.length ? offres.map(({ c, o, f }) => { const px = eoPrixCny(o, D);
+      return `<div class="eo-o${o.absent ? ' absent' : ''}"><div><b>${E(f ? mkNomFournisseur(f) : o.fournisseur || 'Fournisseur')}</b>${f && f.agent ? ' <span class="lc-tag">agent</span>' : ''}
+        ${o.absent ? '<br><span class="eo-g">n\'a pas ce produit</span>' : `<br>${px > 0 ? '<b class="eo-px">' + E(nf(px, 2)) + ' ¥</b>' + (o.devise && o.devise !== 'CNY' ? ' <span class="eo-g">(' + E(mkPrixCourt(o)) + ')</span>' : '') + (num(o.moq) ? ' <span class="eo-g">· dès ' + E(nf(o.moq)) + '</span>' : '') + '<br>' : ''}${eoVerdictHtml(e, D, r, p, px)}`}</div>
+        ${f ? `<button type="button" class="b contour" onclick="ctOuvrirDossier('${f.id}')">Sa fiche</button>` : ''}</div>`; }).join('')
+      : '<p class="eo-g" style="margin:2px 0 6px">Personne encore dans ton carnet.</p>'}
+    ${sugg.length ? `<div class="eo-s"><span class="eo-g">Peut-être chez :</span>${sugg.map(x => `<div class="eo-o"><div><b>${E(mkNomFournisseur(x.f))}</b><br><span class="eo-g">${E(x.p ? [x.p.ref, x.p.categorie].filter(Boolean).join(' · ') + (x.p.caracteristiques ? ' — ' + String(x.p.caracteristiques).slice(0, 60) : '') : x.c.article + (x.o.modele ? ' · ' + x.o.modele : ''))}</span></div>
+        <button type="button" class="b contour" onclick="eoRelier('${E(p.id)}','${x.f.id}','${x.p ? 'p:' + x.p.id : 'o:' + x.o.id}')">🔗 C'est ce produit</button></div>`).join('')}</div>` : ''}
+    <div class="eo-b">
+      <button type="button" class="b contour" onclick="eoDemander('${E(p.id)}')">➕ Le demander à un fournisseur</button>
+      <button type="button" class="b contour" onclick="eoOu('${E(p.id)}', this)">📍 Où le chercher</button></div>
+    <div class="eo-ou" id="eoou_${E(p.id)}" hidden></div>
+  </div>`;
+}
+function eoOu(pid, b) {
+  const e = etActuelle(), D = e && etDonnees[e.id], p = D && D.produits[pid]; const z = document.getElementById('eoou_' + pid); if (!p || !z) return;
+  if (z.hidden) { z.innerHTML = ouHtml(p); z.hidden = false; b.textContent = '📍 Fermer « où chercher »'; } else { z.hidden = true; b.textContent = '📍 Où le chercher'; }
+}
+// Relier un modèle d'un fournisseur (son catalogue, ou un produit noté chez lui) au produit de l'étude.
+function eoRelier(pid, fid, cleLigne) {
+  const e = etActuelle(), D = e && etDonnees[e.id], p = D && D.produits[pid], f = mkFournisseur(fid); if (!p || !f) return;
+  const l = pxTrouverLigne(f, cleLigne); if (!l) return;
+  const { o } = pxOffrePour(f, l);
+  o.etude_cle = eoCle(e, p); if (p.nom_cn && !o.nom_cn) o.nom_cn = p.nom_cn;
+  eoIndex = null; sauverLocal(); dessiner();
+  avertir('🔗 Relié : ' + p.nom_fr + ' ↔ ' + mkNomFournisseur(f) + '.' + (num(o.prix) > 0 ? '' : '\nSon prix n\'est pas encore connu : « 💰 Demander ses prix » sur sa fiche (le produit est coché).'), 6000);
+}
+// Le demander à un fournisseur : le produit (photo et nom chinois de l'étude) entre dans SA demande de prix.
+function eoDemander(pid) {
+  const e = etActuelle(), D = e && etDonnees[e.id], p = D && D.produits[pid]; if (!p) return;
+  const L = aqCandidats();
+  mkBoite(`<div class="mk-dlg ct-champs"><h3>➕ À qui demander « ${E(p.nom_fr)} » ?</h3>
+    <p class="px-aide">Le produit entre dans sa liste avec la photo et le nom chinois de l'étude (<span lang="zh">${E(p.nom_cn)}</span>), puis « 💰 Demander ses prix » s'ouvre, produit coché.
+      Votre prix maximum ne part pas chez le fournisseur.</p>
+    <input id="eo_q" placeholder="🔎 Chercher un fournisseur (nom, code F05…)" oninput="eoFiltrer()" style="font-size:16px">
+    <div class="aq-liste" id="eo_liste">${L.map(f => aqCandidatHtml(f).replace(`aqChoisir('${f.id}')`, `eoDemanderA('${E(pid)}','${f.id}')`)).join('') || '<p class="px-aide">Aucun fournisseur dans le carnet.</p>'}</div>
+    <div class="mk-boutons"><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+  if (typeof ctRemplirMinis === 'function') ctRemplirMinis();
+}
+function eoFiltrer() {
+  const q = normaliserNom((document.getElementById('eo_q') || {}).value || '');
+  document.querySelectorAll('#eo_liste .aq-c').forEach(b => { b.style.display = !q || normaliserNom(b.textContent).includes(q) ? '' : 'none'; });
+}
+function eoAjouterChez(e, p, f) {
+  const cle = eoCle(e, p);
+  let o = mkOffresDe(f).map(x => x.o).find(x => x.etude_cle === cle), l;
+  if (o) l = pxTrouverLigne(f, 'o:' + o.id) || { cle: 'o:' + o.id };
+  else {
+    l = pxNouvelleLigne(f, p.nom_fr); o = l.o;
+    Object.assign(o, { etude_cle: cle, nom_cn: p.nom_cn || '', photo_doc: p.photo_doc || '', note: String(p.specs || '').slice(0, 160) });
+    if (!num(l.c.quantite)) l.c.quantite = etQte(e, etDonnees[e.id], etReg(e), p) || 0;
+  }
+  EO_CN[normaliserNom(l.c ? l.c.article : p.nom_fr)] = p.nom_cn || '';
+  return l;
+}
+function eoDemanderA(pid, fid) {
+  const e = etActuelle(), D = e && etDonnees[e.id], p = D && D.produits[pid], f = mkFournisseur(fid); if (!p || !f) return;
+  const l = eoAjouterChez(e, p, f);
+  eoIndex = null; sauverLocal(); fermerBoite();
+  pxD = null; pxBoiteDemande(f.id);
+  if (pxD) { pxD.choix.add(l.cle); pxDessinerDemande(); }
+}
+// La fiche de l'étude : la partie « Qui le vend ? » juste avant la quantité.
+const eoFicheAvant = etFicheHtml;
+etFicheHtml = function (e, D, r, p) {
+  const h = eoFicheAvant.apply(this, arguments);
+  return h.replace('<div class="et-lot">', eoHtml(e, D, r, p) + '<div class="et-lot">');
+};
+const eoEcranAvant = ecranEtude;
+ecranEtude = function (e) { eoRetenirCn(); eoIndex = null; return eoEcranAvant.apply(this, arguments); };
+// Les réglages de l'étude acceptent aussi un transitaire choisi (0 % quand le cargo est « tout compris »).
+const eoRegAvant = etReg;
+etReg = function (e) { const r = eoRegAvant.apply(this, arguments); const x = (C.etude_reg || {})[e.id] || {}; if (x.transit != null) r.transit = num(x.transit); return r; };
+// Le contrat : le nom chinois de la société (celui de la licence et du compte bancaire) quand la carte l'a donné.
+if (typeof ctrVendeur === 'function') {
+  const eoVendeurAvant = ctrVendeur;
+  ctrVendeur = function (f) {
+    const neuf = !f.vendeur_legal;
+    const v = eoVendeurAvant.apply(this, arguments);
+    if (neuf && f.societe_cn && (!v.nom || v.nom === String(f.societe || '').trim())) v.nom = f.societe_cn + (f.societe && f.societe !== f.societe_cn ? ' / ' + f.societe : '');
+    return v;
+  };
+}
+// Un fichier de Claude (catalogue lu) peut relier lui-même les modèles d'un fournisseur aux produits de l'étude :
+//   fournisseurs[].produits[].etude = '2410:cui-12'   ou   fournisseurs[].offres[].etude = '2410:cui-12'
+const eoFusionAvant = ctFusion;
+ctFusion = function (imp, appliquer) {
+  const bilan = eoFusionAvant.apply(this, arguments);
+  if (!appliquer) return bilan;
+  let n = 0;
+  (imp.fournisseurs || []).forEach((x, i) => {
+    const f = (bilan[i] && bilan[i].id && mkFournisseur(bilan[i].id)) || ctTrouverFournisseur(x); if (!f) return;
+    (Array.isArray(x.produits) ? x.produits : []).forEach(xp => {
+      if (!xp.etude || !/^\d+:[a-z]+-\d+$/i.test(String(xp.etude))) return;
+      const p = ctProduits(f).find(y => ctCleRef(y.ref) && ctCleRef(y.ref) === ctCleRef(xp.ref)); if (!p) return;
+      const l = pxTrouverLigne(f, 'p:' + p.id); if (!l) return;
+      const { o } = pxOffrePour(f, l); o.etude_cle = String(xp.etude); if (xp.nom_cn && !o.nom_cn) o.nom_cn = String(xp.nom_cn); p.interesse = true; n++;
+    });
+    (Array.isArray(x.offres) ? x.offres : []).forEach(xo => {
+      if (!xo.etude) return;
+      const o = mkOffresDe(f).map(y => y.o).find(y => (xo.modele && normaliserNom(y.modele) === normaliserNom(xo.modele)) || (xo.article && !y.etude_cle && normaliserNom((trouverComparaison && (C.comparaisons || []).find(c => (c.offres || []).includes(y)) || {}).article || '') === normaliserNom(xo.article)));
+      if (o) { o.etude_cle = String(xo.etude); n++; }
+    });
+  });
+  if (n) eoIndex = null;
+  return bilan;
+};
+// =====================================================================================================
+//  CARNET 1.11.0 — E. MA LISTE EN PDF : UNE COMPLÈTE POUR MOI, UNE POUR L'AGENT (24/10/2026)
+//  Riche, 13 h 38 : « quand j'ai choisi les produits, cette liste-là, il faut pouvoir la transférer au démarcheur, celui qui va
+//  m'aider à faire les achats… la première liste avec tous les détails (combien ça va se vendre à Conakry, à quel prix on achète),
+//  la deuxième que j'envoie au démarcheur, ceux qui connaissent les endroits, avec le prix estimé en yuans… qu'il cherche entre tel
+//  prix et tel prix, qu'il ne dépasse pas ce montant… je l'envoie en PDF par WhatsApp… et qu'on puisse comparer avec nos
+//  fournisseurs du carnet. »
+//  Onglet ⭐ → l'étude → « ✅ Ma liste » :
+//   - 📄 Ma liste complète (PDF) : photo, prix en Chine, prix maximum, arrivé au magasin, ton prix, prix à Conakry, gain, quantités,
+//     totaux — pour toi seulement ;
+//   - 📤 Liste pour l'agent (PDF) : photo, numéro, nom en français ET en chinois, quantité, prix visé et PRIX MAXIMUM en yuans, la
+//     façon de répondre (« 3 = 28 ¥ — marché… ») ; tes prix de vente, ta marge et ton gain NE partent PAS. L'agent reçoit sa fiche
+//     dans le carnet : sa réponse (message ou capture) se range avec « 📸 Sa réponse », et ses prix apparaissent sur chaque produit
+//     de l'étude, à côté de ceux de tes fournisseurs (« 🏭 Qui le vend ? »).
+//  Les pages sont dessinées dans le téléphone (chinois compris) puis rangées dans un PDF : rien ne part sur Internet.
+// =====================================================================================================
+const AG_W = 1240, AG_H = 1754;
+async function agPhoto(p) {
+  try { if (p.photo_doc) { const src = await ctLire(p.photo_doc); if (src) return await trImage(src); } } catch (e) {}
+  return null;
+}
+function agLignesTexte(g, texte, x, y, largeur, taille, gras, inter, max) {
+  g.font = (gras ? '800 ' : '500 ') + taille + 'px system-ui,-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif';
+  const mots = String(texte || '').split(/(\s+|(?<=[一-鿿]))/).filter(m => m && !/^\s+$/.test(m));
+  const L = []; let cur = '';
+  for (const m of mots) {
+    const essai = cur ? cur + (/^[一-鿿]/.test(m) || /[一-鿿]$/.test(cur) ? '' : ' ') + m : m;
+    if (g.measureText(essai).width > largeur && cur) { L.push(cur); cur = m; if (L.length >= max) break; } else cur = essai;
+  }
+  if (cur && L.length < max) L.push(cur);
+  if (L.length === max && mots.length && g.measureText(L[max - 1]).width > largeur - 20) L[max - 1] = L[max - 1].replace(/.{2}$/, '…');
+  L.forEach((t, i) => g.fillText(t, x, y + i * inter));
+  return L.length;
+}
+function agEntete(g, titre, sous, page, pages) {
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, AG_W, AG_H);
+  g.fillStyle = '#0d3f85'; g.fillRect(0, 0, AG_W, 170);
+  g.fillStyle = '#ffffff'; g.textAlign = 'left';
+  trTexteAjuste(g, titre, 50, 70, AG_W - 300, 44, true);
+  trTexteAjuste(g, sous, 50, 120, AG_W - 300, 26, false);
+  g.textAlign = 'right'; trTexteAjuste(g, 'KYLO EURGUINE', AG_W - 50, 70, 260, 30, true); trTexteAjuste(g, page + ' / ' + pages, AG_W - 50, 120, 200, 26, false); g.textAlign = 'left';
+}
+const agFeuCouleur = { vert: '#16a34a', jaune: '#d97706', rouge: '#dc2626', gris: '#94a3b8' };
+// Les pages : 5 produits par page (la 1re a les explications, ou les totaux).
+async function agPages(e, D, r, liste, mode, opts) {
+  const PAR = 5, H_L = 292, Y0 = 200;
+  const pages = [], premiere = mode === 'agent' ? 290 : 330;
+  const parPage = [], reste = liste.slice();
+  parPage.push(reste.splice(0, Math.floor((AG_H - Y0 - premiere - 60) / H_L)));
+  while (reste.length) parPage.push(reste.splice(0, PAR));
+  const jour = new Date().toLocaleDateString('fr-FR'), T = D.params.taux;
+  const total = { achat: 0, gain: 0, vente: 0, arrive: 0, vol: 0 };
+  liste.forEach(p => { const c = etCalcule(D, r, p), q = etQte(e, D, r, p); total.achat += q * c.achat; total.gain += q * c.gain; total.vente += q * c.vente; total.arrive += q * c.arrive; total.vol += q * p.volume_m3; });
+  let n = 0;
+  for (let ip = 0; ip < parPage.length; ip++) {
+    const c = document.createElement('canvas'); c.width = AG_W; c.height = AG_H; const g = c.getContext('2d');
+    if (mode === 'agent') agEntete(g, 'Liste d\'achat · 采购清单 · Shopping list', (opts.agent ? 'Pour ' + opts.agent + ' · ' : '') + jour + ' · ' + liste.length + ' produits · ' + ctSignature(), ip + 1, parPage.length);
+    else agEntete(g, 'Ma liste d\'achat — détail complet', e.titre + ' · ' + jour + ' · ' + liste.length + ' produits · NE PAS ENVOYER', ip + 1, parPage.length);
+    let y = Y0;
+    if (ip === 0 && mode === 'agent') {
+      g.fillStyle = '#fff7e6'; g.fillRect(40, y, AG_W - 80, premiere - 30); g.strokeStyle = '#f0c36d'; g.lineWidth = 2; g.strokeRect(40, y, AG_W - 80, premiere - 30);
+      g.fillStyle = '#16233a';
+      let yy = y + 46;
+      yy += 36 * agLignesTexte(g, 'Pour chaque produit : trouvez le fournisseur et son prix (petite quantité). Ne dépassez JAMAIS le prix MAXIMUM en rouge.', 64, yy, AG_W - 130, 27, true, 36, 2);
+      yy += 34 * agLignesTexte(g, '每个产品请找供应商和价格（小批量）。价格不能超过红色的最高价。', 64, yy + 4, AG_W - 130, 27, false, 34, 2);
+      yy += 10;
+      yy += 34 * agLignesTexte(g, 'Répondez sur WhatsApp : numéro = prix ¥ — fournisseur / marché. Exemple : « 3 = 28 ¥ — Xidi Er Malu, boutique 12 ».', 64, yy + 8, AG_W - 130, 25, false, 34, 2);
+      agLignesTexte(g, '回复格式：编号 = 价格 ¥ — 供应商/市场，例如「3 = 28 ¥ — 西堤二马路 12号」。', 64, yy + 14, AG_W - 130, 25, false, 34, 2);
+      y += premiere;
+    } else if (ip === 0) {
+      const X = T.EUR_GNF, cases = [['Achat en Chine', nf(Math.round(total.achat / X)) + ' €'], ['Arrivé au magasin', nf(Math.round(total.arrive / X)) + ' €'],
+        ['Ventes attendues', nf(Math.round(total.vente / X)) + ' €'], ['Gain attendu', nf(Math.round(total.gain / X)) + ' €'], ['Place sur le bateau', nf(total.vol, 1) + ' m³']];
+      const lw = (AG_W - 80 - 4 * 16) / 5;
+      cases.forEach(([t, v], i) => { const x = 40 + i * (lw + 16); g.fillStyle = '#eef4ff'; g.fillRect(x, y, lw, 130); g.fillStyle = '#5a6b85'; trTexteAjuste(g, t, x + 14, y + 42, lw - 28, 22, false); g.fillStyle = i === 3 ? '#15803d' : '#16233a'; trTexteAjuste(g, v, x + 14, y + 98, lw - 28, 38, true); });
+      g.fillStyle = '#5a6b85';
+      agLignesTexte(g, 'Réglages : marge ' + nf(r.marge, 0) + ' %, frais du voyage ' + nf(r.voyage, 0) + ' %, bateau ' + nf(r.fret, 0) + ' $/m³, douane ' + nf(r.douane, 2) + ' %, marchandage ' + nf(r.marchand, 0) + ' %. Taux du ' + (D.params.date || '') + ' : 1 ¥ = ' + nf(T.CNY_GNF, 0) + ' GNF, 1 € = ' + nf(T.EUR_GNF, 0) + ' GNF.', 44, y + 180, AG_W - 88, 22, false, 30, 3);
+      y += premiere;
+    }
+    for (const p of parPage[ip]) {
+      n++;
+      const k = etCalcule(D, r, p), q = etQte(e, D, r, p), feu = p.a_relever ? 'gris' : k.feu;
+      g.strokeStyle = '#d7e1f0'; g.lineWidth = 2; g.strokeRect(40, y, AG_W - 80, H_L - 16);
+      if (mode !== 'agent') { g.fillStyle = agFeuCouleur[feu]; g.fillRect(40, y, 12, H_L - 16); }
+      const img = await agPhoto(p);
+      if (img) { const s = Math.min(240 / img.width, 240 / img.height), w = img.width * s, h = img.height * s; g.drawImage(img, 70 + (240 - w) / 2, y + 18 + (240 - h) / 2, w, h); }
+      else { g.fillStyle = '#e8effb'; g.fillRect(70, y + 18, 240, 240); }
+      g.fillStyle = '#d32f2f'; g.beginPath(); g.arc(92, y + 40, 30, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#fff'; g.textAlign = 'center'; trTexteAjuste(g, String(n), 92, y + 51, 54, n > 99 ? 24 : 30, true); g.textAlign = 'left';
+      const xd = 340, ld = mode === 'agent' ? 470 : 500;
+      g.fillStyle = '#16233a';
+      let yy = y + 50;
+      yy += 38 * agLignesTexte(g, p.nom_fr, xd, yy, ld, 30, true, 38, 2);
+      g.fillStyle = '#0d3f85'; yy += 36 * agLignesTexte(g, p.nom_cn, xd, yy + 2, ld, 28, true, 36, 2);
+      g.fillStyle = '#475569';
+      if (mode === 'agent') yy += 30 * agLignesTexte(g, p.specs || '', xd, yy + 4, ld, 22, false, 30, 2);
+      g.fillStyle = '#16233a'; trTexteAjuste(g, 'Quantité · 数量 : ' + nf(q, 0) + ' pièces / 个', xd, y + H_L - 40, ld, 26, true);
+      // À droite : les prix.
+      const xp = mode === 'agent' ? 840 : 860, lp = AG_W - 60 - xp;
+      if (mode === 'agent') {
+        let yp = y + 52;
+        if (opts.vise) { g.fillStyle = '#475569'; trTexteAjuste(g, 'Prix visé · 目标价', xp, yp, lp, 24, false); g.fillStyle = '#16233a'; trTexteAjuste(g, '≈ ' + nf(p.achat_cny, 2) + ' ¥', xp, yp + 44, lp, 38, true); yp += 92; }
+        g.fillStyle = '#fde2e2'; g.fillRect(xp - 12, yp - 34, lp + 24, 120);
+        g.fillStyle = '#9b1c1c'; trTexteAjuste(g, 'MAXIMUM · 最高价', xp, yp, lp, 24, true);
+        g.fillStyle = '#dc2626'; trTexteAjuste(g, k.maxAchat > 0 ? nf(k.maxAchat, 2) + ' ¥' : 'à éviter', xp, yp + 60, lp, 52, true);
+      } else {
+        const T2 = (lib, val, yv, col) => { g.fillStyle = '#5a6b85'; trTexteAjuste(g, lib, xp, yv, lp, 21, false); g.fillStyle = col || '#16233a'; g.textAlign = 'right'; trTexteAjuste(g, val, AG_W - 60, yv, 200, 24, true); g.textAlign = 'left'; };
+        const gnf = v => nf(Math.round(v / 500) * 500, 0);
+        T2('Prix en Chine', nf(p.achat_cny, 2) + ' ¥', y + 40); T2('Maximum à payer', nf(k.maxAchat, 2) + ' ¥', y + 72, '#dc2626');
+        T2('Arrivé au magasin', gnf(k.arrive), y + 104); T2('Ton prix (+' + nf(r.marge, 0) + ' %)', gnf(k.kylo), y + 136);
+        T2('Conakry affiché', gnf(p.affiche_gnf), y + 168); T2('2e prix (marchandage)', gnf(k.deuxieme), y + 200);
+        T2('Gain par pièce', gnf(k.gain), y + 232, k.gain > 0 ? '#15803d' : '#dc2626');
+        g.fillStyle = '#16233a'; trTexteAjuste(g, '= ' + nf(q * p.achat_cny, 0) + ' ¥ · gain ≈ ' + nf(Math.round(q * k.gain / T.EUR_GNF), 0) + ' €', xd, y + H_L - 70, ld, 22, false);
+      }
+      y += H_L;
+    }
+    g.fillStyle = '#94a3b8'; g.textAlign = 'center';
+    trTexteAjuste(g, mode === 'agent' ? 'KYLO EURGUINE · Conakry, Guinée · 几内亚科纳克里' : 'Document de travail de KYLO EURGUINE — contient les prix de vente : ne pas envoyer aux fournisseurs ni aux agents.', AG_W / 2, AG_H - 30, AG_W - 80, 20, false);
+    g.textAlign = 'left';
+    pages.push({ src: c.toDataURL('image/jpeg', 0.85), w: AG_W, h: AG_H });
+  }
+  return pages;
+}
+function agListe() { const e = etActuelle(), D = e && etDonnees[e.id]; if (!D) return null; return { e, D, r: etReg(e), L: etListeOnglet(e, D, 'moi') }; }
+async function agMaListe(b) {
+  const x = agListe(); if (!x || !x.L.length) { avertir('Ta liste est vide : touche « ✅ Je prends » sur des produits.'); return; }
+  const t = b && b.textContent; if (b) { b.disabled = true; b.textContent = '⏳ Préparation du PDF…'; }
+  try {
+    etMajFacteur(x.e, x.D, x.r, x.L);
+    const pages = await agPages(x.e, x.D, x.r, x.L, 'moi', {});
+    await remettreFichier(cxPdfDepuisImages(pages), 'KYLO-ma-liste-complete-' + new Date().toLocaleDateString('fr-CA') + '.pdf');
+  } catch (err) { avertir('Le PDF n\'a pas pu être préparé : ' + (err.message || err), 7000); }
+  if (b) { b.disabled = false; b.textContent = t; }
+}
+let agE = null;
+function agBoite() {
+  const x = agListe(); if (!x || !x.L.length) { avertir('Ta liste est vide : touche « ✅ Je prends » sur des produits.'); return; }
+  const agents = fournisseursListe().filter(f => f.agent);
+  agE = { pages: [], fid: '' };
+  mkBoite(`<div class="mk-dlg ct-champs"><h3>📤 Liste pour l'agent (PDF)</h3>
+    <div class="ag-quoi"><b>Ce qui part :</b> la photo, le numéro, le nom en français et en chinois, la quantité, le prix visé et le <b>prix MAXIMUM en yuans</b> (à ne jamais dépasser), et comment répondre.<br>
+      <b>Ce qui ne part PAS :</b> tes prix de vente à Conakry, ton gain, ta marge.</div>
+    <label for="ag_nom">Nom de l'agent (démarcheur)</label>
+    <input id="ag_nom" list="ag_noms" placeholder="ex. Mamadou" value="${E(agents[0] ? agents[0].contact || '' : '')}" style="font-size:17px">
+    <datalist id="ag_noms">${agents.map(f => `<option value="${E(f.contact || f.nom)}">`).join('')}</datalist>
+    <label class="et-tc" for="ag_vise"><input type="checkbox" id="ag_vise" checked> Montrer aussi le prix visé (le prix trouvé en ligne)</label>
+    <label class="et-tc" for="ag_fiche"><input type="checkbox" id="ag_fiche" checked> Lui faire une fiche dans le carnet (pour noter ses réponses et les comparer à tes fournisseurs)</label>
+    <p class="px-aide">${x.L.length} produit(s) de « ✅ Ma liste », dans cet ordre (le n° 1 de la liste = le n° 1 de sa réponse).</p>
+    <div id="ag_res"></div>
+    <div class="mk-boutons"><button class="b vert" id="ag_ok" onclick="agPreparer()">📄 Préparer le PDF de l'agent</button><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+}
+function agFicheAgent(nom) {
+  const n = normaliserNom(nom);
+  let f = fournisseursListe().find(x => x.agent && normaliserNom(x.contact || x.nom) === n);
+  if (!f) { f = { id: idUnique('f'), code: mkProchainCode(), nom: 'Agent — ' + (nom || 'démarcheur'), contact: nom || '', agent: true, source: 'agent', marche: '', batiment: '', allee: '', wechat: '', tel: '', qualite: '', remarque: 'Agent / démarcheur : cherche les produits de ma liste.', le: mkMaintenant().slice(0, 10), vu_le: mkMaintenant(), decision: '', docs: [], produits: [] }; fournisseursListe().unshift(f); }
+  return f;
+}
+async function agPreparer() {
+  const x = agListe(); if (!x) return;
+  const nom = String((document.getElementById('ag_nom') || {}).value || '').trim();
+  const vise = !!(document.getElementById('ag_vise') || {}).checked, fiche = !!(document.getElementById('ag_fiche') || {}).checked;
+  const b = document.getElementById('ag_ok'); if (b) { b.disabled = true; b.textContent = '⏳ Préparation…'; }
+  try {
+    etMajFacteur(x.e, x.D, x.r, x.L);
+    if (fiche) {
+      const f = agFicheAgent(nom);
+      const lignes = x.L.map((p, i) => { const l = eoAjouterChez(x.e, p, f); return { n: i + 1, cle: l.cle, nom: p.nom_fr }; });
+      f.px_demande = { le: mkMaintenant(), paliers: [], lignes }; f.demande_le = f.px_demande.le; f.demande_canal = 'whatsapp';
+      agE.fid = f.id; sauverLocal();
+    }
+    agE.pages = await agPages(x.e, x.D, x.r, x.L, 'agent', { agent: nom, vise });
+    const z = document.getElementById('ag_res');
+    if (z) z.innerHTML = `<div class="aq ok">✅ ${agE.pages.length} page(s) prête(s)${agE.fid ? ' · fiche « ' + E(mkNomFournisseur(mkFournisseur(agE.fid))) + ' » créée (Fournisseurs)' : ''}.</div>
+      <div class="ag-apercu">${agE.pages.map((p, i) => `<img src="${p.src}" alt="Page ${i + 1}" onclick="mkApercu(agE.pages[${i}].src,'Page ${i + 1}')">`).join('')}</div>
+      <button class="b" style="background:#25d366;color:#fff;margin-top:8px" onclick="agEnvoyer()">📤 Envoyer le PDF (WhatsApp, WeChat…)</button>
+      ${agE.fid ? `<p class="px-aide" style="margin-top:8px">Sa réponse : sur sa fiche → « 📸 Sa réponse en photos » (capture ou message collé). Ses prix iront sur chaque produit de l'étude, à côté de ceux de tes fournisseurs.</p>` : ''}`;
+  } catch (err) { avertir('Le PDF n\'a pas pu être préparé : ' + (err.message || err), 7000); }
+  if (b) { b.disabled = false; b.textContent = '📄 Refaire le PDF de l\'agent'; }
+}
+function agEnvoyer() {
+  if (!agE || !agE.pages.length) return;
+  const nom = String((document.getElementById('ag_nom') || {}).value || 'agent').trim().replace(/[^\w-]+/g, '-');
+  remettreFichier(cxPdfDepuisImages(agE.pages), 'KYLO-liste-achat-' + nom + '-' + new Date().toLocaleDateString('fr-CA') + '.pdf');
+}
+// Les boutons, dans « ✅ Ma liste ».
+const agEcranAvant = ecranEtude;
+ecranEtude = function (e) {
+  const h = agEcranAvant.apply(this, arguments);
+  if (etOnglet !== 'moi') return h;
+  const D = etDonnees[e.id]; if (!D || !etListeOnglet(e, D, 'moi').length) return h;
+  return h.replace('<button type="button" class="b contour" style="width:auto" onclick="etCopierListe(this)">',
+    `<div class="ag-b"><button type="button" class="b vert" onclick="agBoite()">📤 Liste pour l'agent (PDF, sans tes prix de vente)</button>
+      <button type="button" class="b contour" onclick="agMaListe(this)">📄 Ma liste complète (PDF, pour moi)</button></div><button type="button" class="b contour" style="width:auto" onclick="etCopierListe(this)">`);
+};
+// =====================================================================================================
+//  CARNET 1.11.0 — F. LE CARGO ET LE CONTRÔLE (24/10/2026)
+//  Riche, 13 h 01 : « en faisant ça, je veux profiter de trouver un cargo, ou la personne qui va se charger du contrôle et de
+//  l'envoyer, pour que je puisse discuter avec eux ». D'après la recherche du 24/10 (sources et dates dans le rapport).
+//  🏭 Fournisseurs (en haut) et l'étude → « 🚢 Cargo et contrôle » :
+//   1. les cargos à comparer (contact, prix annoncé et ce qu'il comprend, délai, ce qu'il faut vérifier), les 10 questions à
+//      envoyer (en français pour un cargo guinéen, en chinois + anglais pour un cargo chinois), SA réponse notée, la comparaison
+//      en € par m³ « tout compris » et pour TA liste ; « ⭐ Je choisis ce cargo » met son prix dans les calculs de l'étude
+//      (douane et transitaire à 0 si son prix comprend tout) et son entrepôt dans les contrats ;
+//   2. le contrôle (V-Trust, QIMA, le cargo lui-même) et la règle : jamais le solde avant le rapport ;
+//   3. avant l'acompte : vérifier la société (licence, gsxt.gov.cn, compte au nom de la société) — le message chinois prêt.
+// =====================================================================================================
+const CG_CARGOS = [
+  { id: 'colis224', nom: 'Colis224', qui: 'Guinéen. Entrepôt bateau à Foshan (Nanhai, Lishui, 29 Shangsha Road) ; entrepôt avion à Canton (Yuexiu, 202 Huanshi Xilu, Meibo Sports City, 10e étage, salle 1020).',
+    wechat: 'kindy Drame', tel_cn: '+8618719472926', whatsapp: '+224620178930', email: 'contact@colis224.com', site: 'https://colis224.com/', langue: 'fr',
+    prix: 'Bateau 4 700 000 GNF le m³ ; avion 200 000 GNF le kg (batteries, liquides 250 000 GNF/kg) ; colis minimum 5 kg.', prix_m3: 4700000, devise: 'GNF', tout: '?',
+    delai: 'Bateau 45 à 60 jours ; avion 17 à 21 jours (le site dit aussi 7 à 15).', verifier: 'Les avis viennent de son propre site. Demander par écrit ce que comprend le prix (douane, BESC, livraison). Rendez-vous obligatoire avant de livrer l\'entrepôt.', source: 'colis224.com, consulté le 24/10/2026' },
+  { id: 'aixin', nom: 'AI XIN CARGO', qui: 'Canton, Baiyun, Shijing, Dagang Xijie n° 13, parc d\'entrepôts « Daguanjia », porte 2.', contact: '« Balde » (numéro incomplet sur TikTok)', langue: 'fr',
+    prix: 'Pas de prix publié.', delai: '60 à 65 jours.', verifier: 'Source faible (un post TikTok de 2026) : aller voir l\'entrepôt AVANT de lui confier quoi que ce soit.', source: 'TikTok, 2026' },
+  { id: 'sdi', nom: 'SDI Logistics', qui: 'Shenzhen et Canton (vitrine Made-in-China).', site: 'https://sdilogistics.en.made-in-china.com/', langue: 'cn',
+    prix: 'Annonce « customs included », départ le mardi, contrôle qualité « gratuit ». Prix affiché bizarre (730 $ / m²) : demander un vrai devis par m³.', delai: '55 à 65 jours.', verifier: 'Promesses commerciales à vérifier par écrit.', source: 'Made-in-China, 2026' },
+  { id: 'ay', nom: 'Guangzhou AY International', qui: 'Canton (« Audited Supplier » Made-in-China).', site: 'https://ayforwarding.en.made-in-china.com/', langue: 'cn',
+    prix: 'Bateau 150 à 200 $ le m³ (minimum 1 m³) ; avion 10 à 15 $/kg (minimum 100 kg) ; assurance 0,3 % de 110 % de la valeur ; 7 jours de stockage gratuit.', prix_m3: 175, devise: 'USD', tout: 'non',
+    delai: '30 à 60 jours.', verifier: 'Demander si le prix comprend le dédouanement à Conakry (« door to door » annoncé).', source: 'Made-in-China, 2026' },
+  { id: 'betterluck', nom: 'BETTERluck Shipping', qui: 'Canton, Huangpu : salles 607-608, Talent Building, 1 Yichuang Street.', site: 'https://blshipping.com/', langue: 'cn',
+    prix: 'Pas de prix publié ; regroupe plusieurs fournisseurs dans son entrepôt, va chercher dans les marchés de gros.', delai: 'Avion 4 à 8 jours ouvrés (annoncé).', verifier: 'Le prix final à Conakry n\'est pas annoncé.', source: 'blshipping.com, 2026' }];
+const CG_CONTROLES = [
+  ['V-Trust (siège à Canton)', '268 $ la journée « tout compris » dans les grandes zones industrielles (298 $ ailleurs), week-end sans supplément, rapport en 24 h. Payer 2 jours avant.', 'https://www.v-trust.com/', 'Électroménager : 220 V / 50 Hz, prise, emballage.'],
+  ['QIMA', 'À partir de 309 à 419 $ la journée selon les sources ; réservation en ligne, inspecteur en 48 h.', 'https://www.qima.com/', 'Même usage, plus cher.'],
+  ['TradeAider', '199 $ la journée (prix annoncé par lui-même).', 'https://www.tradeaider.com/', 'Option bon marché, à tester.'],
+  ['Le cargo lui-même', 'Comptage, photos, vidéo, essai de mise en marche (Colis224 : 100 000 GNF d\'« achat assisté » avec contrôle).', '', 'Petits articles : accessoires, outillage, déco.']];
+const CG_QUESTIONS_FR = (vol) => `Bonjour, je suis ${ctSignature().split('–')[0].trim() || 'Riche'}, de KYLO EURGUINE à Conakry. Je suis à Guangzhou jusqu'au 6 novembre pour une commande d'environ ${vol} chez plusieurs fournisseurs (accessoires téléphone, petit électroménager, déco, outillage, beauté). Avant de choisir mon cargo, merci de me répondre par écrit :
+1. Prix du m³ en bateau : qu'est-ce qui est compris (fret, BESC, port de Conakry, douane et TVA, livraison à Madina) et qu'est-ce qui ne l'est pas ?
+2. Pouvez-vous m'écrire « prix ferme, aucun frais en plus à Conakry » ?
+3. Comment mesurez-vous le volume ? Je veux la photo du mètre sur chaque carton et la liste signée à la réception.
+4. Y a-t-il un minimum ? Combien de jours de stockage gratuit ?
+5. Quelle est la date du prochain bateau, et la date limite pour livrer votre entrepôt ?
+6. Si un carton est perdu ou cassé, vous remboursez combien ? Quel est le prix de l'assurance ?
+7. Acceptez-vous les batteries (power banks), les liquides et les cosmétiques, et à quel prix ?
+8. Comptez-vous les cartons ? Faites-vous des photos, une vidéo et un essai des appareils électriques avant le départ ? Pour quel prix ?
+9. Pouvez-vous m'envoyer votre marquage de cartons (shipping mark) et l'adresse exacte de l'entrepôt en chinois, pour mes fournisseurs ?
+10. Quel est le nom de votre société en Chine et votre adresse à Conakry ? Pouvez-vous me donner deux clients guinéens que je peux appeler ?
+Merci.`;
+const CG_QUESTIONS_CN = (vol) => `您好！我是几内亚科纳克里 KYLO EURGUINE 公司的 ${ctSignature().split('–')[0].trim() || 'Riche'}。我在广州到11月6日，有一批货（约 ${vol}，几个供应商）要从广州/佛山海运到几内亚科纳克里（拼箱）。请书面回复：
+1. 每立方米海运价格包含什么（运费、BESC/ECTN、科纳克里港口费、清关关税和增值税、送货）？不包含什么？
+2. 能否写明"价格固定，到科纳克里不再加收任何费用"？
+3. 体积怎么量？我需要每箱量尺寸的照片和签字的入库清单。
+4. 有最低起运量吗？免费仓储几天？
+5. 下一班船是哪天？入仓截止日期是哪天？
+6. 货物丢失或损坏怎么赔偿？保险费多少？
+7. 能不能走移动电源、液体、化妆品？价格多少？
+8. 入仓时能点数、拍照、拍视频、电器通电测试吗？多少钱？
+9. 请发唛头（shipping mark）和仓库详细中文地址给我，我转给供应商。
+10. 贵公司中文全称是什么？在科纳克里有办公室吗？
+谢谢！
+Hello, this is ${ctSignature().split('–')[0].trim() || 'Riche'} from KYLO EURGUINE (Conakry, Guinea). I have about ${vol} of goods from several suppliers to ship LCL from Guangzhou/Foshan to Conakry. Please answer in writing: what your price per CBM includes (freight, BESC/ECTN, Conakry port, customs duties and VAT, delivery) and what it does not; a firm price with no extra charge in Conakry; how you measure volume (photo of each carton measured); minimum and free storage days; next sailing and warehouse cut-off date; compensation and insurance; batteries/liquids/cosmetics; counting, photos, video and power-on test at the warehouse; your shipping mark and warehouse address in Chinese; your company name and Conakry office. Thank you!`;
+const CG_LICENCE_CN = '您好！下单付定金之前，请发一下贵公司营业执照的清楚彩色照片（要看到公司全称和统一社会信用代码），以及公司对公账户信息（开户名必须和营业执照上的公司名称一致）。谢谢！\nHello, before paying the deposit, please send a clear colour photo of your business licence (company name and 18-character credit code) and your company bank account (the account name must be the same as the company name on the licence). Thank you!';
+function cgListe() { const perso = Array.isArray(C.cargos_perso) ? C.cargos_perso : []; return CG_CARGOS.concat(perso); }
+function cgRep(id) { const t = C.cargos_rep || (C.cargos_rep = {}); return t[id] || (t[id] = {}); }
+// Le prix du m³ « tout compris » d'un cargo, en euros (sa réponse notée, sinon son prix annoncé).
+function cgEurM3(x) {
+  const r = cgRep(x.id), v = num(r.prix_m3) || num(x.prix_m3), d = r.devise || x.devise || 'USD'; if (!(v > 0)) return 0;
+  const e = etActuelle(), D = e && etDonnees[e.id], T = D ? D.params.taux : null;
+  const gnf = d === 'GNF' ? v : d === 'USD' ? v * (T ? T.USD_GNF : tauxDe('USD')) : d === 'EUR' ? v * (T ? T.EUR_GNF : tauxDe('EUR')) : d === 'CNY' ? v * (T ? T.CNY_GNF : tauxDe('CNY')) : 0;
+  const eur = T ? T.EUR_GNF : tauxDe('EUR'); return eur > 0 ? gnf / eur : 0;
+}
+function cgToutCompris(x) { const r = cgRep(x.id); return r.douane === 'oui' ? 'oui' : r.douane === 'non' ? 'non' : x.tout || '?'; }
+// Le volume de la liste (Ma liste, sinon le groupe 1) : pour chiffrer chaque cargo.
+function cgVolume() {
+  const e = etActuelle(), D = e && etDonnees[e.id]; if (!D) return { m3: 0, quoi: '' };
+  const r = etReg(e); let L = etListeOnglet(e, D, 'moi'), quoi = 'ta liste';
+  if (!L.length) { L = etListeOnglet(e, D, '1'); quoi = 'le groupe 1'; }
+  etMajFacteur(e, D, r, L); const t = etTotaux(e, D, r, L); etFacteur = 1;
+  return { m3: t.vol, quoi, achat: t.achat, apayer: t.apayer, gain: t.gain };
+}
+function cgCopier(texte, puis) {
+  try { navigator.clipboard.writeText(texte).then(() => { avertir('📋 Copié. Collez-le dans la discussion.', 3000); if (puis) setTimeout(puis, 600); }, () => avertir('Copiez le texte à la main (appui long).')); }
+  catch (e) { avertir('Copiez le texte à la main (appui long).'); }
+}
+function cgQuestions(id) {
+  const x = cgListe().find(c => c.id === id); if (!x) return;
+  const v = cgVolume(), vol = v.m3 ? Math.ceil(v.m3) + ' m³' : '20 m³';
+  const t = x.langue === 'cn' ? CG_QUESTIONS_CN(vol) : CG_QUESTIONS_FR(vol);
+  cgRep(id).questions_le = mkMaintenant(); sauverLocal();
+  const wa = String(x.whatsapp || '').replace(/\D/g, '');
+  cgCopier(t, () => { if (wa) ctNouvelOnglet('https://wa.me/' + wa + '?text=' + encodeURIComponent(t)); else if (x.wechat || x.langue === 'cn') location.href = 'weixin://'; });
+}
+function cgCarteHtml(x, v, choisi) {
+  const r = cgRep(x.id), eur = cgEurM3(x), tc = cgToutCompris(x);
+  const wa = String(x.whatsapp || '').replace(/\D/g, ''), tel = String(x.tel_cn || '').replace(/[^\d+]/g, '');
+  return `<div class="cg-c${choisi ? ' choisi' : ''}" id="cg_${x.id}">
+    <div class="cg-t"><b>${E(x.nom)}</b>${choisi ? ' <span class="lc-tag">⭐ mon cargo</span>' : ''}${x.perso ? ' <span class="lc-tag">ajouté par moi</span>' : ''}</div>
+    <div class="cg-q">${E(x.qui || '')}</div>
+    <div class="cg-l"><b>Prix annoncé :</b> ${E(x.prix || '—')}</div>
+    <div class="cg-l"><b>Délai :</b> ${E(x.delai || '—')}</div>
+    ${x.verifier ? `<div class="cg-l cg-att">⚠ ${E(x.verifier)}</div>` : ''}
+    ${x.source ? `<div class="cg-s">Source : ${E(x.source)}</div>` : ''}
+    <div class="cg-b">
+      ${x.wechat ? `<button type="button" class="b wechat" onclick="cgCopier(${E(JSON.stringify(x.wechat))}, () => location.href='weixin://')">💬 WeChat « ${E(x.wechat)} »</button>` : ''}
+      ${wa ? `<button type="button" class="b tr-wa" onclick="ctNouvelOnglet('https://wa.me/${wa}')">🟢 WhatsApp</button>` : ''}
+      ${tel ? `<button type="button" class="b contour" onclick="location.href='tel:${E(tel)}'">📞 ${E(ctTelLisible(tel))}</button>` : ''}
+      ${x.site ? `<button type="button" class="b contour" onclick="ctNouvelOnglet(${E(JSON.stringify(x.site))})">🌐 Site</button>` : ''}
+      <button type="button" class="b vert" onclick="cgQuestions('${x.id}')">📋 Les 10 questions ${x.langue === 'cn' ? '(中文 + English)' : '(français)'}${r.questions_le ? ' ✓' : ''}</button>
+    </div>
+    <details class="cg-rep"${r.prix_m3 ? '' : ''}><summary>✏️ Sa réponse${r.prix_m3 ? ' : ' + E(nf(num(r.prix_m3))) + ' ' + E(r.devise || '') + ' le m³' : ''}</summary>
+      <div class="cg-g">
+        <label>Prix du m³ (bateau)<input inputmode="decimal" value="${E(r.prix_m3 || '')}" onchange="cgNoter('${x.id}','prix_m3',this.value)"></label>
+        <label>Monnaie<select onchange="cgNoter('${x.id}','devise',this.value)">${['GNF', 'USD', 'EUR', 'CNY'].map(d => `<option ${(r.devise || x.devise || 'USD') === d ? 'selected' : ''}>${d}</option>`).join('')}</select></label>
+        ${[['douane', 'Douane et TVA comprises ?'], ['besc', 'BESC compris ?'], ['livraison', 'Livraison à Conakry comprise ?']].map(([k, l]) => `<label>${l}<select onchange="cgNoter('${x.id}','${k}',this.value)">${[['', '?'], ['oui', 'Oui'], ['non', 'Non']].map(([v2, t2]) => `<option value="${v2}" ${r[k] === v2 ? 'selected' : ''}>${t2}</option>`).join('')}</select></label>`).join('')}
+        <label>Délai (jours)<input inputmode="numeric" value="${E(r.delai || '')}" onchange="cgNoter('${x.id}','delai',this.value)"></label>
+        <label>Stockage gratuit (jours)<input inputmode="numeric" value="${E(r.stockage || '')}" onchange="cgNoter('${x.id}','stockage',this.value)"></label>
+        <label>Prochain bateau / date limite<input value="${E(r.depart || '')}" onchange="cgNoter('${x.id}','depart',this.value)"></label>
+        <label>Contrôle (photos, essai) : prix<input value="${E(r.controle || '')}" onchange="cgNoter('${x.id}','controle',this.value)"></label>
+      </div>
+      <label>Son marquage de cartons (shipping mark)<textarea rows="2" onchange="cgNoter('${x.id}','marque',this.value)">${E(r.marque || '')}</textarea></label>
+      <label>Adresse de son entrepôt (en chinois si possible)<textarea rows="2" onchange="cgNoter('${x.id}','adresse',this.value)">${E(r.adresse || '')}</textarea></label>
+      <label>Remarque<textarea rows="2" onchange="cgNoter('${x.id}','note',this.value)">${E(r.note || '')}</textarea></label>
+    </details>
+    ${eur > 0 ? `<div class="cg-chiffre">≈ <b>${E(nf(Math.round(eur)))} € le m³</b> ${tc === 'oui' ? '(tout compris, douane comprise)' : tc === 'non' ? '(sans la douane)' : '(douane comprise ? à lui demander)'}${v.m3 ? ' → ' + E(v.quoi) + ' (' + E(nf(v.m3, 1)) + ' m³) ≈ <b>' + E(nf(Math.round(eur * v.m3))) + ' €</b>' : ''}</div>` : ''}
+    <button type="button" class="b ${choisi ? 'gris' : 'contour'}" onclick="cgChoisir('${x.id}')">${choisi ? '⭐ C\'est mon cargo (toucher pour enlever)' : '⭐ Je choisis ce cargo'}</button>
+  </div>`;
+}
+function cgNoter(id, k, v) { cgRep(id)[k] = String(v).trim(); cgRep(id).le = mkMaintenant(); sauverLocal(); }
+function cgAjouter() {
+  const nom = String((document.getElementById('cg_n') || {}).value || '').trim(); if (!nom) { avertir('Écrivez le nom du cargo.'); return; }
+  const contact = String((document.getElementById('cg_t') || {}).value || '').trim();
+  const L = Array.isArray(C.cargos_perso) ? C.cargos_perso : (C.cargos_perso = []);
+  const d = contact.replace(/\D/g, '');
+  L.push({ id: idUnique('cg'), nom, perso: true, qui: contact ? 'Contact : ' + contact : '', whatsapp: /^224/.test(d) || /^\+224/.test(contact) ? d : '', tel_cn: /^(86)?1[3-9]\d{9}$/.test(d) ? '+86' + d.replace(/^86/, '') : '', langue: /^(86)?1[3-9]/.test(d) ? 'cn' : 'fr', prix: 'À lui demander.', delai: '' });
+  sauverLocal(); cgOuvrir();
+}
+// Choisir un cargo : son prix entre dans les calculs de l'étude ; son entrepôt devient le lieu de livraison des contrats.
+function cgChoisir(id) {
+  const x = cgListe().find(c => c.id === id); if (!x) return;
+  if (C.cargo_choisi === id) { C.cargo_choisi = ''; sauverLocal(); cgOuvrir(); avertir('Cargo enlevé. Les calculs de l\'étude gardent les derniers chiffres (⚙ Mes chiffres).'); return; }
+  const e = etActuelle(), D = e && etDonnees[e.id], eur = cgEurM3(x), tc = cgToutCompris(x);
+  let msg = '⭐ ' + x.nom + ' est ton cargo.';
+  if (e && D && eur > 0) {
+    const avant = cgVolume(), t = C.etude_reg || (C.etude_reg = {}), r = t[e.id] || (t[e.id] = {});
+    const usd = eur * D.params.taux.EUR_GNF / D.params.taux.USD_GNF;
+    r.fret = Math.round(usd); if (tc === 'oui') { r.douane = 0; r.transit = 0; }
+    const apres = cgVolume();
+    msg += '\nÉtude : bateau ' + nf(r.fret) + ' $/m³' + (tc === 'oui' ? ', douane 0 %, transitaire 0 % (son prix comprend tout)' : ' (douane inchangée : son prix ne la comprend pas, ou pas encore confirmé)')
+      + '.\n' + apres.quoi.charAt(0).toUpperCase() + apres.quoi.slice(1) + ' : à payer en plus (bateau, douane, transitaire) ' + nf(Math.round(avant.apayer)) + ' € → ' + nf(Math.round(apres.apayer)) + ' €.'
+      + (apres.gain < avant.gain ? '\nTon prix de vente suit ton coût (arrivé + ' + nf(etReg(e).marge, 0) + ' %) : tu vends moins cher que les autres, le gain attendu passe de ' + nf(Math.round(avant.gain)) + ' à ' + nf(Math.round(apres.gain)) + ' €. Monte ta marge (⚙ Mes chiffres) si tu veux garder l\'écart.'
+        : '\nGain attendu : ' + nf(Math.round(avant.gain)) + ' € → ' + nf(Math.round(apres.gain)) + ' €.');
+  } else msg += '\nNotez d\'abord son prix du m³ (« ✏️ Sa réponse ») pour qu\'il entre dans les calculs.';
+  C.cargo_choisi = id; sauverLocal(); cgOuvrir(); avertir(msg, 11000);
+}
+// Les contrats : le lieu de livraison = l'entrepôt du cargo choisi (s'il n'était pas rempli).
+if (typeof ctrContrat === 'function') {
+  const cgContratAvant = ctrContrat;
+  ctrContrat = function (f) {
+    const k = cgContratAvant.apply(this, arguments);
+    const x = C.cargo_choisi && cgListe().find(c => c.id === C.cargo_choisi), r = x ? cgRep(x.id) : null;
+    if (x && !String(k.lieu || '').trim() && (r.adresse || x.qui)) k.lieu = (r.adresse || x.nom + ' — ' + x.qui).slice(0, 220);
+    return k;
+  };
+}
+function cgOuvrir() {
+  const v = cgVolume(), L = cgListe();
+  const tri = L.slice().sort((a, b) => (cgEurM3(a) || 1e9) - (cgEurM3(b) || 1e9));
+  const avecPrix = tri.filter(x => cgEurM3(x) > 0);
+  mkBoite(`<div class="mk-dlg ct-champs cg-dlg"><h3>🚢 Cargo et contrôle</h3>
+    <p class="px-aide">Le cargo reçoit les cartons de tous tes fournisseurs dans son entrepôt, les compte, les envoie et les dédouane à Conakry. Compare au moins 3 cargos
+      avec les MÊMES questions${v.m3 ? ', pour ' + E(v.quoi) + ' (' + E(nf(v.m3, 1)) + ' m³)' : ''}. D'après la recherche du 24/10 : groupage « tout compris » ≈ 450 à 550 € le m³ ; fret seul 100 à 260 $ le m³ (sans la douane).</p>
+    ${avecPrix.length ? `<div class="cg-tab"><b>Comparaison (€ par m³)</b>${avecPrix.map(x => `<div><span>${E(x.nom)}</span><span>${E(nf(Math.round(cgEurM3(x))))} €${cgToutCompris(x) === 'oui' ? ' · tout compris' : cgToutCompris(x) === 'non' ? ' · sans douane' : ' · douane ?'}</span></div>`).join('')}</div>` : ''}
+    <div class="px-titre">1. Les cargos</div>
+    ${tri.map(x => cgCarteHtml(x, v, C.cargo_choisi === x.id)).join('')}
+    <details class="cg-aj"><summary>➕ Ajouter un cargo rencontré</summary>
+      <label for="cg_n">Nom</label><input id="cg_n" placeholder="ex. Diallo Cargo">
+      <label for="cg_t">Téléphone / WhatsApp</label><input id="cg_t" inputmode="tel" placeholder="+224… ou +86…">
+      <button type="button" class="b vert" style="margin-top:8px" onclick="cgAjouter()">➕ Ajouter</button></details>
+    <div class="px-titre">2. Le contrôle de la marchandise</div>
+    <p class="px-aide">Une journée d'inspecteur = un lieu. Le conseil : un inspecteur chez ton plus gros fournisseur d'électroménager (tension, prise, moteur) ; pour le reste, le cargo compte, photographie et essaie. <b>Ne paie jamais le solde de 70 % avant le rapport.</b></p>
+    ${CG_CONTROLES.map(([n, p, u, pour]) => `<div class="cg-c"><b>${E(n)}</b><div class="cg-l">${E(p)}</div><div class="cg-l"><b>Pour :</b> ${E(pour)}</div>${u ? `<button type="button" class="b contour" onclick="ctNouvelOnglet('${u}')">🌐 Son site</button>` : ''}</div>`).join('')}
+    <div class="px-titre">3. Avant l'acompte : vérifier la société</div>
+    <ol class="mk-etapes"><li>Demandez la photo de sa <b>licence</b> (营业执照) et son <b>compte bancaire de société</b> (message prêt ci-dessous).</li>
+      <li>Cherchez le nom chinois exact ou le code à 18 caractères sur <b>gsxt.gov.cn</b> : le statut doit dire « 存续 » (en activité).</li>
+      <li>Ne payez <b>que</b> sur un compte au nom exact de cette société, jamais au nom d'une personne. Acompte 30 % au maximum.</li></ol>
+    <div class="mk-deux"><button type="button" class="b vert" onclick="cgCopier(CG_LICENCE_CN, () => location.href='weixin://')">📋 Message « licence et compte » (中文 + English)</button>
+      <button type="button" class="b contour" onclick="ctNouvelOnglet('https://www.gsxt.gov.cn/')">🔎 Ouvrir gsxt.gov.cn</button></div>
+    <div class="mk-boutons"><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+}
+// Les entrées : en haut de 🏭 Fournisseurs, et dans l'étude.
+const cgRencontresAvant = ecranRencontres;
+ecranRencontres = function () {
+  const h = cgRencontresAvant.apply(this, arguments);
+  const x = C.cargo_choisi && cgListe().find(c => c.id === C.cargo_choisi);
+  const nCartes = fournisseursListe().reduce((s, f) => s + ctDocs(f).filter(d => d.type === 'carte').length, 0);
+  return `<div class="cg-entree"><button type="button" class="b contour" onclick="cgOuvrir()">🚢 Cargo et contrôle${x ? ' · ⭐ ' + E(x.nom) : ' : comparer et choisir'}</button>
+    ${nCartes ? `<button type="button" class="b contour" onclick="lcRelireToutes()">🔁 Relire mes ${nCartes} cartes (nouvelle lecture)</button>` : ''}</div>` + h;
+};
+const cgEcranEtudeAvant = ecranEtude;
+ecranEtude = function (e) {
+  const h = cgEcranEtudeAvant.apply(this, arguments);
+  const x = C.cargo_choisi && cgListe().find(c => c.id === C.cargo_choisi);
+  return h.replace('<details class="et-reg">', `<button type="button" class="b contour" style="margin:4px 0 6px;min-height:50px" onclick="cgOuvrir()">🚢 Cargo et contrôle${x ? ' · ⭐ ' + E(x.nom) : ' : comparer et choisir'}</button><details class="et-reg">`);
+};
 </script>
 <script>
 

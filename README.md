@@ -172,6 +172,7 @@ et PDF complet pour moi ; l'agent a sa fiche, sa réponse se range comme celle d
 F. « 🚢 Cargo et contrôle » (Fournisseurs et étude) : cargos de la recherche du 24/10, 10 questions (FR / 中文+EN), réponse
 notée, comparaison en € par m³, « ⭐ Je choisis » → bateau, douane et transitaire de l'étude, entrepôt dans les contrats ;
 contrôle (V-Trust, QIMA, cargo) ; vérifier la société avant l'acompte (licence, gsxt.gov.cn, message chinois).
+Corrigée le 24/10 au soir (même numéro) : un prénom seul près du numéro (« Rosy ») devient le contact ; une marque qui contient « boss » n'est plus prise pour un poste.
 Fichiers `suivi-1.11.0-*.js` + `suivi-1.11.0.css`, `construire-1.11.0.py` (part de la 1.10.0). Rien de retiré.
 ⚠ Même remarque pour `KYLO-Achats.html`.
 

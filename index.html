@@ -15293,6 +15293,18 @@ function lcCompleter(r, texte, brut) {
   }
   if (addCn) r.adresse_cn = addCn.replace(/\s+/g, '');
   if (r.adresse && r.adresse.length > 140) r.adresse = r.adresse.split(', ').filter((x, i, a) => a.indexOf(x) === i).join(', ').slice(0, 160);
+  // Un « poste » qui n'est pas un poste (la marque « BOSSTECH » lue « BossYECH » contient « boss ») : effacé.
+  if (r.poste && !/\b(sales|manager|director|representative|president|ceo|export|marketing|engineer|merchandiser|assistant|boss|owner|general|purchas\w*|buyer|account)\b|经理|总监|业务|销售|主管|老板|代表|总裁|董事/i.test(r.poste)) delete r.poste;
+  // Un prénom seul sur sa ligne (« Rosy ») juste au-dessus ou au-dessous d'un numéro : c'est le contact.
+  if (!r.contact) {
+    const L = texte.split('\n').map(l => l.trim());
+    const marque = normaliserNom(r.societe || '').replace(/[^a-z]/g, '');
+    for (let i = 0; i < L.length && !r.contact; i++) {
+      const m = L[i].match(/^([A-Z][a-z]{2,11})\b[^A-Za-z]*$/); if (!m || LC_PAS_NOM.test(m[1]) || TR_LIEUX.test(m[1] + ' ')) continue;
+      if (marque && marque.includes(m[1].toLowerCase())) continue;
+      if ([L[i + 1], L[i + 2], L[i - 1]].some(x => (String(x || '').match(/\d/g) || []).length >= 7)) r.contact = m[1];
+    }
+  }
   if (!Object.keys(doute).length) delete r.doute;
   return r;
 }

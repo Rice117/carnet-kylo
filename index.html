@@ -14780,6 +14780,8 @@ function ecranEtude(e) {
   return `<div class="et-zone" style="--et-t:${taille}px">
     <div class="carte"><div class="et-titre">📊 ${E(e.titre)}</div>
       <div style="color:var(--gris);font-size:.9em">${E(nf(D.liste.length, 0))} produits · ${E(groupes.length)} groupes · reçue le ${E(mkJour(e.recue_le || e.le))}${e.parties > 1 && (e.recues || []).length < e.parties ? ' · ⚠ ' + (e.recues || []).length + ' fichier(s) sur ' + e.parties + ' ajoutés' : ''}</div>
+      ${(() => { const manque = e.parties > 1 ? e.parties - (e.recues || []).length : 0;
+        return `<button type="button" class="b ${manque > 0 ? 'vert' : 'contour'}" style="margin:8px 0 2px;min-height:50px" onclick="ctBoiteImport()">📥 Ajouter un fichier de Claude${manque > 0 ? ' (il en manque ' + manque + ')' : ''}</button>`; })()}
       <div class="et-tailles"><span style="align-self:center;font-size:.9em;color:var(--gris)">Taille du texte :</span>
         ${[[16, 'Normal'], [18, 'Grand'], [21, 'Très grand']].map(([v, n]) => `<button type="button" class="mk-puce${taille === v ? ' on' : ''}" onclick="C.etude_taille=${v};sauverLocal();dessiner()">${n}</button>`).join('')}</div>
       <details class="et-reg"><summary>⚙ Mes chiffres (budget, frais du voyage, ma marge…)</summary>

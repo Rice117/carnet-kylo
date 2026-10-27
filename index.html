@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.11.0';
+window.KYLO_APPLICATION = '1.12.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -6332,7 +6332,7 @@ function ctDessinerDemande() {
       ${n ? puce("portee='tous-liste'", 'Les ' + n + ' modèles notés', ctDemande.portee === 'tous-liste') : ''}
       ${nInt ? puce("portee='interesse'", '⭐ Les ' + nInt + ' qui m\'intéressent', ctDemande.portee === 'interesse') : ''}</div>
     <label>Où l'avez-vous rencontré ?</label>
-    <div class="mk-puces">${puce("lieu='foire'", 'Foire de Canton', ctDemande.lieu === 'foire')}
+    <div class="mk-puces">${puce("lieu='yiwu'", 'Yiwu (sa boutique)', ctDemande.lieu === 'yiwu')}${puce("lieu='foire'", 'Foire de Canton', ctDemande.lieu === 'foire')}
       ${puce("lieu='marche'", 'Au marché', ctDemande.lieu === 'marche')}${puce("lieu='usine'", 'À l\'usine', ctDemande.lieu === 'usine')}</div>`}
     <label for="ct_msg">Le message (vous pouvez le modifier)</label>
     <textarea id="ct_msg" class="ct-message" rows="12">${E(msg)}</textarea>
@@ -10032,7 +10032,7 @@ function trAQui(f, suite) {
   const cn = [String(f.contact || '').match(/[\u4e00-\u9fff]+/g), String(f.societe || '').match(/[\u4e00-\u9fff]{4,}/g)].flat().filter(Boolean).join(' · ');
   const carte = ctDocs(f).find(x => x.type === 'carte');
   z.innerHTML = `<h3>💬 À qui envoyez-vous ?</h3>
-    <div class="qui"><div class="code">${E(code)}</div><div><div class="nom">${E(mkNomFournisseur(f).replace(/^F\d+\s*·\s*/, ''))}</div>
+    <div class="qui"><div class="code">${E(code)}</div><div><div class="nom">${E(mkNomFournisseur(f).replace(/^[FY]\d+\s*·\s*/, ''))}</div>
       ${cn ? `<div class="cn">${E(cn)}</div>` : ''}
       <div class="det">${E([f.contact && !/[\u4e00-\u9fff]/.test(f.contact) ? f.contact : '', f.wechat ? 'WeChat : ' + f.wechat : '', f.mobile ? ctTelLisible(f.mobile) : ''].filter(Boolean).join(' · '))}</div></div></div>
     ${carte || f.qr_photo ? `<img class="carte-img" id="tr_aqui_img" alt="Sa carte" ${f.qr_photo && !carte ? `src="${f.qr_photo}"` : ''}>` : ''}
@@ -15592,8 +15592,8 @@ function aqMotsDe(f) {
 }
 function aqParNomDeFichier(noms) {
   const n = normaliserNom(noms.join(' '));
-  const code = (n.match(/\bf(\d{2,3})\b/) || [])[1];
-  if (code) { const f = fournisseursListe().find(x => String(x.code || '').toUpperCase() === 'F' + code); if (f) return { f, pourquoi: 'son code ' + f.code + ' est dans le nom du fichier' }; }
+  const mc = n.match(/\b([fy])(\d{2,3})\b/), code = mc ? mc[1].toUpperCase() + mc[2] : '';
+  if (code) { const f = fournisseursListe().find(x => String(x.code || '').toUpperCase() === code); if (f) return { f, pourquoi: 'son code ' + f.code + ' est dans le nom du fichier' }; }
   let meilleur = null;
   fournisseursListe().forEach(f => { aqMotsDe(f).forEach(m => { if (n.includes(m) && (!meilleur || m.length > meilleur.m.length)) meilleur = { f, m }; }); });
   return meilleur ? { f: meilleur.f, pourquoi: '« ' + meilleur.m + ' » est dans le nom du fichier' } : null;
@@ -15748,7 +15748,7 @@ fwLireImage = async function (fichier) {
 // ---------- 2. Le petit QR sur chaque page de la demande de prix ----------
 // Le code de la page : « KYLO F05 3 » (le code du fournisseur et le n° du produit) — court, donc un QR à gros carrés, facile à relire.
 function rpCodePage(t) {
-  const m = String(t || '').trim().match(/^KYLO\s+(F\d{1,4})\s+(\d{1,3})$/i);
+  const m = String(t || '').trim().match(/^KYLO\s+([FY]\d{1,4})\s+(\d{1,3})$/i);
   if (!m) return null;
   const f = fournisseursListe().find(x => String(x.code || '').toUpperCase() === m[1].toUpperCase());
   return { fid: f ? f.id : '', code: m[1].toUpperCase(), n: Number(m[2]) };
@@ -16643,6 +16643,982 @@ eoHtml = function (e, D, r, p) {
     return `<div class="eo-o${abs || ''}">${doc ? `<img class="ct-mini ctg-eo-img" data-doc="${E(doc)}" alt="">` : ''}<div><b>${nom}</b>${mod ? ` <span class="ctg-mod">${E(mod)}</span>` : ''}`;
   });
 };
+</script>
+<style>
+/* ===================== 1.12.0 — YIWU N'EST PAS GUANGZHOU, ET CHACUN SE RETROUVE DANS WECHAT (27/10/2026) =====================
+   Couleur de Yiwu : l'ambre du carnet ; Guangzhou : le bleu. Textes jamais sous 14 px ; gros boutons pour le pouce. */
+.vl-badge{display:inline-block;font-size:14px;font-weight:800;border-radius:999px;padding:2px 10px;vertical-align:middle;line-height:1.35;white-space:nowrap}
+.vl-badge.vl-yw{background:var(--ambre-pale);color:var(--ambre);border:1px solid var(--ambre)}
+.vl-badge.vl-gz{background:var(--bleu-pale);color:var(--bleu);border:1px solid var(--bleu)}
+.mk-code.vl-yw{background:var(--ambre)}
+.vl-barre{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--carte);border:2px solid var(--lisiere);border-radius:14px;padding:10px 12px;margin:0 0 12px;box-shadow:var(--ombre)}
+.vl-barre-t{flex:1 1 100%;font-size:17px;font-weight:800;color:var(--noir)}
+.vl-ici{flex:1 1 0;min-width:0;min-height:54px;font:inherit;font-size:17px;font-weight:800;border-radius:12px;border:2px solid var(--lisiere);background:var(--carte);color:var(--noir);cursor:pointer}
+.vl-ici.vl-yw.on{background:var(--ambre);border-color:var(--ambre);color:#fff}
+.vl-ici.vl-gz.on{background:var(--bleu);border-color:var(--bleu);color:#fff}
+html[data-theme="sombre"] .vl-ici.on{color:#0c1526}
+.vl-barre-n{flex:1 1 100%;font-size:15px;color:var(--texte-note)}
+.vl-compte{display:block;font-size:15px;font-weight:700;color:var(--gris);margin-top:4px}
+.vl-filtres{margin-bottom:6px}
+.vl-groupe{font-size:19px;margin:16px 4px 8px;padding:6px 12px;border-left:6px solid var(--bleu);border-radius:6px;background:var(--bleu-pale);color:var(--noir)}
+.vl-groupe.vl-yw{border-left-color:var(--ambre);background:var(--ambre-pale)}
+.vl-groupe span{font-size:15px;font-weight:600;color:var(--texte-note)}
+.vl-revoir{background:var(--ambre-pale);border:2px solid var(--ambre);font-size:16px;line-height:1.45}
+.vl-sous{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.vl-changer{font:inherit;font-size:14px;min-height:36px;padding:4px 10px;border-radius:10px;border:1px solid var(--lisiere);background:var(--carte);color:var(--bleu);cursor:pointer}
+.as-titre .vl-badge{font-size:15px;margin-left:6px}
+
+/* WeChat */
+.vw-entree{display:flex;flex-direction:column;align-items:center;gap:2px;min-height:68px;font-size:18px;margin:0 0 12px;background:#1aad19!important;color:#fff!important}
+.vw-entree small{display:block;font-size:15px;font-weight:600;opacity:.95}
+.vw-stand{border:2px solid #1aad19}
+.vw-stand.ok{border-color:var(--vert)}
+.vw-nom{font-size:22px;font-weight:900;letter-spacing:.01em;text-align:center;background:var(--cv);border-radius:12px;padding:10px;margin:6px 0 10px;word-break:break-all;color:var(--noir)}
+.vw-nom.petit{font-size:18px;padding:8px}
+.vw-gros{min-height:60px;font-size:17px!important;background:#1aad19!important;color:#fff!important;margin-bottom:6px}
+.vw-etapes{margin:6px 0 10px;padding-left:22px}
+.vw-etapes li{font-size:16px;line-height:1.45;margin:3px 0}
+.vw-ok{font-size:17px;line-height:1.45;margin:4px 0 8px}
+.vw-petit{min-height:44px;font-size:15px!important;margin-top:8px}
+.vw-cherche{font-size:17px;line-height:1.6;margin:6px 0}
+.vw-mot{display:inline-block;font-size:21px;font-weight:900;background:#1aad19;color:#fff;border-radius:9px;padding:1px 12px;letter-spacing:.03em;vertical-align:middle}
+.vw-nom-wx{font-size:15px;color:var(--texte-note)}
+.vw-av{font-size:15px;color:var(--ambre);line-height:1.4;margin-top:4px}
+.vw-fiche{border:2px solid #1aad19;border-radius:14px;padding:12px;margin:12px 0 4px;background:var(--carte)}
+.vw-fiche.ok{border-color:var(--vert);background:var(--vert-pale)}
+.vw-titre{font-size:17px;font-weight:800;margin-bottom:4px}
+.vw-btns{display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px}
+.vw-btns.deux{grid-template-columns:1fr 1fr}
+.vw-btns .b{min-height:52px;font-size:16px}
+.vw-btns .b.wechat,.vw-fiche .b.wechat{background:#1aad19;color:#fff}
+.vw-autre{margin-top:10px}
+.vw-autre summary{font-size:15px;font-weight:700;cursor:pointer;min-height:40px;display:flex;align-items:center;color:var(--bleu)}
+.vw-autre input{width:100%;box-sizing:border-box;font-size:17px;min-height:50px;margin:6px 0;border-radius:10px;border:1px solid var(--bord-champ);padding:8px 10px;background:var(--champ);color:var(--noir)}
+.vw-autre .b{min-height:48px;font-size:16px}
+.vw-tete-ecran .mk-filtres{margin-top:8px}
+.vw-compteur{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 8px}
+.vw-compteur span{flex:1 1 140px;font-size:17px;border-radius:12px;padding:10px 12px;text-align:center}
+.vw-compteur b{font-size:24px}
+.vw-compteur .ok{background:var(--vert-pale);color:var(--vert)}
+.vw-compteur .att{background:var(--ambre-pale);color:var(--ambre)}
+.vw-mode summary{font-size:16px;font-weight:800;cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--bleu)}
+.vw-ligne{background:var(--carte);border:2px solid var(--lisiere);border-radius:14px;padding:12px;margin:10px 0;box-shadow:var(--ombre)}
+.vw-ligne.ok{border-color:var(--vert)}
+.vw-ligne.vw-dernier{outline:4px solid var(--ambre);outline-offset:2px}
+.vw-tete{display:flex;gap:10px;align-items:flex-start}
+.vw-img{width:68px;height:68px;object-fit:cover;border-radius:10px;flex:none;background:var(--cv);border:1px solid var(--lisiere)}
+.vw-img.vide{display:flex;align-items:center;justify-content:center;font-size:28px}
+.vw-qui{flex:1;min-width:0;font-size:16px;line-height:1.4}
+.vw-qui .det{font-size:15px;color:var(--texte-note)}
+.vw-a{font-size:16px;line-height:1.45;margin:8px 0 2px}
+.vw-sans{font-size:15px;color:var(--texte-note);align-self:center}
+.vw-aqui .cp{display:block;width:100%}
+.vw-aqui .vw-autre input{min-height:46px}
+
+/* Sa boutique à Yiwu */
+.yw-sec{border:2px solid var(--ambre)}
+.yw-grille{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:6px 0 10px}
+.yw-case{display:flex;flex-direction:column;gap:4px;font-size:14px;font-weight:700;color:var(--texte-note)}
+.yw-case.large{grid-column:1/-1}
+.yw-case input{font-size:21px;font-weight:800;text-align:center;min-height:52px;border-radius:10px;border:1px solid var(--bord-champ);background:var(--champ);color:var(--noir);width:100%;box-sizing:border-box;padding:4px}
+.yw-apercu{background:var(--ambre-pale);border-radius:12px;padding:10px 12px;margin:4px 0 10px;font-size:16px;line-height:1.45}
+.yw-fr{font-weight:800}
+.yw-cn{font-size:20px;font-weight:700;margin-top:2px;color:var(--noir)}
+.yw-vide{color:var(--texte-note)}
+.yw-lu{font-size:14px;font-weight:700;color:var(--ambre)}
+.yw-sec .b{min-height:52px;font-size:16px}
+
+/* Le guide du marché de Yiwu */
+.yg{font-size:16px;line-height:1.45}
+.yg h3{margin:4px 0 8px;font-size:20px}
+.yg-onglets{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0 10px}
+.yg-onglets button{min-height:52px;font:inherit;font-size:16px;font-weight:800;border-radius:12px;border:2px solid var(--lisiere);background:var(--carte);color:var(--noir);cursor:pointer}
+.yg-onglets button.on{border-color:var(--ambre);background:var(--ambre-pale)}
+.yg-d{border:2px solid var(--lisiere);border-radius:14px;padding:10px 12px;margin:10px 0;background:var(--carte)}
+.yg-d summary{font-size:18px;font-weight:800;cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px}
+.yg-d summary small{font-size:15px;font-weight:600;color:var(--texte-note)}
+.yg-e{margin:8px 0;padding:8px 10px;border-left:5px solid var(--ambre);background:var(--ambre-pale);border-radius:6px}
+.yg-e b{display:block;font-size:16px}
+.yg-e .cn{font-size:15px;color:var(--texte-note)}
+.yg-adr{font-size:15px;color:var(--texte-note);margin:4px 0}
+.yg-f{border-bottom:1px solid var(--lisiere);padding:8px 2px}
+.yg-f b{font-size:16px}
+.yg-ou{display:inline-block;font-size:15px;font-weight:800;background:var(--ambre-pale);color:var(--ambre);border-radius:8px;padding:1px 8px;margin:2px 4px 2px 0}
+.yg-pas{font-size:15px;color:var(--texte-note)}
+.yg-src{font-size:14px;color:var(--texte-note);margin-top:10px;word-break:break-word}
+.yg .mk-deux .b,.yg .b{min-height:50px;font-size:16px}
+.ou-yw{border-left:5px solid var(--ambre);padding-left:8px}
+</style>
+<script>
+// =====================================================================================================
+//  CARNET 1.12.0 — A. LES VILLES : YIWU N'EST PAS GUANGZHOU (27/10/2026)
+//  Riche, 27/10 à 9 h 53, arrivé à Yiwu : « les fournisseurs que je vais enregistrer ici doivent être distingués de ceux de
+//  Guangzhou ». Chaque fournisseur porte sa VILLE (là où il a été rencontré et noté) :
+//   - les fiches d'avant cette version sont de Guangzhou ; celles notées à partir du 27/10 à 8 h (heure de Chine) sont de Yiwu ;
+//   - « 📍 Je suis à » (en haut de 🏭 Fournisseurs) : chaque nouveau fournisseur prend cette ville, tout seul ;
+//   - à Yiwu, le code commence par Y (Y01, Y02…) ; à Guangzhou il reste F (F01…) : la ville se lit dans le code, partout
+//     (WeChat, demandes de prix, contrats, fichiers) ;
+//   - la liste montre deux groupes (🛍️ Yiwu, puis 🏙️ Guangzhou) et des puces pour n'en voir qu'un.
+//  Rien n'est retiré : les anciens codes F ne changent jamais tout seuls.
+// =====================================================================================================
+window.KYLO_SUIVI = '1.12.0';
+const VL_VILLES = {
+  Yiwu: { id: 'Yiwu', nom: 'Yiwu', cn: '义乌', lettre: 'Y', ic: '🛍️', classe: 'vl-yw',
+    marche: 'Yiwu — marché international (义乌国际商贸城)' },
+  Guangzhou: { id: 'Guangzhou', nom: 'Guangzhou', cn: '广州', lettre: 'F', ic: '🏙️', classe: 'vl-gz',
+    marche: 'Foire de Canton' }
+};
+const VL_ORDRE = ['Yiwu', 'Guangzhou'];
+// Arrivée à Yiwu : le 27/10/2026 à 8 h, heure de Chine (= minuit en temps universel, celui des dates du carnet).
+const VL_ARRIVEE_YIWU = '2026-10-27T00:00:00Z';
+let vlFiltre = 'toutes';
+let vlDansListe = false;
+
+function vlVilleActuelle() {
+  const v = C && C.voyage && C.voyage.ville_actuelle;
+  return VL_VILLES[v] ? v : 'Yiwu';
+}
+function vlVille(f) {
+  if (!f) return '';
+  return VL_VILLES[f.ville] ? f.ville : 'Guangzhou';
+}
+function vlInfo(v) { return VL_VILLES[v] || VL_VILLES.Guangzhou; }
+function vlBadge(f, court) {
+  const v = vlInfo(vlVille(f));
+  return `<span class="vl-badge ${v.classe}">${v.ic} ${court ? '' : E(v.nom)}</span>`;
+}
+// Une fiche d'avant la 1.12.0 : Guangzhou, sauf si elle a été notée à partir de l'arrivée à Yiwu (pas une fiche venue d'un
+// fichier de Claude, de l'Interprète ou de l'agent, qui parlent de Guangzhou).
+function vlVilleDeDepart(f) {
+  let d = String(f.vu_le || f.le || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) d += 'T00:00:00Z';
+  const venueDAilleurs = f.agent || ['claude', 'interprete', 'agent'].includes(f.source);
+  return !venueDAilleurs && d && d >= VL_ARRIVEE_YIWU ? 'Yiwu' : 'Guangzhou';
+}
+// La ville donne aussi le marché et le lieu de rencontre (pour le mot chinois « on s'est vus à… »), seulement s'ils sont vides
+// ou laissés à la valeur d'avant (« Foire de Canton »).
+function vlAccorderLieu(f) {
+  if (vlVille(f) !== 'Yiwu') return;
+  const m = String(f.marche || '').trim();
+  if (!m || m === 'Foire de Canton') f.marche = VL_VILLES.Yiwu.marche;
+  if (!f.lieu_rencontre || f.lieu_rencontre === 'foire') f.lieu_rencontre = 'yiwu';
+}
+// Donne une ville à chaque fiche qui n'en a pas. Appelée avant chaque enregistrement et à chaque écran des fournisseurs.
+function vlAssurer() {
+  if (!C || !C.voyage) return false;
+  let change = false;
+  if (!C.voyage.ville_actuelle) { C.voyage.ville_actuelle = 'Yiwu'; change = true; }
+  const premiereFois = !C.villes_1120;
+  fournisseursListe().forEach(f => {
+    if (!f || VL_VILLES[f.ville]) return;
+    f.ville = premiereFois ? vlVilleDeDepart(f) : vlVilleActuelle();
+    // Noté à Yiwu avant cette version : il a un code F. On ne le change pas tout seul (il a peut-être déjà servi dans WeChat) :
+    // le carnet le propose, une fois.
+    if (premiereFois && f.ville === 'Yiwu' && /^F\d+$/.test(String(f.code || ''))) f.vl_code_a_revoir = true;
+    vlAccorderLieu(f);
+    change = true;
+  });
+  if (premiereFois) { C.villes_1120 = mkMaintenant(); change = true; }
+  return change;
+}
+const vlSauverAvant = sauverLocal;
+sauverLocal = function () {
+  try { vlAssurer(); } catch (e) {}
+  return vlSauverAvant.apply(this, arguments);
+};
+// Le code : Y01, Y02… à Yiwu ; F01, F02… à Guangzhou (chaque ville compte de son côté).
+function vlLettre(v) { return vlInfo(v).lettre; }
+mkProchainCode = function (ville) {
+  const L = vlLettre(VL_VILLES[ville] ? ville : vlVilleActuelle());
+  const re = new RegExp('^' + L + '(\\d+)$');
+  let max = 0;
+  mkFournisseurs().forEach(f => { const m = re.exec(String(f.code || '')); if (m) max = Math.max(max, Number(m[1])); });
+  return L + String(max + 1).padStart(2, '0');
+};
+// Au stand : le nouveau fournisseur prend tout de suite la ville (avant même d'être enregistré).
+const vlStandFournisseurAvant = trStandFournisseur;
+trStandFournisseur = function () {
+  const neuf = !trStandF();
+  const f = vlStandFournisseurAvant.apply(this, arguments);
+  if (neuf && f && !VL_VILLES[f.ville]) { f.ville = vlVilleActuelle(); vlAccorderLieu(f); }
+  return f;
+};
+// « Je suis à » : la ville où l'on est maintenant.
+function vlChoisirVilleActuelle(v) {
+  if (!VL_VILLES[v]) return;
+  C.voyage.ville_actuelle = v;
+  sauverLocal(); dessiner();
+  avertir(vlInfo(v).ic + ' Vous êtes à ' + vlInfo(v).nom + ' : les nouveaux fournisseurs auront un code ' + vlLettre(v) + '01, '
+    + vlLettre(v) + '02…', 4000);
+}
+function vlFiltrer(v) { vlFiltre = v; try { localStorage.setItem('kylo_ville_filtre', v); } catch (e) {} dessiner(); }
+try { const v = localStorage.getItem('kylo_ville_filtre'); if (v === 'toutes' || VL_VILLES[v]) vlFiltre = v; } catch (e) {}
+function vlCompter() {
+  const n = { toutes: 0 };
+  VL_ORDRE.forEach(v => { n[v] = 0; });
+  fournisseursListe().forEach(f => { n.toutes++; n[vlVille(f)] = (n[vlVille(f)] || 0) + 1; });
+  return n;
+}
+// La liste : seulement la ville choisie ; « Toutes » = deux groupes, Yiwu d'abord.
+const vlRecentsAvant = mkFournisseursRecents;
+mkFournisseursRecents = function () {
+  const r = vlRecentsAvant.apply(this, arguments);
+  return vlDansListe && VL_VILLES[vlFiltre] ? r.filter(f => vlVille(f) === vlFiltre) : r;
+};
+function vlAvecFiltre(v, fn) {
+  const avantF = vlFiltre, avantD = vlDansListe;
+  vlFiltre = v; vlDansListe = true;
+  try { return fn(); } finally { vlFiltre = avantF; vlDansListe = avantD; }
+}
+function vlTitreGroupe(v, n) {
+  const x = vlInfo(v);
+  return `<h3 class="vl-groupe ${x.classe}">${x.ic} ${E(x.nom)} <span>— ${n} fournisseur${n > 1 ? 's' : ''}</span></h3>`;
+}
+const vlListeAvant = mkListeFournisseursHtml;
+mkListeFournisseursHtml = function () {
+  const args = arguments, self = this;
+  if (VL_VILLES[vlFiltre]) return vlAvecFiltre(vlFiltre, () => vlListeAvant.apply(self, args));
+  const villes = VL_ORDRE.filter(v => fournisseursListe().some(f => vlVille(f) === v));
+  if (villes.length < 2) return vlListeAvant.apply(self, args);
+  const parts = villes.map(v => {
+    const h = vlAvecFiltre(v, () => vlListeAvant.apply(self, args));
+    const n = (h.match(/class="mk-fiche"/g) || []).length;
+    return n ? vlTitreGroupe(v, n) + h : '';
+  }).filter(Boolean);
+  return parts.length ? parts.join('') : vlListeAvant.apply(self, args);
+};
+if (typeof clListeParCategorie === 'function') {
+  const vlCategorieAvant = clListeParCategorie;
+  clListeParCategorie = function () {
+    const args = arguments, self = this;
+    return VL_VILLES[vlFiltre] ? vlAvecFiltre(vlFiltre, () => vlCategorieAvant.apply(self, args)) : vlCategorieAvant.apply(self, args);
+  };
+}
+// Sur chaque fiche de la liste : la ville à côté du code, et le code de la couleur de sa ville.
+const vlCarteAvant = mkCarteFournisseurHtml;
+mkCarteFournisseurHtml = function (f) {
+  const h = vlCarteAvant.apply(this, arguments);
+  if (!f) return h;
+  return h.replace('<span class="mk-code">', `<span class="mk-code ${vlInfo(vlVille(f)).classe}">`)
+    .replace(/(<span class="mk-code[^"]*">[^<]*<\/span>)/, '$1 ' + vlBadge(f));
+};
+// Changer la ville d'un fournisseur (rangé dans la mauvaise ville) : et son code, s'il n'a pas encore servi.
+function vlCodeAServi(f) {
+  return !!(f.wechat_renomme || f.wechat_nom || f.px_demande || f.demande_le || f.catalogue_demande_le || f.contrat);
+}
+function vlBoiteVille(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const ici = vlVille(f);
+  mkBoite(`<div class="mk-dlg">
+    <h3>📍 Où avez-vous rencontré ${E(mkNomFournisseur(f))} ?</h3>
+    <p class="mk-aide" style="font-size:15px">Aujourd'hui : ${vlBadge(f)}. Son code : <b>${E(f.code || '—')}</b>.</p>
+    <div class="mk-boutons">${VL_ORDRE.filter(v => v !== ici).map(v => {
+      const neuf = mkProchainCode(v), servi = vlCodeAServi(f);
+      return `<button class="b ${servi ? 'contour' : 'vert'}" onclick="vlChangerVille('${f.id}','${v}',true)">${vlInfo(v).ic} ${E(vlInfo(v).nom)} — nouveau code ${E(neuf)}</button>
+        <button class="b ${servi ? 'vert' : 'contour'}" onclick="vlChangerVille('${f.id}','${v}',false)">${vlInfo(v).ic} ${E(vlInfo(v).nom)} — garder le code ${E(f.code || '')}</button>
+        ${servi ? `<p class="mk-aide" style="font-size:15px">⚠ Le code ${E(f.code || '')} a déjà servi (WeChat, demande de prix ou contrat) : gardez-le, sinon il ne se retrouvera plus.</p>` : ''}`;
+    }).join('')}
+      <button class="b gris" onclick="fermerBoite()">Annuler</button></div></div>`);
+}
+function vlChangerVille(fid, v, recoder) {
+  const f = mkFournisseur(fid); if (!f || !VL_VILLES[v]) return;
+  const ancien = f.code, avantV = vlVille(f);
+  f.ville = v;
+  if (recoder) { f.code_avant = ancien; f.code = mkProchainCode(v); }
+  delete f.vl_code_a_revoir;
+  if (v === 'Yiwu') vlAccorderLieu(f);
+  else {
+    if (f.marche === VL_VILLES[avantV].marche) f.marche = VL_VILLES[v].marche;
+    if (f.lieu_rencontre === 'yiwu') f.lieu_rencontre = 'foire';
+  }
+  sauverLocal(); fermerBoite(); dessiner();
+  avertir(vlInfo(v).ic + ' ' + (f.nom || f.societe || 'Le fournisseur') + ' est rangé à ' + vlInfo(v).nom
+    + (recoder ? ' : son code devient ' + f.code + ' (avant ' + ancien + ').' : ' (code ' + f.code + ' gardé).'), 5000);
+}
+// Ceux notés ce matin à Yiwu avec un code F (avant la mise à jour) : leur donner un code Y, une fois, si le code n'a pas servi.
+function vlARevoir() { return fournisseursListe().filter(f => f.vl_code_a_revoir && vlVille(f) === 'Yiwu'); }
+function vlRevoirHtml() {
+  const L = vlARevoir(); if (!L.length) return '';
+  const libres = L.filter(f => !vlCodeAServi(f));
+  return `<div class="carte vl-revoir"><b>🛍️ ${L.length} fournisseur${L.length > 1 ? 's' : ''} noté${L.length > 1 ? 's' : ''} à Yiwu avant la mise à jour</b>
+    ${L.length > 1 ? 'ont' : 'a'} encore un code de Guangzhou : ${L.map(f => '<b>' + E(f.code) + '</b> ' + E(asNomTete(f))).join(', ')}.
+    ${libres.length ? `<div class="mk-boutons"><button class="b vert" onclick="vlRecoderMatin()">Leur donner un code Y (${libres.map(f => E(f.code)).join(', ')})</button>` : '<div class="mk-boutons">'}
+    <button class="b contour" onclick="vlGarderMatin()">Garder leurs codes F</button></div>
+    ${libres.length < L.length ? '<p class="mk-aide" style="font-size:15px">Un code qui a déjà servi (WeChat, demande de prix) est gardé.</p>' : ''}</div>`;
+}
+function vlRecoderMatin() {
+  const faits = [];
+  vlARevoir().forEach(f => {
+    if (!vlCodeAServi(f)) { f.code_avant = f.code; f.code = mkProchainCode('Yiwu'); faits.push(f.code_avant + ' → ' + f.code); }
+    delete f.vl_code_a_revoir;
+  });
+  sauverLocal(); dessiner();
+  avertir(faits.length ? '🛍️ Nouveaux codes : ' + faits.join(', ') : 'Codes gardés.', 6000);
+}
+function vlGarderMatin() { vlARevoir().forEach(f => { delete f.vl_code_a_revoir; }); sauverLocal(); dessiner(); }
+
+// L'écran 🏭 Fournisseurs : « Je suis à », les puces des villes, et le nombre par ville.
+function vlBarreHtml() {
+  const ici = vlVilleActuelle();
+  return `<div class="vl-barre" role="group" aria-label="La ville où je suis">
+    <span class="vl-barre-t">📍 Je suis à :</span>
+    ${VL_ORDRE.map(v => `<button type="button" class="vl-ici ${vlInfo(v).classe}${v === ici ? ' on' : ''}" onclick="vlChoisirVilleActuelle('${v}')">${vlInfo(v).ic} ${E(vlInfo(v).nom)}${v === ici ? ' ✓' : ''}</button>`).join('')}
+    <span class="vl-barre-n">Nouveaux codes : <b>${E(vlLettre(ici))}01, ${E(vlLettre(ici))}02…</b></span></div>`;
+}
+function vlPucesHtml() {
+  const n = vlCompter();
+  const p = [['toutes', '🌍 Toutes les villes', n.toutes]].concat(VL_ORDRE.map(v => [v, vlInfo(v).ic + ' ' + vlInfo(v).nom, n[v] || 0]));
+  return `<div class="mk-filtres vl-filtres">${p.map(([k, t, c]) => `<button type="button" class="mk-puce${vlFiltre === k ? ' on' : ''}" onclick="vlFiltrer('${k}')">${t} (${c})</button>`).join('')}</div>`;
+}
+const vlRencontresAvant = ecranRencontres;
+ecranRencontres = function () {
+  if (vlAssurer()) { try { vlSauverAvant(); } catch (e) {} }
+  let h = vlRencontresAvant.apply(this, arguments);
+  const n = vlCompter();
+  h = h.replace(/(<h2 style="font-size:19px">🏭 Fournisseurs rencontrés \(\d+\))(<\/h2>)/,
+    `$1<span class="vl-compte">${VL_ORDRE.map(v => vlInfo(v).ic + ' ' + vlInfo(v).nom + ' ' + (n[v] || 0)).join(' · ')}</span>$2`);
+  h = h.replace('<div class="mk-filtres">', vlPucesHtml() + '<div class="mk-filtres">');
+  h = h.replace('Son <b>code</b> (F01, F02…) est le nom à lui donner dans WeChat :\n    vous le retrouvez ensuite tout de suite.',
+    'Son <b>code</b> (Y01… à Yiwu, F01… à Guangzhou) se met devant son nom dans WeChat, avec un tiret (« Y01-… ») :\n    vous le retrouvez ensuite en tapant « Y01- ».');
+  return vlBarreHtml() + vlRevoirHtml() + h;
+};
+// Sa fiche : la ville sous son nom, et « changer ».
+const vlDossierAvant = ecranDossier;
+ecranDossier = function () {
+  const h = vlDossierAvant.apply(this, arguments);
+  const f = mkFournisseur(ctDossier); if (!f) return h;
+  const d = String(f.vu_le || f.le || '');
+  const ligne = `<p class="ct-sous vl-sous">${vlBadge(f)}${d ? ' · noté le ' + E(mkJour(d)) : ''}
+    <button type="button" class="vl-changer" onclick="vlBoiteVille('${f.id}')">changer de ville</button></p>`;
+  return h.replace(/(<p class="ct-titre"><span class="mk-code)(">)/, `$1 ${vlInfo(vlVille(f)).classe}$2`)
+    .replace(/(<p class="ct-titre">[\s\S]*?<\/p>)/, '$1' + ligne);
+};
+// Au stand : la ville dans le titre, et la couleur du code.
+const vlStandAvant = ecranStand;
+ecranStand = function () {
+  const h = vlStandAvant.apply(this, arguments);
+  const v = vlInfo(vlVilleActuelle());
+  return h.replace('<div class="as-titre">📷 Au stand</div>', `<div class="as-titre">📷 Au stand <span class="vl-badge ${v.classe}">${v.ic} ${E(v.nom)}</span></div>`);
+};
+const vlQuiAvant = asQuiHtml;
+asQuiHtml = function () {
+  const h = vlQuiAvant.apply(this, arguments), f = trStandF();
+  return f ? h.replace('<span class="mk-code">', `<span class="mk-code ${vlInfo(vlVille(f)).classe}">`) : h;
+};
+// « Où l'avez-vous rencontré ? » (demande de prix) : Yiwu, sa boutique au marché.
+const vlCtLieuAvant = ctLieu;
+ctLieu = function (code, langue) {
+  if (code === 'yiwu') return langue === 'cn' ? '在义乌国际商贸城您的店铺' : 'at your shop in Yiwu International Trade City';
+  return vlCtLieuAvant.apply(this, arguments);
+};
+// Les fichiers de Claude peuvent dire la ville ; « Envoyer à Claude » l'emporte.
+['ville'].forEach(k => { if (typeof CT_CHAMPS_IMPORT !== 'undefined' && !CT_CHAMPS_IMPORT.includes(k)) CT_CHAMPS_IMPORT.push(k); });
+['ville', 'code_avant', 'lieu_rencontre'].forEach(k => {
+  if (typeof CL_CHAMPS_ENVOI !== 'undefined' && !CL_CHAMPS_ENVOI.includes(k)) CL_CHAMPS_ENVOI.push(k);
+  if (typeof FS_CHAMPS_ENVOI !== 'undefined' && !FS_CHAMPS_ENVOI.includes(k)) FS_CHAMPS_ENVOI.push(k);
+});
+
+// =====================================================================================================
+//  CARNET 1.12.0 — B. RETROUVER CHAQUE FOURNISSEUR DANS WECHAT, SANS CHERCHER (27/10/2026)
+//  Riche, 26/10 au soir : « impossible d'envoyer une demande directement dans la discussion d'un fournisseur, il faut chercher son
+//  nom parmi des milliers de contacts aux noms qui se ressemblent » ; WeCom demande un passeport et 3 jours, la page à part dans
+//  Claude l'a perdu (« elle est dans Claude, comment elle doit se retrouver dans WeChat ? »). 27/10 : « il faut tout mettre en place
+//  en même temps… pour qu'on s'en passe de l'autre ».
+//  WeChat ne laisse AUCUNE application ouvrir la discussion d'une personne. La seule clé sûre : le CODE devant son nom dans WeChat,
+//  avec un tiret — « Y01-Bosstech-Rosy », « F08-BAVIN-Lisa… ». Dans WeChat : 🔍 → « Y01- » → une seule personne.
+//  Tout est DANS le carnet :
+//   1. au stand, le nom est copié et le scanner de WeChat s'ouvre : on scanne son QR, on colle dans « Remarque », c'est fini ;
+//   2. sur sa fiche : le mot exact à taper dans WeChat ; s'il porte déjà un autre nom dans WeChat (« BAVIN-Lisa… »), on l'écrit
+//      une fois et le carnet dit quoi taper (« BAVIN ») ;
+//   3. « 💬 Mes fournisseurs dans WeChat » : tous, ville par ville, ceux à nommer d'abord, avec le compteur ;
+//   4. « À qui envoyez-vous ? » (avant chaque envoi) montre le mot à taper.
+// =====================================================================================================
+// Le nom à lui donner dans WeChat : CODE-Marque-Prénom (le tiret après le code : « F10- » ne trouve pas F100 à F109,
+// ni un stand « 1F104 »).
+function vwNomPropose(f) {
+  if (!f) return '';
+  const code = String(f.code || '').trim();
+  const propre = t => String(t || '').replace(/[一-鿿]+/g, ' ').replace(/[^A-Za-z0-9&]+/g, ' ').trim();
+  // « Le Tian Stationery » donne la marque « Le » : trop court pour reconnaître quelqu'un, on prend les deux premiers mots.
+  let marque = propre(trMarque(f.societe));
+  if (marque.length <= 2 && f.societe) marque = propre(f.societe).split(/\s+/).filter(Boolean).slice(0, 2).join('') || marque;
+  const prenom = propre(trPrenom(f.contact || '')).split(/\s+/)[0] || '';
+  let reste = [marque, prenom && normaliserNom(prenom) !== normaliserNom(marque) ? prenom : ''].filter(Boolean).join('-');
+  if (!reste) reste = propre(f.nom).split(/\s+/).filter(Boolean).slice(0, 2).join('-');
+  return ((code ? code + '-' : '') + reste).replace(/-+$/, '').slice(0, 30);
+}
+// Le mot à taper dans la recherche de WeChat (🔍) pour le trouver.
+function vwMot(f) {
+  if (!f) return '';
+  const code = String(f.code || '').trim(), nom = String(f.wechat_nom || '').trim();
+  if (nom) {
+    if (code && nom.toUpperCase().startsWith(code.toUpperCase() + '-')) return code + '-';
+    const m = nom.match(/[A-Za-z0-9]+|[一-鿿]+/);
+    return m ? m[0] : nom;
+  }
+  return f.wechat_renomme ? code : '';
+}
+function vwNomme(f) { return !!(f && (String(f.wechat_nom || '').trim() || f.wechat_renomme)); }
+// Le mot est-il sûr ? « F12 » (sans tiret) trouve aussi F120…F129 : on le dit.
+function vwMotAvertissement(f) {
+  const mot = vwMot(f);
+  if (!mot) return '';
+  if (/^[FY]\d+$/i.test(mot)) return 'Sans tiret, « ' + mot + ' » trouve aussi ' + mot + '0, ' + mot + '1… : choisissez celui qui s\'appelle « ' + (f.wechat_nom || mot + ' …') + ' ». Mieux : ajoutez le tiret dans WeChat (« ' + mot + '- »).';
+  return '';
+}
+// Ce qu'on tape dans WeChat pour le retrouver, en une ligne (fiche, « À qui ? », liste).
+function vwLigneMotHtml(f) {
+  const mot = vwMot(f);
+  if (!mot) return '';
+  const av = vwMotAvertissement(f);
+  return `<div class="vw-cherche">Dans WeChat : <b>🔍</b> → tapez <span class="vw-mot">${E(mot)}</span>${f.wechat_nom ? ` <span class="vw-nom-wx">(« ${E(f.wechat_nom)} »)</span>` : ''}${av ? `<div class="vw-av">${E(av)}</div>` : ''}</div>`;
+}
+// Copier son numéro (ou son ID WeChat) et ouvrir WeChat : WeChat → + → Ajouter des contacts → coller → son profil.
+function vwCleRecherche(f) {
+  const tel = typeof wxPortable === 'function' ? wxPortable(f) : '';
+  const id = typeof wxIdentifiant === 'function' ? wxIdentifiant(f) : '';
+  return tel ? { v: tel, quoi: 'son numéro' } : id ? { v: id, quoi: 'son ID WeChat' } : null;
+}
+function vwCopierNumero(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const k = vwCleRecherche(f); if (!k) { avertir('Ni numéro ni ID WeChat gardé pour lui.'); return; }
+  vwRetenir(fid);
+  mkCopier(k.v, '📋 ' + k.quoi[0].toUpperCase() + k.quoi.slice(1) + ' copié. WeChat s\'ouvre : + → Ajouter des contacts → collez → son profil → ⋯ → Remarque → tapez « ' + (f.code || '') + '- » devant son nom.');
+  setTimeout(() => ctAller('weixin://'), 700);
+}
+function vwCopierNom(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const nom = vwNomPropose(f);
+  f.vw_copie = nom; sauverLocal(); vwRetenir(fid);
+  mkCopier(nom, '📋 Nom copié : dans WeChat, ⋯ → Remarque (备注) → effacez → appui long → Coller → OK.');
+}
+// « C'est fait » : il porte maintenant son code dans WeChat. Le nom gardé est celui qui a été copié (ou « CODE-… »).
+function vwMarquer(fid, nom) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const n = String(nom || '').trim() || f.vw_copie || (f.code ? f.code + '-…' : '');
+  f.wechat_nom = n; f.wechat_renomme = true; delete f.vw_copie;
+  if (!f.wx_invite_le && !f.wx_ami_le) f.wx_invite_le = mkMaintenant();
+  sauverLocal();
+}
+function vwFait(fid) {
+  vwMarquer(fid);
+  const f = mkFournisseur(fid);
+  vwRafraichir();
+  avertir('✅ ' + (f ? mkNomFournisseur(f) : '') + ' : dans WeChat, tapez « ' + (f ? vwMot(f) : '') + ' » pour le retrouver.', 5000);
+}
+function vwGarderAutreNom(fid, idChamp) {
+  const z = document.getElementById(idChamp); const v = z ? z.value.trim() : '';
+  if (!v) { avertir('Écrivez le nom qu\'il porte dans votre WeChat (copiez-le depuis son profil).'); return; }
+  vwMarquer(fid, v);
+  const f = mkFournisseur(fid);
+  vwRafraichir();
+  avertir('✅ Noté : dans WeChat, tapez « ' + (f ? vwMot(f) : v) + ' » pour le retrouver.', 5000);
+}
+function vwOublier(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  delete f.wechat_nom; delete f.wechat_renomme; delete f.vw_copie;
+  sauverLocal(); vwRafraichir();
+}
+function vwRafraichir() {
+  if (ongletActif === 'stand') { const z = document.getElementById('vw_stand'); if (z) z.outerHTML = vwStandHtml(trStandF()); asMajQui(); return; }
+  const a = document.getElementById('tr_aqui'); if (a) { const u = a.querySelector('.une-fois, .vw-aqui'); if (u) u.outerHTML = vwAQuiBlocHtml(mkFournisseur(a.dataset.fid)); const et = a.querySelector('.etape'); if (et) et.innerHTML = vwEtapeAQui(mkFournisseur(a.dataset.fid)); }
+  if (!a) dessiner();
+}
+
+// ---------- 1. Au stand : le nom donné dans WeChat AU MOMENT où on l'ajoute ----------
+function vwStandHtml(f) {
+  const nom = f ? vwNomPropose(f) : '';
+  const code = f ? f.code : mkProchainCode();
+  if (f && vwNomme(f)) return `<section class="carte as-sec vw-stand ok" id="vw_stand"><h2>💬 Dans votre WeChat</h2>
+      <div class="vw-ok">✅ Il s'appelle <b>« ${E(f.wechat_nom || code)} »</b> dans votre WeChat.</div>
+      ${vwLigneMotHtml(f)}
+      <button type="button" class="b gris vw-petit" onclick="vwOublier('${f.id}')">↩️ Ce n'est pas encore fait</button></section>`;
+  return `<section class="carte as-sec vw-stand" id="vw_stand"><h2>💬 L'ajouter sur WeChat avec son code</h2>
+    <p class="mk-aide" style="font-size:15px">Le nom à lui donner dans votre WeChat (son code d'abord) :</p>
+    <div class="vw-nom" aria-live="polite">${E(nom || (code + '-'))}</div>
+    <button type="button" class="b wechat vw-gros" onclick="vwStandWeChat()">💬 Copier ce nom et ouvrir le scanner WeChat</button>
+    <ol class="vw-etapes"><li>Scannez <b>son QR</b> avec WeChat (sur son téléphone ou sa carte).</li>
+      <li>Touchez <b>Ajouter aux contacts</b> (添加到通讯录).</li>
+      <li>Case <b>Remarque</b> (备注) : effacez, appui long → <b>Coller</b> → <b>Envoyer</b> (发送).</li></ol>
+    <button type="button" class="b vert" onclick="vwStandFait()">✅ C'est fait : il s'appelle ${E(code)}- dans mon WeChat</button>
+    <details class="vw-autre"><summary>Il était déjà dans mon WeChat sous un autre nom</summary>
+      <label for="vw_autre_stand">Le nom qu'il porte dans votre WeChat</label>
+      <input id="vw_autre_stand" placeholder="ex : BAVIN-Lisa NewAsia" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <button type="button" class="b contour" onclick="vwStandAutre()">Garder ce nom</button></details></section>`;
+}
+function vwStandWeChat() {
+  const f = trStandFournisseur();
+  const nom = vwNomPropose(f);
+  f.vw_copie = nom; sauverLocal(); asSauver(true);
+  mkCopier(nom, '📋 « ' + nom + ' » copié. WeChat : scannez son QR → Ajouter aux contacts → Remarque → Coller → Envoyer.');
+  setTimeout(() => ctAller('weixin://dl/scan'), 700);
+  const z = document.getElementById('vw_stand'); if (z) z.outerHTML = vwStandHtml(f);
+  asMajQui();
+}
+function vwStandFait() { const f = trStandFournisseur(); vwMarquer(f.id); vwRafraichir(); avertir('✅ Dans WeChat, tapez « ' + vwMot(f) + ' » pour le retrouver.', 4500); }
+function vwStandAutre() { const f = trStandFournisseur(); vwGarderAutreNom(f.id, 'vw_autre_stand'); }
+const vwStandAvant = ecranStand;
+ecranStand = function () {
+  const h = vwStandAvant.apply(this, arguments);
+  return h.replace('<section class="carte as-sec"><h2>💬 2. Ses QR codes</h2>', vwStandHtml(trStandF()) + '<section class="carte as-sec"><h2>💬 2. Ses QR codes</h2>');
+};
+const vwMajToutAvant = asMajTout;
+asMajTout = function () {
+  vwMajToutAvant.apply(this, arguments);
+  if (ongletActif !== 'stand') return;
+  const z = document.getElementById('vw_stand'), f = trStandF();
+  if (z && document.activeElement && z.contains(document.activeElement)) return;   // il tape un nom : on ne l'efface pas
+  if (z) z.outerHTML = vwStandHtml(f);
+};
+// Le nom se met à jour quand la marque ou le contact est tapé.
+const vwAsChampAvant = asChamp;
+asChamp = function (k) {
+  vwAsChampAvant.apply(this, arguments);
+  if (!['societe', 'contact', 'nom'].includes(k)) return;
+  const f = trStandF(), z = document.querySelector('#vw_stand .vw-nom');
+  if (f && z) z.textContent = vwNomPropose(f);
+};
+
+// ---------- 2. Sa fiche : le mot à taper, ou comment le nommer ----------
+function vwFicheHtml(f) {
+  const k = vwCleRecherche(f);
+  if (vwNomme(f)) return `<div class="vw-fiche ok">${vwLigneMotHtml(f)}
+      <details class="vw-autre"><summary>✏️ Le nom qu'il porte dans mon WeChat</summary>
+        <input id="vw_nom_${f.id}" value="${E(f.wechat_nom || '')}" placeholder="${E(vwNomPropose(f))}" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <div class="mk-deux"><button type="button" class="b contour" onclick="vwGarderAutreNom('${f.id}','vw_nom_${f.id}')">Garder ce nom</button>
+        <button type="button" class="b gris" onclick="vwOublier('${f.id}')">↩️ Pas encore nommé</button></div></details></div>`;
+  return `<div class="vw-fiche">
+    <div class="vw-titre">💬 Pas encore nommé dans votre WeChat</div>
+    <p class="mk-aide" style="font-size:15px">Une seule fois : dans WeChat, mettez <b>${E(f.code || '')}-</b> devant son nom. Ensuite, 🔍 → « ${E(f.code || '')}- » le trouve tout de suite.</p>
+    <div class="vw-nom petit">${E(vwNomPropose(f))}</div>
+    <div class="vw-btns">
+      ${k ? `<button type="button" class="b wechat" onclick="vwCopierNumero('${f.id}')">📋 Copier ${E(k.quoi)} et ouvrir WeChat</button>` : ''}
+      <button type="button" class="b contour" onclick="vwCopierNom('${f.id}')">📋 Copier le nom « ${E(vwNomPropose(f))} »</button>
+      <button type="button" class="b vert" onclick="vwFait('${f.id}')">✅ C'est fait</button></div>
+    <details class="vw-autre"><summary>Il porte déjà un autre nom dans mon WeChat</summary>
+      <input id="vw_nom_${f.id}" placeholder="ex : BAVIN-Lisa NewAsia" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <button type="button" class="b contour" onclick="vwGarderAutreNom('${f.id}','vw_nom_${f.id}')">Garder ce nom</button></details></div>`;
+}
+const vwDossierAvant = ecranDossier;
+ecranDossier = function () {
+  const h = vwDossierAvant.apply(this, arguments);
+  const f = mkFournisseur(ctDossier); if (!f) return h;
+  const i = h.indexOf('<div class="ct-liens">'); if (i < 0) return h;
+  const j = h.indexOf('</div>', i); if (j < 0) return h;
+  return h.slice(0, j + 6) + vwFicheHtml(f) + h.slice(j + 6);
+};
+
+// ---------- 3. « À qui envoyez-vous ? » : le mot à taper ----------
+function vwEtapeAQui(f) {
+  if (!f) return '';
+  const mot = vwMot(f);
+  return mot ? `Dans WeChat : touchez <b>🔍</b> (en haut), tapez <span class="vw-mot">${E(mot)}</span>${f.wechat_nom ? ` → « ${E(f.wechat_nom)} »` : ''} → sa discussion.<br>Puis appui long dans la case → <b>Coller</b> → Envoyer.${vwMotAvertissement(f) ? '<br><small>' + E(vwMotAvertissement(f)) + '</small>' : ''}`
+    : `Il n'a pas encore son code dans WeChat : faites d'abord « une seule fois » ci-dessous (30 secondes).<br>Ensuite : <b>🔍</b> → <span class="vw-mot">${E((f.code || '') + '-')}</span> → sa discussion → <b>Coller</b> → Envoyer.`;
+}
+function vwAQuiBlocHtml(f) {
+  if (!f || vwNomme(f)) return '<div class="vw-aqui"></div>';
+  const k = vwCleRecherche(f);
+  return `<div class="une-fois vw-aqui"><b>Une seule fois</b> : trouvez-le dans WeChat${k ? ' (📋 ' + E(k.quoi) + ' → <b>+</b> → Ajouter des contacts → coller)' : ''}, puis <b>⋯</b> → <b>Remarque</b> (备注) → mettez <b>${E((f.code || '') + '-')}</b> devant son nom.
+    ${k ? `<button type="button" class="cp" onclick="vwCopierNumero('${f.id}')">📋 Copier ${E(k.quoi)} (${E(k.v)}) et ouvrir WeChat</button>` : ''}
+    <button type="button" class="cp" onclick="vwCopierNom('${f.id}')">📋 Copier le nom « ${E(vwNomPropose(f))} »</button>
+    <button type="button" class="cp" onclick="vwFait('${f.id}')">✓ C'est fait : il s'appelle ${E((f.code || '') + '-')} dans WeChat</button>
+    <details class="vw-autre"><summary>Il porte déjà un autre nom dans mon WeChat</summary>
+      <input id="vw_nom_aqui" placeholder="ex : BAVIN-Lisa NewAsia" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <button type="button" class="cp" onclick="vwGarderAutreNom('${f.id}','vw_nom_aqui')">Garder ce nom</button></details></div>`;
+}
+const vwAQuiAvant = trAQui;
+trAQui = function (f, suite) {
+  vwAQuiAvant.apply(this, arguments);
+  const z = document.getElementById('tr_aqui'); if (!z || !f) return;
+  z.dataset.fid = f.id;
+  const et = z.querySelector('.etape'); if (et) et.innerHTML = vwEtapeAQui(f);
+  const u = z.querySelector('.une-fois');
+  if (u) u.outerHTML = vwAQuiBlocHtml(f);
+  else if (!vwNomme(f) && et) et.insertAdjacentHTML('afterend', vwAQuiBlocHtml(f));
+};
+trAQuiRenomme = function (fid) { vwFait(fid); };
+// Le nom proposé partout (fenêtre « L'ajouter sur WeChat », « À qui ? ») : avec le tiret.
+trNomPourWeChat = function (f) { return vwNomPropose(f); };
+
+// ---------- 4. « 💬 Mes fournisseurs dans WeChat » : tous, ville par ville ----------
+let vwFiltre = 'a_nommer', vwCherche = '';
+try { const x = localStorage.getItem('kylo_wechat_filtre'); if (['a_nommer', 'nommes', 'tous'].includes(x)) vwFiltre = x; } catch (e) {}
+function vwRetenir(fid) { try { localStorage.setItem('kylo_wechat_dernier', fid); } catch (e) {} }
+function vwPriorite(f) {
+  return (f.px_demande || f.demande_le ? 4 : 0) + (f.decision === 'contacter' ? 2 : 0) + (f.decision === 'non' ? -3 : 0) + (vwCleRecherche(f) ? 1 : 0);
+}
+function vwListe() {
+  const q = normaliserNom(vwCherche);
+  return mkFournisseurs().filter(f => !f.agent)
+    .filter(f => !VL_VILLES[vlFiltre] || vlVille(f) === vlFiltre)
+    .filter(f => vwFiltre === 'tous' || (vwFiltre === 'nommes' ? vwNomme(f) : !vwNomme(f)))
+    .filter(f => !q || normaliserNom([f.code, f.nom, f.societe, f.contact, f.wechat, f.wechat_nom, f.mobile, f.tel].join(' ')).includes(q))
+    .map((f, i) => ({ f, i }))
+    .sort((a, b) => vwPriorite(b.f) - vwPriorite(a.f) || String(b.f.vu_le || b.f.le || '').localeCompare(String(a.f.vu_le || a.f.le || '')) || a.i - b.i)
+    .map(x => x.f);
+}
+function vwLigneHtml(f) {
+  const k = vwCleRecherche(f), v = vlInfo(vlVille(f));
+  const det = [k ? (k.quoi === 'son numéro' ? '📞 ' + ctTelLisible(k.v) : '💬 ' + k.v) : '', f.px_demande || f.demande_le ? '💰 prix demandés' : ''].filter(Boolean).join(' · ');
+  const carte = ctDocs(f).find(d => d.type === 'carte');
+  return `<div class="vw-ligne${vwNomme(f) ? ' ok' : ''}" id="vw-${f.id}">
+    <div class="vw-tete">${carte ? `<img class="ct-mini vw-img" data-doc="${E(carte.id)}" alt="Sa carte" onclick="ctVoirDoc('${f.id}','${carte.id}')">` : f.qr_photo ? `<img class="vw-img" src="${f.qr_photo}" alt="QR">` : '<div class="vw-img vide">👤</div>'}
+      <div class="vw-qui"><div><span class="mk-code ${v.classe}">${E(f.code || '—')}</span> <b>${E(asNomTete(f))}</b></div>
+        ${f.societe && f.nom ? `<div class="det">${E(f.societe)}</div>` : ''}
+        <div class="det">${v.ic} ${E(v.nom)}${det ? ' · ' + E(det) : ''}</div></div></div>
+    ${vwNomme(f) ? `${vwLigneMotHtml(f)}<div class="vw-btns deux"><button type="button" class="b contour" onclick="ctOuvrirDossier('${f.id}')">📂 Sa fiche</button>
+        <button type="button" class="b gris" onclick="vwOublier('${f.id}')">↩️ Pas encore nommé</button></div>`
+      : `<div class="vw-a">Dans WeChat, mettez <b>${E((f.code || '') + '-')}</b> devant son nom (ou collez <b>${E(vwNomPropose(f))}</b>).</div>
+      <div class="vw-btns">${k ? `<button type="button" class="b wechat" onclick="vwCopierNumero('${f.id}')">📋 ${E(k.quoi[0].toUpperCase() + k.quoi.slice(1))} → WeChat</button>`
+        : '<span class="vw-sans">Ni numéro ni ID : cherchez-le dans WeChat par sa marque, ou demandez son QR.</span>'}
+        <button type="button" class="b contour" onclick="vwCopierNom('${f.id}')">📋 Son nom</button>
+        <button type="button" class="b vert" onclick="vwFait('${f.id}')">✅ Nommé</button></div>
+      <details class="vw-autre"><summary>Il porte déjà un autre nom dans mon WeChat</summary>
+        <input id="vw_nom_l_${f.id}" placeholder="ex : BAVIN-Lisa NewAsia" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <button type="button" class="b contour" onclick="vwGarderAutreNom('${f.id}','vw_nom_l_${f.id}')">Garder ce nom</button></details>`}
+  </div>`;
+}
+function vwCompte() {
+  const n = { tous: 0, nommes: 0, a_nommer: 0 };
+  mkFournisseurs().filter(f => !f.agent && (!VL_VILLES[vlFiltre] || vlVille(f) === vlFiltre)).forEach(f => { n.tous++; n[vwNomme(f) ? 'nommes' : 'a_nommer']++; });
+  return n;
+}
+function vwFiltrer(v) { vwFiltre = v; try { localStorage.setItem('kylo_wechat_filtre', v); } catch (e) {} dessiner(); }
+function vwChercher(v) { vwCherche = v; const z = document.getElementById('vw_liste'); if (z) { z.innerHTML = vwListeHtml(); ctRemplirMinis(); } }
+function vwListeHtml() {
+  const L = vwListe();
+  if (!L.length) return `<div class="carte"><p class="mk-aide" style="font-size:16px">${vwFiltre === 'a_nommer' && !vwCherche ? '🎉 Tous ceux de ce choix portent leur code dans votre WeChat.' : 'Aucun fournisseur dans ce choix.'}</p></div>`;
+  const plafond = 80, montres = vwCherche ? L : L.slice(0, plafond);
+  return montres.map(vwLigneHtml).join('') + (L.length > montres.length ? `<div class="carte"><p class="mk-aide" style="font-size:15px">${L.length - montres.length} autres : tapez un nom ou un code dans la recherche.</p></div>` : '');
+}
+function ecranWeChat() {
+  vlAssurer();
+  const n = vwCompte(), nv = vlCompter();
+  const dernier = (() => { try { return localStorage.getItem('kylo_wechat_dernier') || ''; } catch (e) { return ''; } })();
+  setTimeout(() => {
+    ctRemplirMinis();
+    const z = dernier && document.getElementById('vw-' + dernier);
+    if (z && !vwEcranVu) { z.classList.add('vw-dernier'); z.scrollIntoView({ block: 'center' }); }
+    vwEcranVu = true;
+  }, 0);
+  return `<button class="b gris" style="margin-bottom:12px;min-height:50px;font-size:16px" onclick="allerA('rencontres')">← Fournisseurs</button>
+  <div class="carte vw-tete-ecran"><h2 style="font-size:20px">💬 Mes fournisseurs dans WeChat</h2>
+    <div class="vw-compteur"><span class="ok">✅ <b>${n.nommes}</b> avec leur code</span><span class="att">⏳ <b>${n.a_nommer}</b> à nommer</span></div>
+    <p class="mk-aide" style="font-size:16px">Dans WeChat, chaque fournisseur porte son code devant son nom, avec un tiret : <b>Y01-…</b> (Yiwu), <b>F08-…</b> (Guangzhou).
+      Pour le retrouver : <b>🔍</b> → tapez le code et le tiret → une seule personne.</p>
+    <details class="vw-mode"><summary>Comment nommer un ancien fournisseur (30 secondes)</summary>
+      <ol class="vw-etapes"><li><b>📋 Numéro → WeChat</b> : son numéro est copié, WeChat s'ouvre.</li>
+        <li>WeChat : <b>+</b> (en haut à droite) → <b>Ajouter des contacts</b> → appui long → <b>Coller</b> → <b>Rechercher</b> : son profil s'ouvre.</li>
+        <li><b>⋯</b> (ou « Définir la remarque ») → <b>Remarque</b> (备注) → tapez <b>F08-</b> devant son nom → <b>OK</b>.</li>
+        <li>Revenez ici : <b>✅ Nommé</b>. Le carnet se rouvre sur le même fournisseur.</li></ol>
+      <p class="mk-aide" style="font-size:15px">Pas besoin de tout faire ce soir : faites-le la première fois que vous lui écrivez. Les nouveaux (au stand) sont nommés tout de suite.</p></details>
+    ${vlPucesHtml().replace(/vlFiltrer\(/g, 'vwVille(')}
+    <div class="mk-filtres">${[['a_nommer', '⏳ À nommer', n.a_nommer], ['nommes', '✅ Avec leur code', n.nommes], ['tous', 'Tous', n.tous]].map(([k, t, c]) => `<button type="button" class="mk-puce${vwFiltre === k ? ' on' : ''}" onclick="vwFiltrer('${k}')">${t} (${c})</button>`).join('')}</div>
+    <input class="mk-recherche" value="${E(vwCherche)}" placeholder="🔎 Chercher : code, nom, numéro…" oninput="vwChercher(this.value)" style="font-size:17px">
+    ${nv.Yiwu ? '' : '<p class="mk-aide" style="font-size:15px">À Yiwu, les nouveaux fournisseurs notés « Au stand » arrivent ici avec leur code Y.</p>'}
+  </div>
+  <div id="vw_liste">${vwListeHtml()}</div>`;
+}
+let vwEcranVu = false;
+function vwVille(v) { vlFiltre = v; try { localStorage.setItem('kylo_ville_filtre', v); } catch (e) {} dessiner(); }
+function vwOuvrir() { vwEcranVu = false; allerA('wechat'); }
+// Le carnet sait dessiner ce nouvel écran, s'y rouvre (retour de WeChat), et l'onglet 🏭 reste allumé.
+const vwDessinerAvant = dessiner;
+dessiner = function () {
+  if (ongletActif !== 'wechat') return vwDessinerAvant.apply(this, arguments);
+  try { if (typeof clDernierC !== 'undefined' && clDernierC !== C) clRestaurerImages(); } catch (e) {}
+  const av = document.getElementById('avantDemarrage'); if (av) av.remove();
+  const memeEcran = _ongletDessine === ongletActif, y = window.scrollY;
+  document.getElementById('ecran').innerHTML = ecranWeChat();
+  _ongletDessine = ongletActif;
+  if (memeEcran) window.scrollTo(0, y); else window.scrollTo(0, 0);
+  majBandeau(); majEtat();
+};
+if (typeof TR_SOUS_FOURNISSEURS !== 'undefined' && !TR_SOUS_FOURNISSEURS.includes('wechat')) TR_SOUS_FOURNISSEURS.push('wechat');
+if (typeof TR_ONGLETS_GARDES !== 'undefined' && !TR_ONGLETS_GARDES.includes('wechat')) TR_ONGLETS_GARDES.push('wechat');
+(function vwRouvrir() {
+  let o = ''; try { o = localStorage.getItem('kylo_onglet') || ''; } catch (e) {}
+  if (o !== 'wechat') return;
+  ongletActif = 'wechat';
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('actif', b.dataset.onglet === 'rencontres'));
+})();
+// L'entrée : en haut de 🏭 Fournisseurs.
+const vwRencontresAvant = ecranRencontres;
+ecranRencontres = function () {
+  const h = vwRencontresAvant.apply(this, arguments);
+  const n = { a: 0, t: 0 };
+  mkFournisseurs().forEach(f => { if (f.agent) return; n.t++; if (!vwNomme(f)) n.a++; });
+  const b = `<button type="button" class="b wechat vw-entree" onclick="vwOuvrir()">💬 Mes fournisseurs dans WeChat<small>${n.t - n.a} sur ${n.t} avec leur code · le mot à taper pour chacun</small></button>`;
+  const i = h.indexOf('<div class="carte"><h2 style="font-size:19px">🏭 Fournisseurs rencontrés');
+  return i < 0 ? b + h : h.slice(0, i) + b + h.slice(i);
+};
+// « Envoyer à Claude » emporte le nom WeChat.
+['wechat_nom'].forEach(k => {
+  if (typeof CL_CHAMPS_ENVOI !== 'undefined' && !CL_CHAMPS_ENVOI.includes(k)) CL_CHAMPS_ENVOI.push(k);
+  if (typeof FS_CHAMPS_ENVOI !== 'undefined' && !FS_CHAMPS_ENVOI.includes(k)) FS_CHAMPS_ENVOI.push(k);
+});
+
+// =====================================================================================================
+//  CARNET 1.12.0 — C. SA BOUTIQUE À YIWU (27/10/2026)
+//  À Yiwu, 75 000 boutiques dans le même marché : sans son numéro (district, porte, étage, rue, n° de boutique), on ne la
+//  retrouve plus. Le carnet le garde sur sa fiche, le lit sur sa carte quand il y est (« 2区 7门 3楼 12街 23456 »), et le
+//  montre en grand, en chinois, au chauffeur ou au gardien. Le guide du marché (qui vend quoi, à quel étage) est dans
+//  suivi-1.12.0-d-guide.js.
+// =====================================================================================================
+const YW_CHIFFRES = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10 };
+function ywNombre(s) {
+  s = String(s || '').trim();
+  if (/^\d+$/.test(s)) return String(Number(s));
+  if (s === '十') return '10';
+  if (/^十[一二三四五六七八九]$/.test(s)) return String(10 + YW_CHIFFRES[s[1]]);
+  if (/^[一二三四五六七八九]十$/.test(s)) return String(YW_CHIFFRES[s[0]] * 10);
+  if (/^[一二三四五六七八九]十[一二三四五六七八九]$/.test(s)) return String(YW_CHIFFRES[s[0]] * 10 + YW_CHIFFRES[s[2]]);
+  return YW_CHIFFRES[s] ? String(YW_CHIFFRES[s]) : '';
+}
+// Lire le numéro de boutique dans un texte (carte de visite, panneau, message). Formats réels (chinagoods, yiwugo, 27/10/2026) :
+//   « 二区29门3楼4街17185 », « 二区22门1楼中街10484B », « 五区1楼3街60517 » (sans porte), « 一区12号门2楼F2-128 »,
+//   « 一区东扩3号门3楼1街103014 », « 国际商贸城六区3楼4街83760 », « International Trade Mart (District 4) / 2 F / Shop No:34229B »,
+//   « Booth 23456, Street 12, F3, Gate 7, District 2 ». Le district 2 s'appelle aussi F区/G区, le 3 H区.
+const YW_DISTRICTS_CN = [['一区东扩', '1E'], ['一区东', '1E'], ['二区东', '2E'], ['F区', '2'], ['G区', '2'], ['H区', '3']];
+function ywLire(texte) {
+  const s = String(texte || '').replace(/[：:]/g, ' ').replace(/\s+/g, ' ');
+  const r = {};
+  const pose = (k, v) => { if (v && !r[k]) r[k] = String(v); };
+  // Chinois
+  for (const [mot, q] of YW_DISTRICTS_CN) if (s.includes(mot)) { pose('q', q); break; }
+  let m = s.match(/([一二三四五六1-6])\s*区/); if (m) pose('q', ywNombre(m[1]));
+  m = s.match(/(\d{1,3}|[一二三四五六七八九十]{1,3})\s*号?\s*门/); if (m) pose('porte', ywNombre(m[1]));
+  m = s.match(/(\d{1,2}|[一二三四五])\s*(?:楼|层)/); if (m) pose('etage', ywNombre(m[1]));
+  m = s.match(/(\d{1,3}|中)\s*街/); if (m) pose('rue', /\d/.test(m[1]) ? ywNombre(m[1]) : m[1]);
+  m = s.match(/\b(F(\d)-\d{2,4}[A-Za-z]?)\b/); if (m) { pose('n', m[1]); pose('etage', m[2]); }
+  m = s.match(/街\s*[东西]?\s*(\d{3,6}[A-Za-z]?)\b/) || s.match(/(?:商位|铺位|店铺|摊位)\s*号?\s*(\d{3,6}[A-Za-z]?)/) || s.match(/(\d{4,6}[A-Za-z]?)\s*号?\s*(?:商位|铺位|摊位)/)
+    || s.match(/[区门楼]\s*(\d{4,6}[A-Za-z]?)\b/);
+  if (m) pose('n', m[1]);
+  // Anglais
+  m = s.match(/\b(?:district|dist\.?|zone)\s*(\d)\b/i) || s.match(/\b(\d)\s*(?:st|nd|rd|th)?\s*district\b/i) || s.match(/\bD([1-6])\b/); if (m) pose('q', m[1]);
+  if (r.q && /^[12]$/.test(r.q) && /\b(?:district|dist\.?)\s*[12]\s*-?\s*east\b/i.test(s)) r.q += 'E';
+  m = s.match(/\bgate\s*(?:no\.?\s*)?(\d{1,3})\b/i); if (m) pose('porte', m[1]);
+  m = s.match(/\b(\d{1,2})\s*(?:\/F|F\b|fl\b|floor\b|st floor|nd floor|rd floor|th floor)/i) || s.match(/\bfloor\s*(\d{1,2})\b/i) || s.match(/\bF(\d)\b(?!-)/); if (m) pose('etage', m[1]);
+  m = s.match(/\b(?:street|st\.?)\s*(?:no\.?\s*)?(\d{1,3})\b/i) || s.match(/\b(\d{1,3})\s*(?:th|st|nd|rd)?\s*street\b/i); if (m) pose('rue', m[1]);
+  m = s.match(/\b(?:booth|shop|stall|store)\s*(?:no\.?|number|#)?\s*(\d{3,6}[A-Z]?)\b/i); if (m) pose('n', m[1]);
+  // Il faut au moins le district ou le n° de boutique, et deux morceaux.
+  const n = ['q', 'porte', 'etage', 'rue', 'n'].filter(k => r[k]).length;
+  if (r.q && !/^(?:[1-6]|1E|2E)$/.test(r.q)) delete r.q;
+  if (n < 2 || !(r.q || r.n)) return null;
+  return r;
+}
+function ywBoutique(f) { return f && f.yiwu && typeof f.yiwu === 'object' ? f.yiwu : {}; }
+function ywRempli(f) { const b = ywBoutique(f); return !!(b.q || b.n || b.rue || b.porte); }
+function ywTexteFr(f) {
+  const b = ywBoutique(f);
+  return [b.q && 'District ' + String(b.q).replace('E', ' Est'), b.porte && 'Porte ' + b.porte, b.etage && (b.etage === '1' ? '1er étage' : b.etage + 'ᵉ étage'),
+    b.rue && (b.rue === '中' ? 'Rue du milieu' : 'Rue ' + b.rue), b.n && 'Boutique n° ' + b.n].filter(Boolean).join(' · ');
+}
+function ywCourt(f) {
+  const b = ywBoutique(f);
+  return [b.q && 'D' + b.q, b.porte && 'Porte ' + b.porte, b.etage && b.etage + 'F', b.rue && (b.rue === '中' ? 'Rue du milieu' : 'Rue ' + b.rue), b.n && 'N° ' + b.n].filter(Boolean).join(' · ');
+}
+function ywTexteCn(f) {
+  const b = ywBoutique(f);
+  const q = String(b.q || ''), dist = q === '1E' ? '一区东' : q === '2E' ? '二区东' : q === '6' ? '六区' : q ? q + '区' : '';
+  return '义乌国际商贸城' + [dist, b.porte && b.porte + '号门', b.etage && b.etage + '楼', b.rue && b.rue + '街', b.n && b.n + '号商位'].filter(Boolean).join(' ');
+}
+// Le fournisseur dont on parle : au stand, celui du stand ; sinon sa fiche.
+function ywCible() { return ongletActif === 'stand' ? trStandFournisseur() : mkFournisseur(ctDossier); }
+function ywChamp(k, v) {
+  const f = ywCible(); if (!f) return;
+  f.yiwu = Object.assign({}, ywBoutique(f));
+  const brut = String(v || '').trim().toUpperCase();
+  if (k === 'n') f.yiwu.n = brut.replace(/[^0-9A-Z-]/g, '').slice(0, 10);
+  else if (k === 'q') f.yiwu.q = (/^[12]\s*E/.test(brut) ? brut[0] + 'E' : (ywNombre(brut.replace(/[^\d一二三四五六]/g, '')) || '')).slice(0, 2);
+  else if (k === 'rue' && /中|M/.test(brut)) f.yiwu.rue = '中';
+  else f.yiwu[k] = ywNombre(brut.replace(/[^\d一二三四五六七八九十]/g, '')) || brut.replace(/\D/g, '');
+  delete f.yiwu.lu;
+  f.allee = ywCourt(f);
+  if (ongletActif === 'stand') asSauver(true);
+  ctPlusTard(f);
+  ywMajApercu(f);
+}
+function ywMajApercu(f) {
+  const z = document.getElementById('yw_apercu'); if (z) z.innerHTML = ywApercuHtml(f);
+}
+function ywApercuHtml(f) {
+  if (!ywRempli(f)) return '<span class="yw-vide">Le numéro est sur sa carte et au-dessus de sa boutique (ex. « 2区 7门 3楼 12街 23456 »).</span>';
+  return `<div class="yw-fr">🛍️ ${E(ywTexteFr(f))}${ywBoutique(f).lu ? ' <span class="yw-lu">lu sur sa carte : vérifiez</span>' : ''}</div><div class="yw-cn" lang="zh">${E(ywTexteCn(f))}</div>`;
+}
+const YW_CASES = [['q', 'District', '区', '2'], ['porte', 'Porte', '门', '7'], ['etage', 'Étage', '楼', '3'], ['rue', 'Rue', '街', '12'], ['n', 'N° boutique', '商位', '23456']];
+function ywSectionHtml(f, ou) {
+  const b = ywBoutique(f);
+  return `<section class="carte ${ou === 'stand' ? 'as-sec ' : ''}yw-sec" id="yw_sec"><h2>📍 Sa boutique à Yiwu</h2>
+    <div class="yw-grille">${YW_CASES.map(([k, l, cn, ex]) => `<label class="yw-case${k === 'n' ? ' large' : ''}"><span>${E(l)} <span lang="zh">${cn}</span></span>
+      <input id="yw_${k}" inputmode="${k === 'n' ? 'text' : 'numeric'}" autocapitalize="characters" autocorrect="off" value="${E(b[k] || '')}" placeholder="${ex}" oninput="ywChamp('${k}', this.value)"></label>`).join('')}</div>
+    <div class="yw-apercu" id="yw_apercu" aria-live="polite">${ywApercuHtml(f)}</div>
+    <div class="mk-deux">
+      <button type="button" class="b contour" onclick="ywMontrer()">🚕 Montrer au chauffeur / au gardien</button>
+      <button type="button" class="b contour" onclick="ywGuideOuvrir()">🗺️ Le marché : qui vend quoi</button></div>
+  </section>`;
+}
+function ywMontrer() {
+  const f = ywCible();
+  if (!f || !ywRempli(f)) { ouChauffeur('义乌国际商贸城'); return; }
+  ouChauffeur(ywTexteCn(f));
+}
+// Au stand (à Yiwu) : la boutique juste après la carte de visite.
+const ywStandAvant = ecranStand;
+ecranStand = function () {
+  const h = ywStandAvant.apply(this, arguments);
+  const f = trStandF();
+  if ((f ? vlVille(f) : vlVilleActuelle()) !== 'Yiwu') return h;
+  // Après « Son nom dans WeChat » (le vendeur est là : WeChat d'abord), avant ses QR.
+  const ici2 = h.indexOf('<section class="carte as-sec"><h2>💬 2. Ses QR codes</h2>');
+  if (ici2 < 0) return h;
+  return h.slice(0, ici2) + ywSectionHtml(f || {}, 'stand') + h.slice(ici2);
+};
+const ywMajToutAvant = asMajTout;
+asMajTout = function () {
+  ywMajToutAvant.apply(this, arguments);
+  if (ongletActif !== 'stand') return;
+  const f = trStandF(); if (!f) return;
+  const b = ywBoutique(f);
+  YW_CASES.forEach(([k]) => { const ch = document.getElementById('yw_' + k); if (ch && document.activeElement !== ch && ch.value !== (b[k] || '')) ch.value = b[k] || ''; });
+  ywMajApercu(f);
+};
+// Sa fiche (Yiwu) : la boutique, sous le WeChat.
+const ywDossierAvant = ecranDossier;
+ecranDossier = function () {
+  const h = ywDossierAvant.apply(this, arguments);
+  const f = mkFournisseur(ctDossier); if (!f || vlVille(f) !== 'Yiwu') return h;
+  ywLireSesCartes(f);
+  const i = h.indexOf('<details class="ct-section" open><summary>📇 Sa carte');
+  return i < 0 ? h : h.slice(0, i) + ywSectionHtml(f, 'fiche') + h.slice(i);
+};
+// Le numéro lu sur sa carte (le texte que le carnet a lu, ou celui collé depuis l'iPhone), si la boutique est encore vide.
+function ywLireSesCartes(f) {
+  if (!f || ywRempli(f)) return false;
+  const textes = [f.texte_carte, ...ctDocs(f).filter(d => d.type === 'carte' || d.face).map(d => d.texte_lu)].filter(Boolean);
+  for (const t of textes) {
+    const r = ywLire(t);
+    if (r) { f.yiwu = Object.assign(r, { lu: true }); if (!String(f.allee || '').trim() || /^D\d/.test(f.allee)) f.allee = ywCourt(f); setTimeout(() => { try { sauverLocal(); } catch (e) {} }, 0); return true; }
+  }
+  return false;
+}
+if (typeof trLireDoc === 'function') {
+  const ywLireDocAvant = trLireDoc;
+  trLireDoc = async function (f, d) {
+    const res = await ywLireDocAvant.apply(this, arguments);
+    try {
+      if (f && vlVille(f) === 'Yiwu' && ywLireSesCartes(f) && ongletActif === 'stand') asMajTout();
+    } catch (e) {}
+    return res;
+  };
+}
+// Un fichier de Claude peut apporter la boutique ; « Envoyer à Claude » l'emporte.
+['yiwu'].forEach(k => {
+  if (typeof CL_CHAMPS_ENVOI !== 'undefined' && !CL_CHAMPS_ENVOI.includes(k)) CL_CHAMPS_ENVOI.push(k);
+  if (typeof FS_CHAMPS_ENVOI !== 'undefined' && !FS_CHAMPS_ENVOI.includes(k)) FS_CHAMPS_ENVOI.push(k);
+});
+
+// ---------- Les questions au vendeur : trois questions de Yiwu (mélanger les modèles, un seul carton, l'entrepôt à Yiwu) ----------
+if (typeof TR_Q !== 'undefined' && TR_Q.base && Array.isArray(TR_Q.base.q) && !TR_Q.base.q.some(q => q[0] === 'yw_hunpi')) {
+  const i = Math.max(0, TR_Q.base.q.findIndex(q => q[0] === 'stock') + 1);
+  TR_Q.base.q.splice(i, 0,
+    ['yw_hunpi', '可以混批吗？（不同款式一起拿货）', 'Mélanger plusieurs modèles dans la même commande (混批) ?', 'choix', [['可以', 'Oui'], ['可以，每款有最低数量', 'Oui, avec un minimum par modèle'], ['不可以', 'Non']], 1],
+    ['yw_carton', '最少拿多少？一箱可以吗？', 'Le minimum ? Un seul carton, c\'est possible ?', 'choix', [['一箱可以', 'Oui, 1 carton'], ['至少两箱', '2 cartons ou plus'], ['按件数算', 'Au nombre de pièces']], 1],
+    ['yw_entrepot', '可以送到我在义乌的货代仓库吗？', 'Livre à l\'entrepôt de mon transitaire à Yiwu ?', 'choix', [['可以，免费', 'Oui, gratuit'], ['可以，要运费', 'Oui, payant'], ['不可以', 'Non']], 1]);
+}
+// Le message de questions (WeChat) : à Yiwu, les questions de Yiwu (et l'entrepôt à Yiwu au lieu de celui de Guangzhou) ;
+// ailleurs, rien ne change.
+if (typeof trQuestionsMessage === 'function') {
+  trQuestionsMessage = function (f) {
+    const yw = !!(f && vlVille(f) === 'Yiwu');
+    return ['base', ...trFamillesDe(f)].flatMap(k => (TR_Q[k] ? TR_Q[k].q : [])
+      .filter(q => q[5] && q[0] !== 'wechat' && (yw ? q[0] !== 'transitaire' : !/^yw_/.test(q[0])))).slice(0, 20);
+  };
+}
+// L'écran tendu au vendeur : même règle (Yiwu : ses 3 questions ; Guangzhou : rien de nouveau).
+if (typeof trVdQuestions === 'function') {
+  const ywVdAvant = trVdQuestions;
+  trVdQuestions = function () {
+    const qs = ywVdAvant.apply(this, arguments), f = mkFournisseur(trVd.fid);
+    const yw = !!(f && vlVille(f) === 'Yiwu');
+    return qs.filter(q => (yw ? q[0] !== 'transitaire' : !/^yw_/.test(q[0])));
+  };
+}
+
+// =====================================================================================================
+//  CARNET 1.12.0 — D. LE MARCHÉ DE YIWU : QUI VEND QUOI, À QUEL ÉTAGE (recherche du 27/10/2026)
+//  Deux onglets : « Par rayon » (mes produits → district et étage) et « Par district » (chaque district, ses étages, son adresse
+//  en chinois pour le chauffeur). « 📍 Où le chercher » (l'étude) montre Yiwu en premier quand on est à Yiwu.
+// =====================================================================================================
+const YW_GUIDE = /*GUIDE*/{"date":"27/10/2026","districts":[{"id":"1","fr":"District 1","cn":"义乌国际商贸城一区","resume":"Jouets, fleurs artificielles, bijoux fantaisie, articles de fête, cadres.","etages":[{"titre":"1er étage","fr":"Fleurs artificielles; accessoires pour fleurs; peluches; jouets gonflables; jouets électriques et à piles; jouets ordinaires","cn":"仿真花、花类配件、毛绒玩具、充气玩具、电动玩具、普通玩具"},{"titre":"2ᵉ étage","fr":"Accessoires pour cheveux; bijoux fantaisie","cn":"头饰、饰品"},{"titre":"3ᵉ étage","fr":"Artisanat de fête (Noël, etc.); artisanat décoratif; porcelaine et cristal; cadres photo; composants pour bijoux; artisanat touristique","cn":"节庆工艺、装饰工艺、瓷器水晶、相框、饰品配件、旅游工艺品"},{"titre":"4ᵉ étage","fr":"Centre de vente directe des usines : céramique, artisanat pour la maison, Noël, fleurs artificielles, bijoux et jade; pavillon des commerçants taïwanais","cn":"生产企业直销中心、台商馆"}],"chauffeur":"义乌国际商贸城一区"},{"id":"1E","fr":"District 1 Est","cn":"义乌国际商贸城一区东","resume":"Bijoux fantaisie et leurs composants.","etages":[{"titre":"1er étage","fr":"Composants et accessoires pour bijoux","cn":"饰品配件"},{"titre":"2ᵉ étage","fr":"Bijoux fantaisie et composants","cn":"饰品及饰品配件"},{"titre":"3ᵉ étage","fr":"Bijoux fantaisie","cn":"饰品"},{"titre":"4ᵉ étage","fr":"Accessoires pour fleurs, composants pour bijoux","cn":"花类配件"}],"chauffeur":"义乌国际商贸城一区东"},{"id":"2","fr":"District 2","cn":"义乌国际商贸城二区","resume":"Le plus utile pour un magasin général : sacs, parapluies, outils, électricité, petit électroménager, téléphonie, piles, lampes.","etages":[{"titre":"1er étage","fr":"Sacs et valises; parapluies; imperméables et pochettes de pluie; articles de plein air et de loisir (pique-nique, tentes); emballages cadeaux","cn":"箱包、伞具、雨披袋、户外休闲用品、礼品包装"},{"titre":"2ᵉ étage","fr":"Outils et quincaillerie; matériel électrique (fils, prises, interrupteurs); serrures et cadenas; vélos, poussettes, véhicules pour enfants","cn":"五金工具配件、电工产品、锁具、车类（自行车、童车）"},{"titre":"3ᵉ étage","fr":"Quincaillerie de cuisine et de salle de bain (casseroles, ustensiles); petit électroménager; téléphonie et accessoires (télécom); instruments électroniques, appareils photo; montres, horloges, pendules murales; piles, lampes, lampes torches","cn":"五金厨卫、小家电、电讯器材、电子仪器仪表、照相器材、钟表、电池、灯具、手电筒"},{"titre":"4ᵉ étage","fr":"Centre de vente directe des usines; pavillons régionaux (Hong Kong, Corée, Sichuan, Anhui, etc.); valises, montres électroniques, quincaillerie électrique haut de gamme","cn":"生产企业直销中心、香港馆、韩商馆、四川馆、安徽馆等精品交易区"},{"titre":"5ᵉ étage","fr":"Centre de services d'achat pour l'export; espace d'exposition de produits; agences d'export (conseil, pas de vente)","cn":"外贸采购服务中心、特色商品展示区、外贸机构"},{"titre":"Hall central 2-3","fr":"Centre d'exposition des produits innovants; musée de l'histoire du marché","cn":"创意产品展示中心、中国小商品城发展历史陈列馆"}],"chauffeur":"义乌国际商贸城二区"},{"id":"2E","fr":"District 2 Est — le solaire","cn":"义乌国际商贸城二区东","resume":"Le marché du solaire (2e étage) et la quincaillerie pour la maison (1er). Étages 3 à 5 : rien de trouvé.","etages":[{"titre":"1er étage","fr":"Quincaillerie pour l'aménagement de la maison","cn":"家装五金"},{"titre":"2ᵉ étage","fr":"Panneaux solaires; régulateurs (contrôleurs); onduleurs; batteries de stockage; lampes solaires à économie d'énergie; lampes de secours et lampes torches (vues en 2023); véhicules électriques (exposition)","cn":"太阳能板、控制器、逆变器、储能电池、太阳能节能灯、应急灯、手电筒、新能源汽车展示"}],"chauffeur":"义乌国际商贸城二区东"},{"id":"3","fr":"District 3","cn":"义乌国际商贸城三区","resume":"Papeterie, fournitures scolaires, lunettes, sport, cosmétiques et outils de beauté.","etages":[{"titre":"sous-sol","fr":"Images du Nouvel An, calendriers, sentences parallèles (couplets)","cn":"年画挂历对联"},{"titre":"1er étage","fr":"Stylos, encre, écriture; papeterie, cahiers; lunettes, lunettes de soleil","cn":"笔墨用品、纸制品、眼镜"},{"titre":"2ᵉ étage","fr":"Fournitures de bureau et scolaires; articles de sport; loisirs, plein air","cn":"办公学习用品、运动器材、体育休闲用品"},{"titre":"3ᵉ étage","fr":"Cosmétiques et parfums; outils de beauté, peignes, miroirs; produits de coiffure; fermetures éclair, boutons, mercerie","cn":"化妆品、美容美发用品、梳镜、拉链/纽扣、服装辅料"},{"titre":"4ᵉ étage","fr":"Centre de vente directe des usines (articles de sport, fitness, tentes, cosmétiques, mercerie)","cn":"生产企业直销中心"},{"titre":"5ᵉ étage","fr":"Tableaux décoratifs; cadres et pièces de cadres; machines d'encadrement","cn":"画业：装饰画、相框配件及加工机械"},{"titre":"Bâtiment de liaison n° 3","fr":"Niveaux -1 et 1 : calendriers, images du Nouvel An; 2e étage : centre des marques « fabriqué au Zhejiang », exposition IA; 3e étage : mercerie","cn":"连接体3号楼：B1-1F 年画挂历对联；2F 浙江制造品牌中心；3F 服装辅料"}],"chauffeur":"义乌国际商贸城三区"},{"id":"4","fr":"District 4","cn":"义乌国际商贸城四区","resume":"Articles ménagers en plastique, chaussettes, chaussures, serviettes, chapeaux, gants. Le 5e étage vend surtout au détail.","etages":[{"titre":"1er étage","fr":"Chaussettes (dans les bâtiments annexes); leggings et collants","cn":"袜类（辅房）、打底裤"},{"titre":"2ᵉ étage","fr":"Articles ménagers du quotidien (plastique, rangement, gadgets de cuisine); boîtes d'emballage; chapeaux et casquettes; gants; bonneterie","cn":"日用百货、包装盒、帽类、手套、针棉"},{"titre":"3ᵉ étage","fr":"Chaussures; serviettes; laine à tricoter; cravates; dentelles, rubans, galons, fils","cn":"鞋类、毛巾、毛线、领带、花边、线带"},{"titre":"4ᵉ étage","fr":"Ceintures et accessoires; écharpes et foulards; soutiens-gorge et lingerie","cn":"皮带/配件、围巾、文胸内衣"},{"titre":"5ᵉ étage","fr":"Centre de vente directe des usines; centre de shopping touristique (surtout du DÉTAIL)","cn":"生产企业直销中心、旅游购物中心（零售为主）"}],"chauffeur":"义乌国际商贸城四区"},{"id":"5","fr":"District 5","cn":"义乌国际商贸城五区","resume":"Literie, perruques et extensions, articles d'hôtel (vaisselle mélamine), accessoires auto.","etages":[{"titre":"1er étage","fr":"Cité des produits importés (plus de 100 pays : alimentation, vin, cosmétiques, artisanat); centre d'exposition des produits africains (produits d'Afrique vendus en Chine, pas des produits pour l'Afrique)","cn":"义乌中国进口商品城、非洲产品展示中心"},{"titre":"2ᵉ étage","fr":"Literie : draps, couettes, oreillers, couvertures, tapis; articles pour animaux et aquariums; produits capillaires : perruques, extensions; articles de mariage","cn":"床上用品、宠物（水族）用品、发制品、婚庆用品"},{"titre":"3ᵉ étage","fr":"Tissus tricotés et tissus pour rideaux; articles de mariage; articles pour hôtels et restaurants (vaisselle mélamine, verres); matières premières pour le tricot","cn":"针织布（窗帘布）、婚庆用品、酒店用品、针棉布、针织原材料"},{"titre":"4ᵉ étage","fr":"Accessoires et pièces auto; pièces moto; distribution de petites marchandises","cn":"汽车用品及配件、汽摩配件、小商品配送"},{"titre":"5ᵉ étage","fr":"Zone de services e-commerce (pas un rayon d'achat)","cn":"网商服务区"}],"chauffeur":"义乌国际商贸城五区"},{"id":"6","fr":"District 6 — Global Digital Trade Center","cn":"义乌全球数贸中心","resume":"Ouvert le 14/10/2025, à l'est du district 5 : produits tendance et technologiques, souvent plus chers. Deux plans d'étages différents sur la page officielle : vérifiez sur place.","etages":[{"titre":"1er étage","fr":"Bijoux fantaisie / bijoux de mode; jouets tendance et créatifs (figurines, IP); tissus pour vêtements de mode","cn":"时尚珠宝、创意潮流玩具、时尚服饰面料"},{"titre":"2ᵉ étage","fr":"Soins de la peau et produits d'esthétique; articles pour bébés et enfants","cn":"护肤及医美用品、婴幼童生活用品"},{"titre":"3ᵉ étage","fr":"Articles pour la maison; santé et matériel médical grand public; drones et équipements automatisés, robots et équipements d'IA, réalité virtuelle et augmentée; articles de voyage","cn":"家庭生活用品、健康医疗用品、无人机及无人化装备、机器人及人工智能装备、AR·VR装备、旅行好物"},{"titre":"4ᵉ étage","fr":"Produits technologiques intelligents (montres connectées, objets connectés); produits sous licence (IP)","cn":"智能科技用品、IP潮品"},{"titre":"5ᵉ étage","fr":"D'après la description de la page seulement : zone d'exposition et organismes de commerce extérieur","cn":"特色商品展示区及外贸机构"}],"chauffeur":"义乌全球数贸中心"}],"autres":[{"fr":"Vêtements : marché de Huangyuan","cn":"义乌篁园服装市场","chauffeur":"义乌篁园服装市场","vend":"De gros. 1er : jeans, pantalons ; 2e : homme et matériel de vitrine (mannequins, cintres) ; 3e et 4e : femme, pyjamas, pulls, sport ; 5e : enfant. Il vise plutôt la moyenne et haute gamme chinoise (article de juillet 2026). Trois adresses différentes selon les sources : donnez seulement le nom au chauffeur."},{"fr":"Marché des matériaux de production","cn":"义乌国际生产资料市场","chauffeur":"义乌国际生产资料市场","vend":"À environ 8 km du grand marché, près de l'aéroport. Machines, matériel d'emballage, équipement hôtelier, luminaires décoratifs (3e), électroménager (4e)."},{"fr":"Perruques : rue Chengxin 1","cn":"诚信一区","chauffeur":"义乌诚信一区（诚信大道67号门对面）","vend":"En face de la porte 67 du grand marché (avenue Chengxin) : perruques, peluches, tissus, dentelle, mercerie. Les perruques sont aussi au district 5, 2e étage."},{"fr":"Meubles","cn":"义乌家具市场","chauffeur":"义乌家具市场","vend":"Meubles de maison et de bureau, rotin, métal, bois massif. Très volumineux : faites le calcul du bateau avant."},{"fr":"À éviter : marché de nuit de Binwang","cn":"宾王夜市","chauffeur":"","vend":"Vente au détail le soir, beaucoup de contrefaçons. L'ancien marché de Binwang a été vidé en 2011 (literie partie au district 5, vêtements à Huangyuan)."}],"familles":[{"ic":"📱","fr":"Accessoires de téléphone, écouteurs, chargeurs, batteries externes","rayons":["tel"],"mots":["telephone","ecouteur","chargeur","cable","coque","power bank","batterie externe","casque","手机","耳机","充电","数据线"],"ou":[{"court":"District 2 · 3ᵉ étage","detail":"Téléphonie : coques, câbles, chargeurs, écouteurs simples."},{"court":"District 6 · 4ᵉ étage","detail":"Objets connectés, plus récents et plus chers."}],"pas":"Électronique de bonne qualité (chargeurs rapides, batteries externes, écouteurs sans fil) : Shenzhen reste la référence. Batteries externes = lithium : accord du transitaire avant d'acheter."},{"ic":"⌚","fr":"Montres connectées","rayons":["tel"],"mots":["montre connectee","smart watch","smartwatch","智能手表"],"ou":[{"court":"District 6 · 4ᵉ étage","detail":"Produits intelligents, objets connectés."},{"court":"District 2 · 3ᵉ étage","detail":"Montres et électronique."}],"pas":"Meilleur choix et meilleurs prix à Shenzhen."},{"ic":"🍳","fr":"Petit électroménager : mixeur, bouilloire, cuiseur à riz, fer à repasser, sèche-cheveux","rayons":["cui","bea"],"mots":["mixeur","blender","bouilloire","cuiseur","fer a repasser","seche-cheveux","seche cheveux","robot","friteuse","电饭","搅拌","电水壶","熨斗","吹风"],"ou":[{"court":"District 2 · 3ᵉ étage","detail":"Petit électroménager (mixeurs, bouilloires, cuiseurs à riz, fers, sèche-cheveux)."},{"court":"Matériaux de production (生产资料市场) · 4ᵉ étage","detail":"Zone électroménager."}],"pas":"Yiwu suffit pour de petites quantités. Les usines sont surtout à Cixi (Ningbo) et à Shunde (Foshan). Exigez 220 V / 50 Hz et la prise ronde C/F."},{"ic":"🌀","fr":"Ventilateurs","rayons":["gro","cui"],"mots":["ventilateur","风扇"],"ou":[{"court":"District 2 · 3ᵉ étage","detail":"Petit électroménager. Ventilateurs rechargeables ou solaires : peut-être au district 2 Est (non vérifié)."}],"pas":"Gros volumes : usines de Zhongshan et Foshan."},{"ic":"☀️","fr":"Solaire : lampes, panneaux, batteries, onduleurs","rayons":["bri"],"mots":["solaire","panneau","onduleur","guirlande solaire","太阳能","逆变器"],"ou":[{"court":"District 2 Est · 2ᵉ étage","detail":"Le marché du solaire : panneaux, régulateurs, onduleurs, batteries, lampes solaires, lampes de secours."},{"court":"District 2 · 3ᵉ étage","detail":"Lampes et torches."}],"pas":""},{"ic":"💡","fr":"Éclairage LED, ampoules, lampes torches, piles","rayons":["bri","mai"],"mots":["ampoule","led","lampe","torche","pile","eclairage","灯","手电","电池"],"ou":[{"court":"District 2 · 3ᵉ étage","detail":"Lampes, ampoules, torches, piles."},{"court":"District 2 Est · 2ᵉ étage","detail":"Lampes de secours et torches."},{"court":"Matériaux de production (生产资料市场) · 3ᵉ étage","detail":"Luminaires décoratifs."}],"pas":"Éclairage professionnel en gros : Guzhen (Zhongshan). Piles au lithium : accord du transitaire."},{"ic":"🍲","fr":"Cuisine : marmites, autocuiseur, boîtes à repas inox, thermos, tasses","rayons":["mai","cui"],"mots":["marmite","casserole","autocuiseur","thermos","gourde","tasse","boite a repas","lunch","poele","锅","保温","杯","饭盒"],"ou":[{"court":"District 2 · 3ᵉ étage","detail":"Quincaillerie de cuisine et de salle de bain (partie Ouest du 3e)."},{"court":"District 4 · 2ᵉ étage","detail":"Gadgets de cuisine, gobelets, boîtes en plastique."}],"pas":"Thermos en gros volume : Yongkang, à environ 1 h de Yiwu (plus de 70 % de la production chinoise)."},{"ic":"🍽️","fr":"Vaisselle en mélamine, articles d'hôtel","rayons":["mai"],"mots":["melamine","vaisselle","assiette","bol","service a the","密胺","餐具"],"ou":[{"court":"District 5 · 3ᵉ étage","detail":"Articles d'hôtel et de restaurant (une boutique mélamine : minimum 50 pièces)."},{"court":"District 4 · 2ᵉ étage","detail":"Une usine mélamine : minimum 1 000 pièces."}],"pas":""},{"ic":"🪣","fr":"Plastique : bassines, seaux, boîtes, poubelles, égouttoirs","rayons":["mai"],"mots":["bassine","seau","boite","poubelle","egouttoir","plastique","rangement","塑料","收纳","垃圾桶"],"ou":[{"court":"District 4 · 2ᵉ étage","detail":"Articles ménagers du quotidien, tous les produits en plastique."},{"court":"District 6 · 3ᵉ étage","detail":"Articles pour la maison, plus « design »."}],"pas":"Volumineux pour peu de valeur : le bateau au m³ coûte cher. Bassines et seaux pas cités nommément : à vérifier sur place."},{"ic":"🛏️","fr":"Literie, draps, serviettes, rideaux, moustiquaires, nattes et tapis","rayons":["mai"],"mots":["drap","literie","couette","oreiller","serviette","rideau","moustiquaire","natte","tapis","床上","毛巾","窗帘","蚊帐","地毯"],"ou":[{"court":"District 5 · 2ᵉ étage","detail":"Literie : draps, couettes, oreillers, couvertures, tapis."},{"court":"District 5 · 3ᵉ étage","detail":"Tissus pour rideaux, textile d'hôtel."},{"court":"District 4 · 3ᵉ étage","detail":"Serviettes."}],"pas":"Moustiquaires : aucun étage officiel ; le plus probable est le district 5, 2e étage."},{"ic":"☂️","fr":"Parapluies et imperméables","rayons":["mai"],"mots":["parapluie","impermeable","pluie","伞","雨衣","雨披"],"ou":[{"court":"District 2 · 1er étage","detail":"Parapluies, imperméables, pochettes de pluie."}],"pas":""},{"ic":"🎒","fr":"Sacs, sacs à dos d'école, valises","rayons":["mai"],"mots":["sac","valise","cartable","sacoche","箱包","书包","行李箱"],"ou":[{"court":"District 2 · 1er étage","detail":"Sacs, sacs à dos, valises."},{"court":"District 2 · 4ᵉ étage","detail":"Meilleure qualité (vente directe des usines)."}],"pas":""},{"ic":"👟","fr":"Chaussures, claquettes, chaussettes","rayons":["mai"],"mots":["chaussure","claquette","sandale","tong","chaussette","鞋","拖鞋","袜"],"ou":[{"court":"District 4 · 3ᵉ étage","detail":"Chaussures (cuir, sport, sandales)."},{"court":"District 4 · 1er étage","detail":"Chaussettes (bâtiments annexes)."}],"pas":"Claquettes pas citées nommément : à vérifier au même étage."},{"ic":"👕","fr":"Vêtements, chapeaux, gants","rayons":[],"mots":["vetement","chemise","pantalon","chapeau","casquette","gant","服装","帽","手套"],"ou":[{"court":"Huangyuan (篁园服装市场) · étages 1-5","detail":"1er jeans, 2e homme, 3e et 4e femme, 5e enfant."},{"court":"District 4 · 2ᵉ étage","detail":"Chapeaux, gants, bonneterie."},{"court":"District 4 · 4ᵉ étage","detail":"Lingerie, ceintures, écharpes."}],"pas":"Vêtements bon marché en gros volume : Guangzhou reste la référence habituelle."},{"ic":"🕶️","fr":"Montres, horloges murales, lunettes de soleil","rayons":["mai","tel"],"mots":["montre","horloge","pendule","lunette","钟","表","眼镜"],"ou":[{"court":"District 2 · 3ᵉ étage","detail":"Montres, horloges, pendules."},{"court":"District 3 · 1er étage","detail":"Lunettes, lunettes de soleil."}],"pas":""},{"ic":"💇","fr":"Perruques, extensions, bijoux, accessoires cheveux","rayons":["bea"],"mots":["perruque","meche","extension","bijou","barrette","假发","发制品","饰品","头饰"],"ou":[{"court":"District 5 · 2ᵉ étage","detail":"Perruques et extensions."},{"court":"诚信一区 (face porte 67)","detail":"Rue des perruques."},{"court":"District 1 · 2ᵉ étage","detail":"Bijoux fantaisie, accessoires cheveux (environ 3 000 boutiques)."},{"court":"District 1 Est · étages 1-3","detail":"Bijoux et composants."}],"pas":"Beaucoup de vendeurs de perruques viennent de Xuchang (Henan)."},{"ic":"💄","fr":"Cosmétiques, outils de beauté, parfums, tondeuses","rayons":["bea"],"mots":["cosmetique","maquillage","parfum","creme","tondeuse","rasoir","peigne","miroir","化妆","香水","理发","剃须"],"ou":[{"court":"District 3 · 3ᵉ étage","detail":"Cosmétiques, pinceaux, peignes, miroirs, coiffure, parfums."},{"court":"District 6 · 2ᵉ étage","detail":"Soins de la peau."},{"court":"District 2 · 3ᵉ étage","detail":"Rasoirs et tondeuses électriques (petit électroménager, à vérifier)."}],"pas":"Cosmétiques réglementés à l'entrée en Guinée ; parfums = alcool, marchandise dangereuse : demandez au transitaire avant d'acheter."},{"ic":"🧸","fr":"Jouets (dont jouets à piles)","rayons":["mai"],"mots":["jouet","peluche","poupee","玩具"],"ou":[{"court":"District 1 · 1er étage","detail":"Jouets électriques et à piles, peluches, gonflables."},{"court":"District 6 · 1er étage","detail":"Jouets tendance, plus chers."}],"pas":"Gros volumes : Shantou/Chenghai (Guangdong)."},{"ic":"✏️","fr":"Papeterie, stylos, fournitures scolaires, sport","rayons":["mai"],"mots":["stylo","cahier","papeterie","scolaire","cartable","sport","ballon","文具","笔","本子","体育"],"ou":[{"court":"District 3 · 1er étage","detail":"Stylos, encre, cahiers, papier."},{"court":"District 3 · 2ᵉ étage","detail":"Fournitures de bureau et scolaires, articles de sport."}],"pas":""},{"ic":"🔧","fr":"Outils, quincaillerie, serrures, cadenas, jardin","rayons":["bri"],"mots":["outil","quincaillerie","serrure","cadenas","tournevis","perceuse","jardin","工具","五金","锁"],"ou":[{"court":"District 2 · 2ᵉ étage","detail":"Outils, quincaillerie, serrures."},{"court":"District 2 Est · 1er étage","detail":"Quincaillerie pour la maison."},{"court":"District 2 · 4ᵉ étage","detail":"Vente directe des usines (vis, boulons)."}],"pas":"Gros volumes d'outils : Yongkang, à environ 1 h de route."},{"ic":"🔌","fr":"Électricité : fils, prises, multiprises, rallonges","rayons":["bri"],"mots":["prise","multiprise","rallonge","fil electrique","interrupteur","插座","电线","开关"],"ou":[{"court":"District 2 · 2ᵉ étage","detail":"Matériel électrique (fils, prises, interrupteurs)."}],"pas":"Vérifiez 220 V et la prise ronde C/F avant d'acheter."},{"ic":"🚗","fr":"Accessoires auto et moto","rayons":["bri"],"mots":["auto","voiture","moto","pneu","汽车","摩托"],"ou":[{"court":"District 5 · 4ᵉ étage","detail":"Accessoires et pièces auto, pièces moto."}],"pas":""},{"ic":"🎄","fr":"Décoration, fleurs artificielles, cadres, articles de fête","rayons":["deco","mai"],"mots":["decoration","fleur","cadre","tableau","fete","noel","mariage","装饰","花","相框","工艺"],"ou":[{"court":"District 1 · 1er étage","detail":"Fleurs artificielles."},{"court":"District 1 · 3ᵉ étage","detail":"Fête, artisanat décoratif, cadres, porcelaine."},{"court":"District 3 · 5ᵉ étage","detail":"Tableaux décoratifs."},{"court":"District 5 · 2ᵉ étage","detail":"Articles de mariage."}],"pas":""},{"ic":"📦","fr":"Emballages","rayons":[],"mots":["emballage","sachet","boite cadeau","包装"],"ou":[{"court":"District 2 · 1er étage","detail":"Emballages cadeaux, sachets."},{"court":"District 4 · 2ᵉ étage","detail":"Boîtes d'emballage."}],"pas":""},{"ic":"🪧","fr":"Caissons lumineux en tissu (SEG), enseignes","rayons":["deco"],"mots":["caisson","enseigne","light box","灯箱","卡布"],"ou":[],"pas":"Pas un produit de Yiwu : aucun rayon officiel. Visez Guangzhou ou Shenzhen, ou 1688 / Made-in-China livré à l'entrepôt."}],"pratique":["Horaires : tous les jours, environ 9 h – 17 h. Beaucoup de boutiques ouvrent vers 10 h et ferment dès 16 h 30 ; certaines ferment le dimanche. Arrivez vers 9 h 30.","Taxi (DiDi) : il n'y a pas de numéro de rue. Tapez le district et la porte, par exemple « 义乌国际商贸城二区 29号门 ». Métro : ligne 金义东线, station 国际商贸城站.","Le numéro d'une boutique se lit district → porte → étage → rue → boutique : « 二区29门3楼4街17185 ». Donnez la porte au chauffeur, la rue et le numéro au gardien.","Minimum : souvent 1 carton par article (12 à 144 pièces) ou environ 50 pièces par modèle, négociable si vous prenez plusieurs modèles. « Pas de minimum » veut souvent dire plusieurs cartons. Faites écrire si un carton peut mélanger les modèles.","Échantillons : en général payants. Les prix sont « départ Yiwu ». En stock : livré en 3 à 10 jours. Moins de 300 $ chez un vendeur : environ 10 $ de livraison.","Paiement : les yuans en espèces passent partout. WeChat Pay / Alipay avec carte étrangère : 5 000 $ maximum par paiement, 3 % de frais au-delà de 200 ¥ (règles de février 2025). Acompte 10 à 30 %, le reste à l'arrivée chez le transitaire, jamais avant d'avoir écrit le produit, la quantité et le marquage des cartons.","Regrouper : choisissez d'abord un transitaire qui a un entrepôt à Yiwu. Chaque boutique fait un bon (开单) avec son numéro et livre à cet entrepôt avec un bon de livraison. Départ par le port de Ningbo. La Guinée exige un BESC par envoi.","Transitaires : aucun vérifié avec entrepôt À YIWU et ligne vers Conakry. Pistes : AGL (groupage vers Conakry depuis Ningbo), Colis224 (demandez s'ils reçoivent à Yiwu), SINO Shipping (Ningbo). Le plus sûr : demander aux commerçants guinéens de Yiwu quel entrepôt ils utilisent.","Marchandises dangereuses : batteries externes, piles au lithium, parfums. Accord du transitaire avant d'acheter, sinon le bateau les refuse.","À éviter : le 5e étage du district 4 (surtout du détail) et le marché de nuit de Binwang (contrefaçons)."],"sources":["http://jh.bendibao.com/tour/2023829/21258.shtm","https://colis224.com/","https://en.yiwufair.com/wizard/market/t19598.html","https://en.yiwufair.com/wizard/market/t19599.html","https://en.yiwufair.com/wizard/market/t19600.html","https://en.yiwufair.com/wizard/market/t19601.html","https://en.yiwufair.com/wizard/market/t19602.html","https://en.yiwugo.com/product/detail/938166650.html","https://en.yiwugo.com/product/detail/941769077.html","https://en.yiwugo.com/product/detail/962479942.html","https://en.yiwugo.com/product/detail/986451453.html","https://en.yiwugo.com/purchaserservice/index.html","https://fulfillbot.com/?p=1000539","https://goodhopefreight.com/guinea/how-to-ship-from-china-to-guinea.html","https://m.thepaper.cn/newsDetail_forward_21865892","https://m.thepaper.cn/newsDetail_forward_23894900","https://m.thepaper.cn/newsDetail_forward_31504019","https://tidenews.com.cn/news.html?id=3500304","https://tidenews.com.cn/news.html?id=3578704","https://trade.yw.gov.cn/czzn/t10451.html","https://www.aglgroup.com/app/uploads/2025/08/Digital-Flyer-AGL-China-LCL-Solution-V2-EN.pdf","https://www.chinagoods.com/markets/detail/1/01","https://www.chinagoods.com/markets/detail/2/02","https://www.chinagoods.com/markets/detail/3/03","https://www.chinagoods.com/markets/detail/4/04","https://www.chinagoods.com/markets/detail/5/05","https://www.chinagoods.com/markets/detail/7/06","https://www.chinagoods.com/markets/detail/8/07","https://www.chinagoods.com/tradeCenter","https://www.eastchinatrip.com/zh-hant/yiwu-international-trade-market-guide/","https://www.globalsources.com/knowledge/yiwu-market/","https://www.news.cn/fortune/20251014/dcc09298f936412a9526d19de28aed66/c.html","https://www.news.cn/fortune/20260408/09d60bafa6404d97813a83c8ddd2616b/c.html","https://www.sino-shipping.com/fr/expedition-chine-guinee/","https://www.thepaper.cn/newsDetail_forward_22343754"]}/*FIN-GUIDE*/;
+let ygVue = 'rayon';
+function ygChauffeur(cn) { ouChauffeur(cn); }
+function ygPlans(cn) { window.open('https://maps.apple.com/?q=' + encodeURIComponent(cn), '_blank'); }
+function ygBoutonsAdresse(cn) {
+  if (!cn) return '';
+  return `<div class="mk-deux"><button type="button" class="b contour" onclick='ygChauffeur(${E(JSON.stringify(cn))})'>🚕 Montrer au chauffeur</button>
+    <button type="button" class="b contour" onclick='ygPlans(${E(JSON.stringify(cn))})'>🗺️ Plans</button></div>`;
+}
+function ygOuHtml(ou) {
+  return (ou || []).map(o => `<span class="yg-ou">${E(o.court)}</span>${o.detail ? ' ' + E(o.detail) : ''}`).join('<br>');
+}
+function ygRayonsHtml() {
+  if (!YW_GUIDE.familles.length) return '<p class="yg-pas">Le guide des rayons n\'est pas encore arrivé.</p>';
+  return YW_GUIDE.familles.map(x => `<div class="yg-f"><b>${E(x.ic || '')} ${E(x.fr)}</b><div>${x.ou && x.ou.length ? ygOuHtml(x.ou) : ''}</div>
+      ${x.pas ? `<div class="yg-pas">${E(x.pas)}</div>` : ''}</div>`).join('');
+}
+function ygDistrictsHtml() {
+  const d = YW_GUIDE.districts.map(x => `<details class="yg-d"><summary>${E(x.fr)} <small lang="zh">${E(x.cn)}</small></summary>
+      ${x.resume ? `<p>${E(x.resume)}</p>` : ''}
+      ${(x.etages || []).map(e => `<div class="yg-e"><b>${E(e.titre)}</b>${E(e.fr)}${e.cn ? `<div class="cn" lang="zh">${E(e.cn)}</div>` : ''}</div>`).join('')}
+      ${x.adresse_cn ? `<div class="yg-adr" lang="zh">📍 ${E(x.adresse_cn)}</div>` : ''}${x.horaires ? `<div class="yg-adr">🕘 ${E(x.horaires)}</div>` : ''}
+      ${ygBoutonsAdresse(x.chauffeur || x.cn)}</details>`).join('');
+  const a = YW_GUIDE.autres.map(x => `<details class="yg-d"><summary>${E(x.fr)} <small lang="zh">${E(x.cn)}</small></summary>
+      <p>${E(x.vend)}</p>${x.adresse_cn ? `<div class="yg-adr" lang="zh">📍 ${E(x.adresse_cn)}</div>` : ''}${ygBoutonsAdresse(x.chauffeur || x.cn)}</details>`).join('');
+  return d + (a ? '<h3 style="font-size:18px;margin-top:14px">Les autres marchés de gros</h3>' + a : '');
+}
+function ygPratiqueHtml() {
+  return YW_GUIDE.pratique.length ? `<details class="yg-d"><summary>💡 Acheter à Yiwu : les règles du marché</summary>${YW_GUIDE.pratique.map(p => `<p>• ${E(p)}</p>`).join('')}</details>` : '';
+}
+function ywGuideOuvrir(vue) {
+  if (vue) ygVue = vue;
+  mkBoite(`<div class="mk-dlg yg">
+    <h3>🛍️ Le marché de Yiwu</h3>
+    <p class="mk-aide" style="font-size:15px">Le grand marché (义乌国际商贸城, « Futian ») : 5 districts reliés entre eux, et le district 6 juste à côté (ouvert en 2025). Allez-y tôt ; le n° de chaque boutique est au-dessus de sa porte.</p>
+    <div class="yg-onglets"><button type="button" class="${ygVue === 'rayon' ? 'on' : ''}" onclick="ywGuideOuvrir('rayon')">📦 Par rayon</button>
+      <button type="button" class="${ygVue === 'district' ? 'on' : ''}" onclick="ywGuideOuvrir('district')">🏢 Par district</button></div>
+    ${ygVue === 'rayon' ? ygRayonsHtml() : ygDistrictsHtml()}
+    ${ygPratiqueHtml()}
+    ${YW_GUIDE.sources.length ? `<div class="yg-src">Recherche du ${E(YW_GUIDE.date)} : ${YW_GUIDE.sources.map(u => E(u.replace(/^https?:\/\/(www\.)?/, '').split('/')[0])).filter((v, i, a) => a.indexOf(v) === i).join(' · ')}. Les étages bougent : vérifiez sur place avec le plan à l'entrée de chaque district.</div>` : ''}
+    <div class="mk-boutons"><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+  const d = document.getElementById('boite'); if (d) d.scrollTop = 0;
+}
+// L'entrée : en haut de 🏭 Fournisseurs quand on est à Yiwu.
+const ygRencontresAvant = ecranRencontres;
+ecranRencontres = function () {
+  const h = ygRencontresAvant.apply(this, arguments);
+  if (vlVilleActuelle() !== 'Yiwu') return h;
+  const b = `<button type="button" class="b contour tr-gros yg-entree" onclick="ywGuideOuvrir()">🛍️ Le marché de Yiwu<small>qui vend quoi, à quel district et quel étage</small></button>`;
+  const i = h.indexOf('<button type="button" class="b wechat vw-entree"');
+  return i < 0 ? b + h : h.slice(0, i) + b + h.slice(i);
+};
+// « 📍 Où le chercher » (l'étude) : le rayon de Yiwu qui correspond au produit (ses mots en français ou en chinois) ;
+// à Yiwu, en premier.
+function ygPourProduit(p) {
+  const t = normaliserNom([p.nom_fr, p.nom, p.nom_cn, p.requete_1688].filter(Boolean).join(' '));
+  if (!t) return [];
+  return YW_GUIDE.familles.filter(x => (x.mots || []).some(m => t.includes(normaliserNom(m))));
+}
+if (typeof ouHtml === 'function') {
+  const ygOuAvant = ouHtml;
+  ouHtml = function (p) {
+    const h = ygOuAvant.apply(this, arguments);
+    const L = ygPourProduit(p || {}).slice(0, 2);
+    const y = L.map(x => `<div class="ou-l ou-yw"><b>🛍️ À Yiwu — ${E(x.fr)}</b><div>${x.ou.length ? ygOuHtml(x.ou) : ''}</div>${x.pas ? `<div class="ou-g">${E(x.pas)}</div>` : ''}</div>`).join('')
+      + `<div class="ou-l ou-yw">${L.length ? '' : '<div class="ou-g">Ce produit n\'est pas dans le guide de Yiwu : cherchez son rayon.</div>'}<button type="button" class="b contour" onclick="ywGuideOuvrir('rayon')">🛍️ Le guide du marché de Yiwu</button></div>`;
+    return vlVilleActuelle() === 'Yiwu' ? y + h : h + y;
+  };
+}
 </script>
 <script>
 

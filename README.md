@@ -184,6 +184,34 @@ plusieurs modèles reliés au même produit ; un fichier de Claude remplit aussi
 Fichiers `suivi-1.11.0-*.js` + `suivi-1.11.0.css`, `construire-1.11.0.py` (part de la 1.10.0). Rien de retiré.
 ⚠ Même remarque pour `KYLO-Achats.html`.
 
+Version 1.12.0 — 27/10/2026 : **Yiwu n'est pas Guangzhou, et chacun se retrouve dans WeChat**.
+A. Villes : chaque fournisseur porte sa ville (`ville` : Yiwu ou Guangzhou). Les fiches d'avant sont de Guangzhou ; celles notées
+à partir du 27/10 à 8 h (heure de Chine) sont de Yiwu (sauf celles venues d'un fichier de Claude, de l'Interprète ou de l'agent).
+« 📍 Je suis à » en haut de 🏭 Fournisseurs : chaque nouveau fournisseur prend cette ville. À Yiwu le code commence par Y (Y01…),
+à Guangzhou il reste F (F01…) ; chaque ville compte de son côté. Ceux notés à Yiwu avant la mise à jour (codes F) : « Leur donner
+un code Y » (seulement si le code n'a pas servi : WeChat, demande de prix, contrat), ou les garder. La liste : deux groupes
+(🛍️ Yiwu puis 🏙️ Guangzhou) et des puces de ville ; Sa fiche : la ville et « changer de ville ». Un fournisseur de Yiwu a le
+marché de Yiwu et le lieu de rencontre « yiwu » (« 在义乌国际商贸城您的店铺见过 » dans la demande de prix et le mot WeChat ;
+« Yiwu (sa boutique) » dans « Où l'avez-vous rencontré ? »). Les codes Y sont reconnus partout (QR « KYLO Y01 3 » des pages
+de demande de prix, nom de fichier « KYLO-报价-Y01-… », « À qui ? »).
+B. WeChat : le nom à donner dans WeChat est « CODE-Marque-Prénom » (« Y01-Bosstech-Rosy ») ; le mot à taper dans la recherche
+est le code avec le tiret (« Y01- »), ou, s'il porte déjà un autre nom (« BAVIN-Lisa.1F084 NewAsia »), le premier mot de ce nom
+(`wechat_nom`). Au stand : « 💬 Copier ce nom et ouvrir le scanner WeChat », puis « ✅ C'est fait ». Sa fiche : le mot à taper,
+ou « Copier son numéro et ouvrir WeChat » / « Copier le nom » / « C'est fait » / « Il porte déjà un autre nom ». « À qui
+envoyez-vous ? » montre le mot à taper. Nouvel écran « 💬 Mes fournisseurs dans WeChat » (entrée en haut de 🏭 Fournisseurs) :
+tous, par ville, « ⏳ À nommer » / « ✅ Avec leur code », ceux à qui des prix ont été demandés d'abord, compteur ; le carnet
+s'y rouvre au retour de WeChat, sur le dernier fournisseur touché.
+C. Sa boutique à Yiwu (`yiwu` : district, porte, étage, rue, n° de boutique) : au stand et sur sa fiche, lue sur sa carte quand
+elle y est (« 二区东7门3楼12街23456 », « Booth 23456, Street 12, F3, Gate 7, District 2 »), écrite en chinois en grand pour le
+chauffeur ou le gardien. Questions au vendeur de Yiwu : mélanger les modèles (混批), un seul carton, livrer à l'entrepôt du
+transitaire à Yiwu.
+D. « 🛍️ Le marché de Yiwu » : qui vend quoi, par rayon et par district (recherche du 27/10), adresses en chinois pour le
+chauffeur ; « 📍 Où le chercher » (l'étude) montre Yiwu en premier quand on y est.
+« Envoyer à Claude » emporte `ville`, `code_avant`, `lieu_rencontre`, `wechat_nom`, `yiwu`.
+Fichiers `suivi-1.12.0-*.js` + `suivi-1.12.0.css`, `construire-1.12.0.py` (part de la 1.11.0). Test rejouable :
+`tests/test-carnet-1120.py`. Rien de retiré.
+⚠ Même remarque pour `KYLO-Achats.html`.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

@@ -4,13 +4,13 @@
 // Une nouvelle version change le nom VERSION : l'appareil la range a la prochaine
 // ouverture avec Internet, puis jette l'ancienne. Les achats, eux, ne sont jamais ici :
 // ils restent dans la memoire du carnet et dans votre fichier.
-const VERSION = 'carnet-kylo-1.11.0-f8b7e3b97f';
+const VERSION = 'carnet-kylo-1.12.0-a5d28d7241';
 const FICHIERS = ["./","./index.html","./manifest.webmanifest","./lecteur-codes.js","./icones/icone-180.png","./icones/icone-192.png","./icones/icone-512-masquable.png","./icones/icone-512.png"];
 // L'empreinte exacte (SHA-256) de chaque fichier de CETTE version. 1.0.3 : si Internet donne un
 // fichier different (copie en retard chez l'hebergeur, fichier d'une autre fabrication), on ne
 // range RIEN sous le nom de cette version : l'ancienne version reste en place, intacte, et on
 // reessaiera a la prochaine ouverture avec Internet.
-const EMPREINTES = {"./":"f8b7e3b97fad6c98a8e23bfa074901dc6aadecd7db2dca04f6027c93b2895f6f","./index.html":"f8b7e3b97fad6c98a8e23bfa074901dc6aadecd7db2dca04f6027c93b2895f6f","./manifest.webmanifest":"206117d1f2fe00f5deb4cbaf42a9ddf61c62f4d7d5afa38f7810b28abbfe47eb","./lecteur-codes.js":"3e6840539ee0b66b9d70323bfdb67de1dad7da7d005c7a433c74da29bab2e0ba","./icones/icone-180.png":"ad6843165e8129d65fa23fdcd1a1ae3cc653ca5e6de44f3153aeef797589e510","./icones/icone-192.png":"59d586d2d7cb9c66ca035055a9a1ff71e8260e15a8722624cda9f128d0229bd2","./icones/icone-512-masquable.png":"9bbd5f30c9ac77b48daa6b80f73f33f40b2aba60ec6b49e7102b1f08e7958a85","./icones/icone-512.png":"9339df7ecec70578c8db3084bf5d2ad7a1bc26788793eabd963a387a656def97"};
+const EMPREINTES = {"./":"a5d28d724154b261935e2980779510826dc009fe0129b9f7f19ce5cb20e7829e","./index.html":"a5d28d724154b261935e2980779510826dc009fe0129b9f7f19ce5cb20e7829e","./manifest.webmanifest":"206117d1f2fe00f5deb4cbaf42a9ddf61c62f4d7d5afa38f7810b28abbfe47eb","./lecteur-codes.js":"3e6840539ee0b66b9d70323bfdb67de1dad7da7d005c7a433c74da29bab2e0ba","./icones/icone-180.png":"ad6843165e8129d65fa23fdcd1a1ae3cc653ca5e6de44f3153aeef797589e510","./icones/icone-192.png":"59d586d2d7cb9c66ca035055a9a1ff71e8260e15a8722624cda9f128d0229bd2","./icones/icone-512-masquable.png":"9bbd5f30c9ac77b48daa6b80f73f33f40b2aba60ec6b49e7102b1f08e7958a85","./icones/icone-512.png":"9339df7ecec70578c8db3084bf5d2ad7a1bc26788793eabd963a387a656def97"};
 const hexa = (buf) => Array.from(new Uint8Array(buf)).map((o) => o.toString(16).padStart(2, '0')).join('');
 
 self.addEventListener('install', (e) => {

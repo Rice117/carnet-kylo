@@ -18443,7 +18443,7 @@ function jnContenu(f, depuis, pagesWeChat) {
   // les modèles de ses catalogues lus par le carnet (fichier WeChat, photo de page, texte) ou dont il a noté le prix : Claude les vérifie
   const offreDe = new Map(offres.filter(({ o }) => o.produit_id).map(({ o }) => [o.produit_id, o]));
   const modeles = tout ? [] : ctProduits(f).filter(p => { const o = offreDe.get(p.id);
-    return (p.source !== 'claude' && (jnApres(p.ajoute_le, depuis) || jnApres(p.prix_le, depuis))) || (o && jnOffreDuJour(o, depuis, false)); })
+    return (p.source !== 'claude' && jnApres(p.ajoute_le, depuis)) || (jnApres(p.prix_le, depuis) && p.prix_le !== p.prix_claude_le) || (o && jnOffreDuJour(o, depuis, false)); })
     .map(p => ({ p, o: offreDe.get(p.id) || null }));
   const docs = ctDocs(f).filter(d => {
     if (d.type === 'carte') return nouveau || jnApres(d.le, depuis);
@@ -18561,7 +18561,23 @@ async function jnPreparer() {
     const toile = document.createElement('canvas'); toile.width = JN_W; toile.height = JN_H;
     const etat = { toile, g: null, y: 0, n: 0, pages: [], parties: [], octets: 0, titreJour };
     const e = typeof etActuelle === 'function' ? etActuelle() : null, k = typeof cmActuelle === 'function' ? cmActuelle() : null;
-    const r = e && typeof etReg === 'function' ? etReg(e) : null;
+    // l'étude en cours part aussi, en court (nom, prix en Chine, volume, prix affiché, feu et prix maximum avec MES chiffres, mon choix) :
+    // Claude relie chaque produit vu sans avoir besoin d'autre chose
+    let r = null, etudeProduits = null, etudeTaux = null;
+    if (e && typeof etLire === 'function') {
+      try {
+        const D = await etLire(e); r = typeof etReg === 'function' ? etReg(e) : null;
+        if (D && D.produits && r && D.params && D.params.taux) {
+          const ch = typeof etChoix === 'function' ? etChoix(e.id) : {}; etudeTaux = D.params.taux;
+          etudeProduits = (Array.isArray(D.liste) && D.liste.length ? D.liste : Object.keys(D.produits)).map(id => D.produits[id]).filter(Boolean).map(p => {
+            const c = etCalcule(D, r, p), m = ch[p.id] || {};
+            return { id: p.id, nom_fr: p.nom_fr || '', nom_cn: p.nom_cn || '', rayon: p.rayon || '', groupe: p.groupe || null, achat_cny: num(p.achat_cny), volume_m3: num(p.volume_m3),
+              affiche_gnf: num(p.affiche_gnf), quantite: num(p.quantite), feu: p.a_relever ? 'a_relever' : c.feu, max_achat_cny: Math.round(c.maxAchat * 10) / 10,
+              mon_choix: m.etat || '', ma_qte: m.qte != null ? m.qte : null };
+          });
+        }
+      } catch (x) { etudeProduits = null; }
+    }
     const nProd = L.reduce((s, x) => s + x.k.produits.length, 0);
     const consigne = "Claude : relis chaque photo de produit, chaque étiquette et chaque prix noté (devise, minimum), et ce qui est écrit sur les cartes et les photos de réponses. "
       + "Les « modèles lus dans ses catalogues » ont été lus par le carnet : vérifie chaque référence, prix et carton sur la photo. "
@@ -18572,7 +18588,7 @@ async function jnPreparer() {
     jnNouvellePage(etat);
     jnTexte(etat, 'Ma journée pour Claude — ' + titreJour, 46, true, '#0d3f85');
     jnTexte(etat, (jnEtat.portee === 'tout' ? 'Tout le carnet' : jnEtat.portee === 'dernier' ? 'Depuis le ' + mkJour(C.claude_journee_le) + ' ' + mkHeure(C.claude_journee_le) : "Aujourd'hui")
-      + ' · ' + L.length + ' fournisseurs · ' + nProd + ' produits notés · ville : ' + ((C.voyage && C.voyage.ville_actuelle) || '?') + ' · carnet ' + window.KYLO_APPLICATION, 24, false, '#3d4a5f');
+      + ' · ' + L.filter(x => x.f.id !== JN_SANS).length + ' fournisseurs · ' + nProd + ' produits notés · ville : ' + ((C.voyage && C.voyage.ville_actuelle) || '?') + ' · carnet ' + window.KYLO_APPLICATION, 24, false, '#3d4a5f');
     etat.y += 14; jnTexte(etat, consigne, 24, false, '#16233a');
     if (r) { etat.y += 6; jnTexte(etat, 'Mes chiffres : budget ' + nf(r.budget) + ' € · frais du voyage ' + nf(r.voyage) + ' % · marge ' + nf(r.marge) + ' % · marchandage ' + nf(r.marchand) + ' % · bateau ' + nf(r.fret) + ' $/m³ · douane ' + nf(r.douane, 2) + ' %', 22, false, '#3d4a5f'); }
     etat.y += 18; jnTexte(etat, 'Sommaire', 30, true, '#0d3f85');
@@ -18581,7 +18597,7 @@ async function jnPreparer() {
     const sommaire = [];
     jnFinirPage(etat); const pageSommaire = etat.pages.length - 1;
     const json = { format: 'kylo-pour-claude', version: 3, quoi: 'journee', le: maintenant, de: depuis.getTime() ? depuis.toISOString() : '', application: window.KYLO_APPLICATION,
-      ville: (C.voyage && C.voyage.ville_actuelle) || '', consigne, etude: e ? { id: e.id, titre: e.titre } : null, commande: k ? { id: k.id, titre: k.titre } : null,
+      ville: (C.voyage && C.voyage.ville_actuelle) || '', consigne, etude: e ? { id: e.id, titre: e.titre, taux: etudeTaux, produits: etudeProduits || [] } : null, commande: k ? { id: k.id, titre: k.titre } : null,
       reglages: r, taux: (C.voyage && C.voyage.taux) || {}, fournisseurs: [],
       decisions: { choix_claude: typeof cxDecisionsPourClaude === 'function' ? cxDecisionsPourClaude() : [], etudes_choix: typeof etDecisionsPourClaude === 'function' ? etDecisionsPourClaude() : [],
         commandes_choix: typeof cmDecisionsPourClaude === 'function' ? cmDecisionsPourClaude() : [] } };
@@ -18627,7 +18643,7 @@ async function jnPreparer() {
         else if (p1 || p2) { if (p2) jnTexte(etat, 'Étiquette / prix :', 22, true, '#0d3f85'); jnDessinerImage(etat, p1 || p2, JN_MG, etat.y, L2, JN_H - etat.y - 40); }
         else jnTexte(etat, '(pas de photo)', 24, false, '#9a6208');
         const pos = jnFinirPage(etat);
-        x.produits_vus.push({ n, article: c.article, modele: o.modele || '', prix: num(o.prix) || 0, devise: o.devise || '', moq: num(o.moq) || 0, note: o.note || '', vu_le: o.vu_le || '',
+        x.produits_vus.push({ n, cle: 'o:' + o.id, article: c.article, modele: o.modele || '', prix: num(o.prix) || 0, devise: o.devise || '', moq: num(o.moq) || 0, note: o.note || '', vu_le: o.vu_le || '',
           qualites: qs, photo: !!p1, etiquette: !!p2, achete: !!o.achat_id, etude: o.etude_cle || '', partie: pos.partie, page: pos.page });
       }
       // Les modèles de ses catalogues lus par le carnet : 6 par page (photo, référence, prix, carton) — à vérifier par Claude
@@ -18653,7 +18669,7 @@ async function jnPreparer() {
           places.push({ p, o, qs, prix, dev, photo: !!im });
         }
         const pos = jnFinirPage(etat);
-        places.forEach(({ p, o, qs, prix, dev, photo }) => x.modeles_lus.push({ ref: p.ref || '', categorie: p.categorie || '', caracteristiques: p.caracteristiques || '', colisage: num(p.colisage) || 0,
+        places.forEach(({ p, o, qs, prix, dev, photo }) => x.modeles_lus.push({ cle: o ? 'o:' + o.id : 'p:' + p.id, ref: p.ref || '', categorie: p.categorie || '', caracteristiques: p.caracteristiques || '', colisage: num(p.colisage) || 0,
           carton: [num(p.dim_l) || 0, num(p.dim_la) || 0, num(p.dim_h) || 0], poids_kg: num(p.poids_kg) || 0, prix: prix || 0, devise: dev, moq: num(p.moq) || 0, qualites: qs,
           lu_par: o && o.cotation_source && o.cotation_source !== 'claude' ? o.cotation_source : (p.source || ''), page_catalogue: p.page || '', interesse: !!p.interesse, photo, partie: pos.partie, page: pos.page }));
       }
@@ -18709,6 +18725,15 @@ async function jnUnFichier(i) {
   const voie = await remettreFichier(x.blob, x.nom);
   if (voie !== 'erreur' && voie !== 'annule') jnNoterEnvoi();
 }
+// ---------- un prix posé par un fichier de Claude est marqué : il ne repart pas chez Claude ----------
+const jnFusionAvant = ctFusion;
+ctFusion = function (imp, appliquer) {
+  if (!appliquer) return jnFusionAvant.apply(this, arguments);
+  const avant = new Map(); fournisseursListe().forEach(f => ctProduits(f).forEach(p => avant.set(p, p.prix_le || '')));
+  const res = jnFusionAvant.apply(this, arguments);
+  fournisseursListe().forEach(f => ctProduits(f).forEach(p => { if (p.prix_le && avant.get(p) !== p.prix_le) p.prix_claude_le = p.prix_le; }));
+  return res;
+};
 // ---------- l'entrée en haut de 🏭 Fournisseurs ----------
 const jnRencontresAvant = ecranRencontres;
 ecranRencontres = function () {

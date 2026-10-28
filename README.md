@@ -233,6 +233,19 @@ Fichiers `suivi-1.13.0-*.js` + `suivi-1.13.0.css`, `construire-1.13.0.py` (part 
 exprès pour D). Rien de retiré.
 ⚠ Même remarque pour `KYLO-Achats.html`.
 
+Version 1.14.0 — 28/10/2026 : **« 📤 Ma journée pour Claude »** (en haut de 🏭 Fournisseurs).
+Ce qui a été noté aujourd'hui (ou depuis le dernier envoi, ou tout) part en deux fichiers faits dans le téléphone, sans Internet :
+un PDF que Claude lit (page de consignes et sommaire ; une page par fournisseur : coordonnées, boutique de Yiwu, sa carte, la liste
+de ses produits ; une page par produit noté avec SA photo, l'étiquette et le prix tapé ; les modèles de ses catalogues lus par le
+carnet, 6 par page avec photo, référence, prix et carton, « à vérifier » ; ses réponses et panneaux en photo ; les pages WeChat
+seulement si on coche), et `KYLO-journee-<jour>.json` (`format: kylo-pour-claude`, `quoi: journee`) avec les mêmes données en
+chiffres, chaque produit renvoyant à sa partie et sa page du PDF. Ce qui vient d'un fichier de Claude ne repart pas. Les produits
+notés sans fournisseur partent dans un groupe à part. Au-delà de 80 pages ou 22 Mo, le PDF est coupé en parties. « 📤 Partager »
+envoie les fichiers ensemble (sinon 💾 un par un). Claude renvoie le fichier habituel (`kylo-import`).
+Fichiers `suivi-1.14.0-a-journee.js` + `suivi-1.14.0.css`, `construire-1.14.0.py` (part de la 1.13.0). Tests rejouables :
+`tests/test-carnet-1140.py` (27 contrôles), et les 51 + 57 contrôles de la 1.13.0 rejoués sur la 1.14.0. Rien de retiré.
+⚠ Même remarque pour `KYLO-Achats.html`.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

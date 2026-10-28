@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.13.0';
+window.KYLO_APPLICATION = '1.14.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -18359,6 +18359,364 @@ vwLigneHtml = function (f) {
   const h = vwLigneAvant113.apply(this, arguments);
   if (vwNomme(f)) return h;
   return h.replace(/<div class="vw-a">[\s\S]*?<\/div>/, `<div class="vw-a">${vwSecoursHtml(f)}</div>`);
+};
+</script>
+<style>
+/* ===================== 1.14.0 — « 📤 MA JOURNÉE POUR CLAUDE » (28/10/2026) =====================
+   Mêmes couleurs que le carnet ; textes jamais sous 14 px ; gros boutons pour le pouce. */
+.b.jn-entree{display:block;width:100%;min-height:62px;margin:0 0 10px;background:var(--bleu);color:#fff;font-size:17px;font-weight:800;text-align:left;padding:10px 14px;border-radius:14px}
+.b.jn-entree small{display:block;font-weight:400;font-size:14px;opacity:.95}
+html[data-theme="sombre"] .b.jn-entree{background:#1d4f9a;color:#fff}
+.jn-dlg .jn-aide{font-size:16px;line-height:1.45;margin:6px 0 10px;color:var(--texte-note)}
+.jn-puces{margin:4px 0 10px}
+.jn-liste{display:grid;gap:6px;max-height:46vh;overflow-y:auto;border:1px solid var(--lisiere);border-radius:12px;padding:6px}
+.jn-f{display:flex;gap:10px;align-items:flex-start;padding:8px;border-radius:10px;background:var(--carte);cursor:pointer;font-size:16px;line-height:1.35}
+.jn-f input{width:26px;height:26px;flex:0 0 auto;margin:2px 0 0;accent-color:var(--vert)}
+.jn-f small{font-size:14px;color:var(--gris)}
+.jn-wx{margin-top:8px;border:1px dashed var(--lisiere)}
+.jn-neuf{display:inline-block;font-size:14px;font-weight:700;color:var(--vert);background:var(--vert-pale);border-radius:999px;padding:0 8px}
+.jn-vide{font-size:16px;color:var(--gris);margin:8px 0}
+.b.jn-gros{display:block;width:100%;min-height:58px;font-size:17px;margin-top:10px}
+.jn-pret{margin-top:10px;background:var(--vert-pale);color:var(--vert);border-radius:10px;padding:10px;font-size:15px;line-height:1.45;word-break:break-word}
+.jn-un{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.jn-un .b{flex:1 1 160px;min-height:48px;font-size:15px}
+.jn-etapes{margin:10px 0 0;padding-left:22px;display:grid;gap:6px;font-size:15px;line-height:1.45}
+</style>
+<script>
+// =====================================================================================================
+//  CARNET 1.14.0 — « 📤 MA JOURNÉE POUR CLAUDE » (28/10/2026)
+//  Riche, 28/10 à 18 h 40, après la commande dans le carnet : « il reste quelque chose à faire : les catalogues de la journée,
+//  les prix qu'on affichait sur notre carnet, qu'on les envoie directement à Claude pour qu'il puisse les traiter… comme celle
+//  que tu fais, parce que le carnet peut le faire, mais il n'est pas précis comme toi. Les fournisseurs que je retrouve
+//  aujourd'hui, j'ai pris la photo de leurs produits et leur prix : organise ça pour que je récupère directement sur le carnet
+//  et t'envoie pour traiter. »
+//  L'ancien « 📤 Envoyer à Claude » (📋 Où j'en suis) part avec TOUT : 140 fournisseurs, des milliers de modèles, toutes les
+//  photos, en ZIP de 15 Mo en plusieurs parties — trop lourd (seule la partie 1 avait été commencée), et un ZIP ne se joint pas
+//  toujours dans Claude. Il reste là, sans changement.
+//  « Ma journée pour Claude » (en haut de 🏭 Fournisseurs) :
+//   - seulement ce qui est nouveau : aujourd'hui (par défaut), ou depuis le dernier envoi, ou tout ; chaque fournisseur se décoche ;
+//   - UN PDF que Claude lit (et Riche aussi) : une page de consignes, une page par fournisseur (sa carte, ses coordonnées, la
+//     liste de ses produits), chaque produit noté avec SA photo, l'étiquette et le prix tapé, ses réponses en photos et ses
+//     panneaux ; les pages de catalogues reçus sur WeChat seulement si on le coche (mieux : transférer le PDF d'origine) ;
+//   - un petit fichier .json avec les mêmes données en chiffres (prix, devises, minimums, codes, l'étude et la commande en cours,
+//     tes chiffres) : Claude n'a rien à deviner ;
+//   - les deux partent ensemble par « Partager » (→ l'application Claude, ou Enregistrer dans Fichiers), ou un par un.
+//  Le PDF est fait dans le téléphone, page par page (une seule page en mémoire à la fois), sans Internet. Au-delà de 22 Mo ou de
+//  80 pages, il est coupé en parties.
+//  Ce que Claude renvoie : le fichier habituel (📥 Ajouter un fichier de Claude) — fournisseurs complétés, prix relus, produits
+//  reliés à l'étude, et la commande mise à jour.
+// =====================================================================================================
+const JN_MAX_OCTETS = 22e6, JN_MAX_PAGES = 80, JN_W = 1240, JN_H = 1754, JN_MG = 70;
+let jnEtat = null;   // { portee, depuis, coches: Set(fid), pagesWeChat, fichiers: [{ nom, blob, pages, taille }], json }
+function jnDebutJour() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+function jnDepuis(portee) {
+  if (portee === 'tout') return new Date(0);
+  if (portee === 'dernier' && C.claude_journee_le) { const d = new Date(C.claude_journee_le); if (!isNaN(d)) return d; }
+  return jnDebutJour();
+}
+const jnApres = (iso, d) => { if (!iso) return false; const x = new Date(iso); return !isNaN(x) && x >= d; };
+function jnJourLocal(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+// Ce qui part pour un fournisseur : ses produits notés, les modèles lus dans ses catalogues, ses photos (dans la période).
+// Ce qui vient de Claude (fournisseurs et prix du fichier de Claude) ne repart pas : Claude l'a déjà.
+const JN_SANS = '_sans';
+function jnTitreF(f) { return [f.code, mkNomFournisseur(f).replace(/^[FY]\d+\s*·\s*/, '')].filter(Boolean).join(' · '); }
+function jnSansFournisseur() { return { id: JN_SANS, code: '', nom: 'Produits notés sans fournisseur', docs: [], produits: [] }; }
+function jnOffresSans() {
+  const L = fournisseursListe(), ids = new Set(L.map(f => f.id)), noms = new Set(L.map(f => normaliserNom(f.nom)).filter(Boolean)), res = [];
+  (C.comparaisons || []).forEach(c => (c.offres || []).forEach(o => {
+    if (o.produit_id || (o.fournisseur_id && ids.has(o.fournisseur_id)) || (!o.fournisseur_id && o.fournisseur && noms.has(normaliserNom(o.fournisseur)))) return;
+    res.push({ c, o });
+  }));
+  return res;
+}
+const jnOffreDuJour = (o, depuis, tout) => tout || jnApres(o.vu_le, depuis) || (jnApres(o.cotation_le, depuis) && o.cotation_source !== 'claude');
+function jnContenu(f, depuis, pagesWeChat) {
+  const tout = depuis.getTime() === 0, sans = f.id === JN_SANS;
+  // « nouveau » : rencontré aujourd'hui (portée du jour), ou après le dernier envoi (portée « depuis mon dernier envoi »)
+  const minuit = depuis.getHours() === 0 && depuis.getMinutes() === 0 && depuis.getSeconds() === 0 && depuis.getMilliseconds() === 0;
+  const jd = jnJourLocal(depuis), lj = f.le ? String(f.le).slice(0, 10) : '';
+  const nouveau = !sans && f.source !== 'claude' && (tout || jnApres(f.cree_le, depuis) || (!!lj && (lj > jd || (lj === jd && (minuit || jnApres(f.vu_le, depuis))))));
+  const offres = sans ? jnOffresSans() : mkOffresDe(f);
+  // les produits notés (au stand, au marché, demandés…), dans l'ordre où il les a notés
+  const produits = offres.filter(({ o }) => !o.produit_id && jnOffreDuJour(o, depuis, tout))
+    .sort((a, b) => String(a.o.vu_le || a.o.cotation_le || '').localeCompare(String(b.o.vu_le || b.o.cotation_le || '')));
+  // les modèles de ses catalogues lus par le carnet (fichier WeChat, photo de page, texte) ou dont il a noté le prix : Claude les vérifie
+  const offreDe = new Map(offres.filter(({ o }) => o.produit_id).map(({ o }) => [o.produit_id, o]));
+  const modeles = tout ? [] : ctProduits(f).filter(p => { const o = offreDe.get(p.id);
+    return (p.source !== 'claude' && (jnApres(p.ajoute_le, depuis) || jnApres(p.prix_le, depuis))) || (o && jnOffreDuJour(o, depuis, false)); })
+    .map(p => ({ p, o: offreDe.get(p.id) || null }));
+  const docs = ctDocs(f).filter(d => {
+    if (d.type === 'carte') return nouveau || jnApres(d.le, depuis);
+    if (d.origine === 'wechat') return pagesWeChat && (tout || jnApres(d.le, depuis));
+    return tout || jnApres(d.le, depuis);
+  });
+  const pagesWx = ctDocs(f).filter(d => d.origine === 'wechat' && (tout || jnApres(d.le, depuis))).length;
+  return { nouveau, produits, modeles, docs, pagesWx, compte: produits.length + modeles.length + docs.filter(d => d.type !== 'carte').length + (nouveau ? 1 : 0) };
+}
+function jnFournisseurs(depuis) {
+  // dans l'ordre de la journée : le premier fournisseur vu en premier
+  const premier = ({ f, k }) => [k.nouveau ? (f.cree_le || f.vu_le || f.le) : '', ...k.produits.map(({ o }) => o.vu_le || o.cotation_le), ...k.docs.map(d => d.le)]
+    .filter(Boolean).map(String).sort()[0] || '9';
+  return fournisseursListe().filter(f => !f.agent).concat([jnSansFournisseur()]).map(f => ({ f, k: jnContenu(f, depuis, !!(jnEtat && jnEtat.pagesWeChat)) }))
+    .filter(x => x.k.nouveau || x.k.produits.length || x.k.modeles.length || x.k.docs.some(d => d.type !== 'carte'))
+    .map(x => Object.assign(x, { t: premier(x) })).sort((a, b) => a.t.localeCompare(b.t));
+}
+function jnResume(depuis) {
+  const L = jnFournisseurs(depuis);
+  return { n: L.filter(x => x.f.id !== JN_SANS).length, produits: L.reduce((s, x) => s + x.k.produits.length, 0), modeles: L.reduce((s, x) => s + x.k.modeles.length, 0), prix: L.reduce((s, x) => s + x.k.produits.filter(({ o }) => num(o.prix) > 0).length, 0),
+    photos: L.reduce((s, x) => s + x.k.produits.reduce((t, { o }) => t + (o.photo ? 1 : 0) + (o.photo2 ? 1 : 0), 0) + x.k.docs.length, 0) };
+}
+// ---------- la fenêtre ----------
+function jnOuvrir() {
+  const avant = jnEtat;
+  jnEtat = { portee: avant ? avant.portee : 'jour', coches: null, pagesWeChat: avant ? avant.pagesWeChat : false, fichiers: null, json: null };
+  jnDessiner();
+}
+function jnPortee(p) { jnEtat.portee = p; jnEtat.coches = null; jnEtat.fichiers = null; jnDessiner(); }
+function jnCocher(fid, oui) { if (!jnEtat.coches) return; if (oui) jnEtat.coches.add(fid); else jnEtat.coches.delete(fid); jnEtat.fichiers = null; jnMajBas(); }
+function jnPagesWeChat(oui) { jnEtat.pagesWeChat = !!oui; jnEtat.fichiers = null; jnDessiner(); }
+function jnDessiner() {
+  const depuis = jnDepuis(jnEtat.portee), L = jnFournisseurs(depuis);
+  if (!jnEtat.coches) jnEtat.coches = new Set(L.map(x => x.f.id));
+  const dernier = C.claude_journee_le ? new Date(C.claude_journee_le) : null;
+  const puce = (k, t) => `<button type="button" class="mk-puce${jnEtat.portee === k ? ' on' : ''}" onclick="jnPortee('${k}')">${t}</button>`;
+  const pagesWx = L.reduce((s, x) => s + x.k.pagesWx, 0);
+  mkBoite(`<div class="mk-dlg jn-dlg"><h3>📤 Ma journée pour Claude</h3>
+    <p class="jn-aide">Les fournisseurs, les photos de leurs produits et les prix que tu as notés partent en <b>un PDF</b> (que Claude lit) et un petit
+      fichier de chiffres. Claude les relit, les vérifie, les relie à ton étude et te renvoie le fichier à ajouter au carnet.</p>
+    <div class="mk-puces jn-puces">${puce('jour', "Aujourd'hui")}${dernier && !isNaN(dernier) ? puce('dernier', 'Depuis mon dernier envoi (' + E(mkJour(C.claude_journee_le)) + ' ' + E(mkHeure(C.claude_journee_le)) + ')') : ''}${puce('tout', 'Tout')}</div>
+    ${L.length ? `<div class="jn-liste">${L.map(({ f, k }) => { const np = k.produits.length, nx = k.produits.filter(({ o }) => num(o.prix) > 0).length, nd = k.docs.filter(d => d.type !== 'carte').length;
+        return `<label class="jn-f" for="jn_${f.id}"><input type="checkbox" id="jn_${f.id}" ${jnEtat.coches.has(f.id) ? 'checked' : ''} onchange="jnCocher('${f.id}',this.checked)">
+          <span><b>${E(f.code || '')}</b> ${E(mkNomFournisseur(f).replace(/^[FY]\d+\s*·\s*/, ''))}${k.nouveau ? ' <span class="jn-neuf">nouveau</span>' : ''}<br>
+          <small>${np ? np + ' produit' + (np > 1 ? 's' : '') + (nx ? ' (' + nx + ' avec prix)' : '') : k.modeles.length ? '' : 'aucun produit noté'}${k.modeles.length ? (np ? ' · ' : '') + k.modeles.length + ' modèle' + (k.modeles.length > 1 ? 's' : '') + ' lus dans ses catalogues' : ''}${nd ? ' · ' + nd + ' photo' + (nd > 1 ? 's' : '') : ''}${k.docs.some(d => d.type === 'carte') ? ' · sa carte' : ''}</small></span></label>`; }).join('')}</div>`
+      : `<p class="jn-vide">Rien de noté ${jnEtat.portee === 'jour' ? "aujourd'hui" : 'depuis le dernier envoi'}. Choisis « Tout » pour tout envoyer.</p>`}
+    ${pagesWx ? `<label class="jn-f jn-wx" for="jn_wx"><input type="checkbox" id="jn_wx" ${jnEtat.pagesWeChat ? 'checked' : ''} onchange="jnPagesWeChat(this.checked)">
+      <span>Ajouter les ${pagesWx} pages de catalogues reçus sur WeChat<br><small>Mieux : transfère-moi le PDF d'origine depuis WeChat (plus net).</small></span></label>` : ''}
+    <div id="jn_bas">${jnBasHtml()}</div>
+    <div class="mk-boutons"><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+}
+function jnBasHtml() {
+  if (jnEtat.fichiers) {
+    const F = jnEtat.fichiers;
+    return `<div class="jn-pret">✅ Prêt : ${F.map(x => `<b>${E(x.nom)}</b> (${E(jnTaille(x.taille))}${x.pages ? ', ' + x.pages + ' pages' : ''})`).join(' + ')}</div>
+      <button type="button" class="b vert jn-gros" onclick="jnPartager()">📤 Partager ${F.length > 1 ? 'les ' + F.length + ' fichiers' : 'le fichier'} → Claude</button>
+      <div class="jn-un">${F.map((x, i) => `<button type="button" class="b contour" onclick="jnUnFichier(${i})">💾 ${x.nom.endsWith('.json') ? 'Le fichier de chiffres' : 'Le PDF' + (F.filter(y => y.nom.endsWith('.pdf')).length > 1 ? ' (partie ' + (i + 1) + ')' : '')}</button>`).join('')}</div>
+      <ol class="jn-etapes"><li>Touche <b>📤 Partager</b> → choisis <b>Claude</b> (ou « Enregistrer dans Fichiers »).</li>
+        <li>Dans la conversation avec Claude : joins-les (bouton <b>+</b> → Fichiers si tu les as enregistrés) et écris <b>« traite ma journée »</b>.</li>
+        <li>Claude te renvoie un fichier : <b>📥 Ajouter un fichier de Claude</b>, comme pour la commande.</li></ol>`;
+  }
+  const depuis = jnDepuis(jnEtat.portee), L = jnFournisseurs(depuis).filter(x => jnEtat.coches && jnEtat.coches.has(x.f.id));
+  const np = L.reduce((s, x) => s + x.k.produits.length, 0), nm = L.reduce((s, x) => s + x.k.modeles.length, 0), nf0 = L.filter(x => x.f.id !== JN_SANS).length;
+  return L.length ? `<button type="button" class="b vert jn-gros" id="jn_go" onclick="jnPreparer()">📄 Préparer : ${nf0} fournisseur${nf0 > 1 ? 's' : ''}, ${np} produit${np > 1 ? 's' : ''}${nm ? ' + ' + nm + ' modèle' + (nm > 1 ? 's' : '') + ' de catalogue' : ''}</button>` : '';
+}
+function jnTaille(o) { return o < 1e6 ? Math.max(1, Math.round(o / 1e3)) + ' Ko' : clMo(o); }
+function jnMajBas() { const z = document.getElementById('jn_bas'); if (z) z.innerHTML = jnBasHtml(); }
+
+// ---------- le PDF, page par page ----------
+function jnNouvellePage(etat) {
+  const c = etat.toile, g = c.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#fff'; g.fillRect(0, 0, JN_W, JN_H);
+  g.fillStyle = '#0d3f85'; g.fillRect(0, 0, JN_W, 12);
+  g.font = '20px ' + CTR_POLICE; g.fillStyle = '#5a6b85'; g.textAlign = 'right';
+  g.fillText('KYLO EURGUINE · ma journée pour Claude · ' + etat.titreJour + ' · page ' + (etat.n + 1), JN_W - JN_MG, 44); g.textAlign = 'left';
+  etat.y = 80; etat.g = g; etat.coupe = false;
+}
+function jnFinirPage(etat) {
+  const u = etat.toile.toDataURL('image/jpeg', 0.8), b = atob(u.split(',')[1]), o = new Uint8Array(b.length);
+  for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i);
+  if (etat.pages.length && (etat.octets + o.length > JN_MAX_OCTETS || etat.pages.length >= JN_MAX_PAGES)) { etat.parties.push(etat.pages); etat.pages = []; etat.octets = 0; }
+  etat.pages.push({ w: JN_W, h: JN_H, octets: o }); etat.octets += o.length; etat.n++;
+  return { partie: etat.parties.length + 1, page: etat.pages.length };
+}
+function jnTexte(etat, t, taille, gras, couleur, x, largeur) {
+  const g = etat.g; g.font = (gras ? 'bold ' : '') + taille + 'px ' + CTR_POLICE; g.fillStyle = couleur || '#16233a';
+  const L = ctrLignes(g, String(t == null ? '' : t), largeur || (JN_W - 2 * JN_MG)), h = Math.round(taille * 1.4);
+  L.forEach(l => { if (etat.y + h > JN_H - 30) { etat.coupe = true; return; } g.fillText(l, x == null ? JN_MG : x, etat.y + taille); etat.y += h; });
+}
+async function jnImage(src) {
+  if (!src) return null;
+  if (typeof src === 'string' && src.startsWith('idb:')) { try { src = await ctLire(src.slice(4)); } catch (e) { return null; } }
+  if (typeof src !== 'string' || !src.startsWith('data:image')) return null;
+  try { return await trImage(src); } catch (e) { return null; }
+}
+async function jnDoc(id) { try { return await jnImage(await ctLire(id)); } catch (e) { return null; } }
+function jnDessinerImage(etat, img, x, y, lmax, hmax) {
+  if (!img || !(lmax > 40) || !(hmax > 40)) return 0;
+  const r = Math.min(lmax / img.width, hmax / img.height, 3), l = Math.round(img.width * r), h = Math.round(img.height * r);
+  etat.g.drawImage(img, x, y, l, h); etat.g.strokeStyle = '#d7e1f0'; etat.g.lineWidth = 2; etat.g.strokeRect(x, y, l, h);
+  return h;
+}
+function jnPrixTexte(o) {
+  const p = num(o.prix); if (!(p > 0)) return 'prix pas noté';
+  return nf(p, 2) + ' ' + (o.devise || '') + (num(o.moq) ? ' · minimum ' + nf(o.moq) + ' pièces' : '');
+}
+async function jnPreparer() {
+  const b = document.getElementById('jn_go'); const etatBouton = t => { if (b) { b.disabled = true; b.textContent = t; } };
+  etatBouton('⏳ Préparation…');
+  try {
+    await clRestaurerImages();
+    const depuis = jnDepuis(jnEtat.portee), maintenant = mkMaintenant();
+    const L = jnFournisseurs(depuis).filter(x => jnEtat.coches.has(x.f.id));
+    const jour = jnJourLocal(new Date()), titreJour = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const toile = document.createElement('canvas'); toile.width = JN_W; toile.height = JN_H;
+    const etat = { toile, g: null, y: 0, n: 0, pages: [], parties: [], octets: 0, titreJour };
+    const e = typeof etActuelle === 'function' ? etActuelle() : null, k = typeof cmActuelle === 'function' ? cmActuelle() : null;
+    const r = e && typeof etReg === 'function' ? etReg(e) : null;
+    const nProd = L.reduce((s, x) => s + x.k.produits.length, 0);
+    const consigne = "Claude : relis chaque photo de produit, chaque étiquette et chaque prix noté (devise, minimum), et ce qui est écrit sur les cartes et les photos de réponses. "
+      + "Les « modèles lus dans ses catalogues » ont été lus par le carnet : vérifie chaque référence, prix et carton sur la photo. "
+      + "Vérifie les chiffres (un prix tapé peut être faux : la photo de l'étiquette fait foi), dis ce que tu ne peux pas lire. Relie chaque produit à mon étude"
+      + (e ? ' « ' + e.titre + ' » (id ' + e.id + ')' : '') + " et calcule avec mes chiffres (feu, prix maximum). Dis-moi ce qui vaut la peine, combien en commander, "
+      + "et renvoie-moi le fichier pour le carnet (format kylo-import : fournisseurs complétés, offres reliées à l'étude" + (k ? ', commande « ' + k.titre + ' » mise à jour' : '') + ").";
+    // Page 1 : consignes et sommaire
+    jnNouvellePage(etat);
+    jnTexte(etat, 'Ma journée pour Claude — ' + titreJour, 46, true, '#0d3f85');
+    jnTexte(etat, (jnEtat.portee === 'tout' ? 'Tout le carnet' : jnEtat.portee === 'dernier' ? 'Depuis le ' + mkJour(C.claude_journee_le) + ' ' + mkHeure(C.claude_journee_le) : "Aujourd'hui")
+      + ' · ' + L.length + ' fournisseurs · ' + nProd + ' produits notés · ville : ' + ((C.voyage && C.voyage.ville_actuelle) || '?') + ' · carnet ' + window.KYLO_APPLICATION, 24, false, '#3d4a5f');
+    etat.y += 14; jnTexte(etat, consigne, 24, false, '#16233a');
+    if (r) { etat.y += 6; jnTexte(etat, 'Mes chiffres : budget ' + nf(r.budget) + ' € · frais du voyage ' + nf(r.voyage) + ' % · marge ' + nf(r.marge) + ' % · marchandage ' + nf(r.marchand) + ' % · bateau ' + nf(r.fret) + ' $/m³ · douane ' + nf(r.douane, 2) + ' %', 22, false, '#3d4a5f'); }
+    etat.y += 18; jnTexte(etat, 'Sommaire', 30, true, '#0d3f85');
+    const sommaireY = etat.y;   // rempli à la fin (on ne connaît pas encore les pages)
+    etat.y = sommaireY + 36 * Math.min(L.length, 30) + 20;
+    const sommaire = [];
+    jnFinirPage(etat); const pageSommaire = etat.pages.length - 1;
+    const json = { format: 'kylo-pour-claude', version: 3, quoi: 'journee', le: maintenant, de: depuis.getTime() ? depuis.toISOString() : '', application: window.KYLO_APPLICATION,
+      ville: (C.voyage && C.voyage.ville_actuelle) || '', consigne, etude: e ? { id: e.id, titre: e.titre } : null, commande: k ? { id: k.id, titre: k.titre } : null,
+      reglages: r, taux: (C.voyage && C.voyage.taux) || {}, fournisseurs: [],
+      decisions: { choix_claude: typeof cxDecisionsPourClaude === 'function' ? cxDecisionsPourClaude() : [], etudes_choix: typeof etDecisionsPourClaude === 'function' ? etDecisionsPourClaude() : [],
+        commandes_choix: typeof cmDecisionsPourClaude === 'function' ? cmDecisionsPourClaude() : [] } };
+    for (let i = 0; i < L.length; i++) {
+      const { f, k: ct } = L[i];
+      etatBouton('⏳ ' + (f.code || '') + ' : ' + (i + 1) + ' / ' + L.length + ' fournisseurs…');
+      const x = {}; CL_CHAMPS_ENVOI.concat(['ville', 'wechat_nom', 'yiwu', 'societe_cn', 'code_avant']).forEach(c => { if (f[c] !== undefined && f[c] !== '' && f[c] !== null) x[c] = f[c]; });
+      x.nouveau = ct.nouveau; if (f.id === JN_SANS) { x.sans_fournisseur = true; delete x.id; } x.nb_modeles_catalogue = ctProduits(f).length; x.produits_vus = []; x.photos = [];
+      // Sa page : en-tête, carte(s), liste des produits
+      jnNouvellePage(etat);
+      const aPlacer = [];
+      jnTexte(etat, jnTitreF(f), 40, true, '#0d3f85');
+      const lignes = [['Société', f.societe], ['Nom chinois', f.societe_cn], ['Contact', [f.contact, f.poste].filter(Boolean).join(' · ')], ['Portable', f.mobile || f.tel], ['WeChat', [f.wechat, f.wechat_nom].filter(Boolean).join(' · ')],
+        ['Ville', f.ville], ['Boutique', typeof ywTexteCn === 'function' && f.yiwu ? ywTexteCn(f) : f.allee], ['Marché', f.marche], ['Remarque', f.remarque], ['Décision', f.decision]].filter(([, v]) => v && String(v).trim());
+      lignes.forEach(([t, v]) => jnTexte(etat, t + ' : ' + v, 22, false, '#16233a'));
+      const cartes = ct.docs.filter(d => d.type === 'carte').slice(0, 2);
+      if (cartes.length) {
+        etat.y += 10; let xx = JN_MG, hh = 0;
+        for (const d of cartes) { const im = await jnDoc(d.id); const h = jnDessinerImage(etat, im, xx, etat.y, (JN_W - 2 * JN_MG - 20) / 2, 420); hh = Math.max(hh, h); xx += (JN_W - 2 * JN_MG) / 2 + 10; if (im) { const ph = { type: 'carte', face: d.face || null }; x.photos.push(ph); aPlacer.push(ph); } }
+        etat.y += hh + 16;
+      }
+      if (ct.produits.length) {
+        jnTexte(etat, 'Ses produits notés (' + ct.produits.length + ') — une page par produit après celle-ci :', 24, true, '#0d3f85');
+        ct.produits.slice(0, 24).forEach(({ c, o }, j) => jnTexte(etat, (j + 1) + '. ' + c.article + (o.modele ? ' (' + o.modele + ')' : '') + ' — ' + jnPrixTexte(o) + (o.note ? ' — ' + String(o.note).slice(0, 80) : ''), 21, false, '#16233a'));
+        if (ct.produits.length > 24 || etat.coupe) { etat.coupe = false; etat.y = Math.min(etat.y, JN_H - 70); jnTexte(etat, '… la suite dans les pages de ses produits.', 21, false, '#5a6b85'); }
+      }
+      if (ct.modeles.length && !etat.coupe) { etat.y += 8; jnTexte(etat, ct.modeles.length + ' modèle' + (ct.modeles.length > 1 ? 's' : '') + ' de ses catalogues, lus par le carnet (à vérifier) : 6 par page, après ses produits.', 22, true, '#9a6208'); }
+      const debut = jnFinirPage(etat); aPlacer.forEach(ph => Object.assign(ph, debut));
+      sommaire.push({ code: f.code || '', nom: mkNomFournisseur(f).replace(/^[FY]\d+\s*·\s*/, ''), produits: ct.produits.length, modeles: ct.modeles.length, partie: debut.partie, page: debut.page });
+      // Les produits : un par page, la photo en grand (l'étiquette et le prix doivent se lire)
+      for (let j = 0; j < ct.produits.length; j++) {
+        const { c, o } = ct.produits[j], n = j + 1;
+        jnNouvellePage(etat);
+        jnTexte(etat, jnTitreF(f) + ' · produit ' + n + ' / ' + ct.produits.length + (o.vu_le ? ' · noté le ' + mkJour(o.vu_le) + ' à ' + mkHeure(o.vu_le) : ''), 22, false, '#5a6b85');
+        jnTexte(etat, c.article + (o.modele ? ' · ' + o.modele : ''), 34, true, '#16233a');
+        jnTexte(etat, 'Prix noté : ' + jnPrixTexte(o), 34, true, num(o.prix) > 0 ? '#157347' : '#9a6208');
+        const qs = Array.isArray(o.qualites) ? o.qualites.filter(q => num(q.prix) > 0) : [];
+        if (qs.length > 1) jnTexte(etat, 'Qualités : ' + qs.map(q => (q.niveau || '') + ' ' + nf(q.prix, 2)).join(' · '), 22, false, '#3d4a5f');
+        if (o.note) jnTexte(etat, 'Note : ' + o.note, 22, false, '#3d4a5f');
+        etat.y += 10;
+        const p1 = await jnImage(o.photo), p2 = await jnImage(o.photo2), reste = JN_H - etat.y - 40, L2 = JN_W - 2 * JN_MG;
+        if (p1 && p2) { const h1 = jnDessinerImage(etat, p1, JN_MG, etat.y, L2, reste * 0.58); etat.y += h1 + 16; jnTexte(etat, 'Étiquette / prix :', 22, true, '#0d3f85'); jnDessinerImage(etat, p2, JN_MG, etat.y, L2, JN_H - etat.y - 40); }
+        else if (p1 || p2) { if (p2) jnTexte(etat, 'Étiquette / prix :', 22, true, '#0d3f85'); jnDessinerImage(etat, p1 || p2, JN_MG, etat.y, L2, JN_H - etat.y - 40); }
+        else jnTexte(etat, '(pas de photo)', 24, false, '#9a6208');
+        const pos = jnFinirPage(etat);
+        x.produits_vus.push({ n, article: c.article, modele: o.modele || '', prix: num(o.prix) || 0, devise: o.devise || '', moq: num(o.moq) || 0, note: o.note || '', vu_le: o.vu_le || '',
+          qualites: qs, photo: !!p1, etiquette: !!p2, achete: !!o.achat_id, etude: o.etude_cle || '', partie: pos.partie, page: pos.page });
+      }
+      // Les modèles de ses catalogues lus par le carnet : 6 par page (photo, référence, prix, carton) — à vérifier par Claude
+      x.modeles_lus = [];
+      for (let j = 0; j < ct.modeles.length; j += 6) {
+        etatBouton('⏳ ' + (f.code || '') + ' : modèles ' + (j + 1) + '–' + Math.min(j + 6, ct.modeles.length) + ' / ' + ct.modeles.length + '…');
+        jnNouvellePage(etat);
+        jnTexte(etat, jnTitreF(f) + ' — modèles lus dans ses catalogues ' + (j + 1) + ' à ' + Math.min(j + 6, ct.modeles.length) + ' sur ' + ct.modeles.length + ' (à vérifier)', 24, true, '#0d3f85');
+        const haut = etat.y + 6, lc = (JN_W - 2 * JN_MG - 30) / 2, hc = Math.floor((JN_H - haut - 40) / 3), places = [];
+        for (let q = 0; q < 6 && j + q < ct.modeles.length; q++) {
+          const { p, o } = ct.modeles[j + q], cx = JN_MG + (q % 2) * (lc + 30), cy = haut + Math.floor(q / 2) * hc;
+          const im = p.photo_doc ? (await jnDoc(p.photo_doc + '~m')) || (await jnDoc(p.photo_doc)) : (o && o.photo_doc ? await jnDoc(o.photo_doc) : null);
+          const hp = im ? jnDessinerImage(etat, im, cx, cy, lc, hc - 150) : 0;
+          etat.y = cy + (hp || 0) + 6;
+          const qs = o && Array.isArray(o.qualites) ? o.qualites.filter(z => num(z.prix) > 0) : [];
+          const prix = qs.length ? num(qs[0].prix) : num(p.prix), dev = qs.length ? (o.devise || 'CNY') : (p.devise || '');
+          const dims = [num(p.dim_l), num(p.dim_la), num(p.dim_h)];
+          jnTexte(etat, (j + q + 1) + '. ' + (p.ref || '(sans référence)') + (p.categorie ? ' · ' + p.categorie : ''), 24, true, '#16233a', cx, lc);
+          jnTexte(etat, prix > 0 ? nf(prix, 2) + ' ' + dev + (qs.length > 1 ? ' (' + qs.map(z => (z.niveau || '') + ' ' + nf(z.prix, 2)).join(' · ') + ')' : '') + (num(p.moq) ? ' · min. ' + nf(p.moq) : '') : 'prix pas lu', 22, true, prix > 0 ? '#157347' : '#9a6208', cx, lc);
+          const carton = [num(p.colisage) ? nf(p.colisage) + ' pcs/carton' : '', dims.every(v => v > 0) ? dims.map(v => nf(v)).join('×') + ' cm' : '', num(p.poids_kg) ? nf(p.poids_kg, 1) + ' kg' : ''].filter(Boolean).join(' · ');
+          if (carton) jnTexte(etat, carton, 20, false, '#3d4a5f', cx, lc);
+          if (p.caracteristiques && etat.y < cy + hc - 40) jnTexte(etat, String(p.caracteristiques).slice(0, 90), 20, false, '#3d4a5f', cx, lc);
+          places.push({ p, o, qs, prix, dev, photo: !!im });
+        }
+        const pos = jnFinirPage(etat);
+        places.forEach(({ p, o, qs, prix, dev, photo }) => x.modeles_lus.push({ ref: p.ref || '', categorie: p.categorie || '', caracteristiques: p.caracteristiques || '', colisage: num(p.colisage) || 0,
+          carton: [num(p.dim_l) || 0, num(p.dim_la) || 0, num(p.dim_h) || 0], poids_kg: num(p.poids_kg) || 0, prix: prix || 0, devise: dev, moq: num(p.moq) || 0, qualites: qs,
+          lu_par: o && o.cotation_source && o.cotation_source !== 'claude' ? o.cotation_source : (p.source || ''), page_catalogue: p.page || '', interesse: !!p.interesse, photo, partie: pos.partie, page: pos.page }));
+      }
+      if (!x.modeles_lus.length) delete x.modeles_lus;
+      // Ses autres photos (réponses, panneaux, pages) : une par page
+      for (const d of ct.docs.filter(d => d.type !== 'carte')) {
+        const im = await jnDoc(d.id); if (!im) continue;
+        jnNouvellePage(etat);
+        const quoi = d.type === 'reponse' ? 'sa réponse en photo' : d.type === 'stand' ? 'son panneau' : d.origine === 'wechat' ? 'page ' + (d.page_fichier || '') + ' de « ' + (d.fichier || 'son fichier') + ' »' : 'page de catalogue (photo)';
+        jnTexte(etat, jnTitreF(f) + ' — ' + quoi + (d.le ? ' · ' + mkJour(d.le) + ' ' + mkHeure(d.le) : ''), 24, true, '#0d3f85');
+        etat.y += 8; jnDessinerImage(etat, im, JN_MG, etat.y, JN_W - 2 * JN_MG, JN_H - etat.y - 40);
+        const pos = jnFinirPage(etat);
+        x.photos.push({ type: d.type, origine: d.origine || '', fichier: d.fichier || '', page_fichier: d.page_fichier || null, le: d.le || '', partie: pos.partie, page: pos.page });
+      }
+      json.fournisseurs.push(x);
+    }
+    // Le sommaire, sur la page 1 (redessinée)
+    etat.parties.push(etat.pages); const parties = etat.parties.filter(p => p.length);
+    {
+      const g = toile.getContext('2d'); const img = await trImage('data:image/jpeg;base64,' + btoa(Array.from(parties[0][0].octets, ch => String.fromCharCode(ch)).join('')));
+      g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(img, 0, 0); etat.g = g; etat.y = sommaireY;
+      sommaire.slice(0, 30).forEach(s => jnTexte(etat, [s.code, s.nom].filter(Boolean).join(' · ') + ' — ' + s.produits + ' produit(s)' + (s.modeles ? ' + ' + s.modeles + ' modèle(s)' : '') + ' — ' + (parties.length > 1 ? 'partie ' + s.partie + ', ' : '') + 'page ' + s.page, 22, false, '#16233a'));
+      if (sommaire.length > 30) jnTexte(etat, '… et ' + (sommaire.length - 30) + ' autres fournisseurs.', 22, false, '#5a6b85');
+      const u = toile.toDataURL('image/jpeg', 0.8), bb = atob(u.split(',')[1]), oo = new Uint8Array(bb.length); for (let i = 0; i < bb.length; i++) oo[i] = bb.charCodeAt(i);
+      parties[0][pageSommaire] = { w: JN_W, h: JN_H, octets: oo };
+    }
+    json.pdf = parties.map((p, i) => ({ partie: i + 1, pages: p.length }));
+    const base = 'KYLO-journee-' + jour + (jnEtat.portee === 'tout' ? '-tout' : '');
+    const fichiers = parties.map((p, i) => { const blob = ctrPdf(p); return { nom: base + (parties.length > 1 ? '-partie-' + (i + 1) + '-sur-' + parties.length : '') + '.pdf', blob, pages: p.length, taille: blob.size }; });
+    const jb = new Blob([JSON.stringify(json, null, 1)], { type: 'application/json' });
+    fichiers.push({ nom: base + '.json', blob: jb, pages: 0, taille: jb.size });
+    jnEtat.fichiers = fichiers; jnEtat.json = json; jnEtat.fini_le = maintenant;
+    jnMajBas();
+  } catch (err) {
+    avertir('⚠ La journée n\'a pas pu être préparée : ' + (err && err.message || err), 8000);
+    if (b) { b.disabled = false; b.textContent = '📄 Réessayer'; }
+  }
+}
+function jnNoterEnvoi() { C.claude_journee_le = jnEtat.fini_le || mkMaintenant(); sauverLocal(); }
+async function jnPartager() {
+  const F = jnEtat && jnEtat.fichiers; if (!F) return;
+  try {
+    const fichiers = F.map(x => new File([x.blob], x.nom, { type: x.blob.type || 'application/octet-stream' }));
+    if (navigator.canShare && navigator.share && navigator.canShare({ files: fichiers })) {
+      await navigator.share({ files: fichiers, title: 'Ma journée pour Claude' });
+      jnNoterEnvoi(); avertir('📤 Envoyé. Dans Claude, écris « traite ma journée ».', 6000); return;
+    }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  avertir('Ce téléphone ne partage pas plusieurs fichiers d\'un coup : enregistre-les un par un (💾).', 7000);
+}
+async function jnUnFichier(i) {
+  const x = jnEtat && jnEtat.fichiers && jnEtat.fichiers[i]; if (!x) return;
+  const voie = await remettreFichier(x.blob, x.nom);
+  if (voie !== 'erreur' && voie !== 'annule') jnNoterEnvoi();
+}
+// ---------- l'entrée en haut de 🏭 Fournisseurs ----------
+const jnRencontresAvant = ecranRencontres;
+ecranRencontres = function () {
+  const h = jnRencontresAvant.apply(this, arguments);
+  let s = null; try { s = jnResume(jnDebutJour()); } catch (e) { s = null; }
+  const b = `<button type="button" class="b jn-entree" onclick="jnOuvrir()">📤 Ma journée pour Claude<small>${s && (s.n || s.produits) ? "Aujourd'hui : " + s.n + ' fournisseur' + (s.n > 1 ? 's' : '') + ', ' + s.produits + ' produit' + (s.produits > 1 ? 's' : '') + ' notés' + (s.prix ? ' (' + s.prix + ' avec prix)' : '') + (s.modeles ? ', ' + s.modeles + ' modèles de catalogue' : '') + ', ' + s.photos + ' photo' + (s.photos > 1 ? 's' : '') : 'Les produits, photos et prix notés, pour que Claude les traite'}</small></button>`;
+  const i = h.indexOf('<button type="button" class="b wechat vw-entree"');
+  return i < 0 ? b + h : h.slice(0, i) + b + h.slice(i);
 };
 </script>
 <script>

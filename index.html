@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.12.0';
+window.KYLO_APPLICATION = '1.13.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -11836,7 +11836,8 @@ async function fsEnvoyerAClaude(bouton) {
     const n = parties.length, enc = new TextEncoder();
     const resume = { format: 'kylo-pour-claude', version: 2, le: mkMaintenant(), application: window.KYLO_APPLICATION, parties: n,
       nb_fournisseurs: fiches.length, nb_photos: nPhotos, fournisseurs: fiches, choix_claude: typeof cxDecisionsPourClaude === 'function' ? cxDecisionsPourClaude() : [],
-      etudes_choix: typeof etDecisionsPourClaude === 'function' ? etDecisionsPourClaude() : [] };
+      etudes_choix: typeof etDecisionsPourClaude === 'function' ? etDecisionsPourClaude() : [],
+      commandes_choix: typeof cmDecisionsPourClaude === 'function' ? cmDecisionsPourClaude() : [] };
     const json = enc.encode(JSON.stringify(resume, null, 1));
     clEnvoi = { parties: parties.map((fichiers, i) => {
       const lisezmoi = enc.encode(`Carnet KYLO pour Claude — ${jour} — partie ${i + 1} sur ${n}\n${fiches.length} fournisseurs, ${nPhotos} photos en tout.\n`
@@ -16094,7 +16095,7 @@ function eoHtml(e, D, r, p) {
     <div class="eo-t">🏭 Qui le vend ?${offres.length ? ' (' + offres.length + ')' : ''}</div>
     ${offres.length ? offres.map(({ c, o, f }) => { const px = eoPrixCny(o, D);
       return `<div class="eo-o${o.absent ? ' absent' : ''}"><div><b>${E(f ? mkNomFournisseur(f) : o.fournisseur || 'Fournisseur')}</b>${f && f.agent ? ' <span class="lc-tag">agent</span>' : ''}
-        ${o.absent ? '<br><span class="eo-g">n\'a pas ce produit</span>' : `<br>${px > 0 ? '<b class="eo-px">' + E(nf(px, 2)) + ' ¥</b>' + (o.devise && o.devise !== 'CNY' ? ' <span class="eo-g">(' + E(mkPrixCourt(o)) + ')</span>' : '') + (num(o.moq) ? ' <span class="eo-g">· dès ' + E(nf(o.moq)) + '</span>' : '') + '<br>' : ''}${eoVerdictHtml(e, D, r, p, px)}`}</div>
+        ${o.absent ? '<br><span class="eo-g">n\'a pas ce produit</span>' : `<br>${px > 0 ? '<b class="eo-px">' + E(nf(px, 2)) + ' ¥</b>' + (o.devise && o.devise !== 'CNY' ? ' <span class="eo-g">(' + E(mkPrixCourt(o)) + ')</span>' : '') + (num(o.moq) ? ' <span class="eo-g">· dès ' + E(nf(o.moq)) + '</span>' : '') + '<br>' : ''}${eoVerdictHtml(e, D, r, p, px, o)}`}</div>
         ${f ? `<button type="button" class="b contour" onclick="ctOuvrirDossier('${f.id}')">Sa fiche</button>` : ''}</div>`; }).join('')
       : '<p class="eo-g" style="margin:2px 0 6px">Personne encore dans ton carnet.</p>'}
     ${sugg.length ? `<div class="eo-s"><span class="eo-g">Peut-être chez :</span>${sugg.map(x => `<div class="eo-o"><div><b>${E(mkNomFournisseur(x.f))}</b><br><span class="eo-g">${E(x.p ? [x.p.ref, x.p.categorie].filter(Boolean).join(' · ') + (x.p.caracteristiques ? ' — ' + String(x.p.caracteristiques).slice(0, 60) : '') : x.c.article + (x.o.modele ? ' · ' + x.o.modele : ''))}</span></div>
@@ -17619,6 +17620,746 @@ if (typeof ouHtml === 'function') {
     return vlVilleActuelle() === 'Yiwu' ? y + h : h + y;
   };
 }
+</script>
+<style>
+/* ===================== 1.13.0 — LA COMMANDE DANS LE CARNET, LE VRAI CARTON, LA MÉMOIRE CALME, WECHAT SANS « F59- » (28/10/2026) =====================
+   Mêmes couleurs que le carnet (bleu/blanc, mode sombre « nuit bleue ») ; textes jamais sous 14 px ; gros boutons pour le pouce. */
+.et-vues .cm-vue{grid-column:1/-1;border:2px solid var(--lisiere);background:var(--carte);color:var(--noir);border-radius:12px;padding:10px 8px;min-height:58px;font-size:16px;font-weight:700;line-height:1.25;cursor:pointer}
+.et-vues .cm-vue small{display:block;font-weight:400;color:var(--gris);font-size:14px}
+.et-vues .cm-vue.on{border-color:var(--vert);background:var(--vert-pale)}
+.b.cm-entree{display:block;width:100%;min-height:62px;margin:0 0 10px;background:var(--vert);color:#fff;font-size:17px;font-weight:800;text-align:left;padding:10px 14px;border-radius:14px}
+.b.cm-entree small{display:block;font-weight:400;font-size:14px;opacity:.95}
+html[data-theme="sombre"] .b.cm-entree{background:#1a7f4e;color:#fff}
+.cm-zone .cm-gris{color:var(--gris);font-size:max(14px,.9em);line-height:1.45;margin:6px 0}
+.cm-note .cm-gris{font-size:1em}
+.cm-zone .cm-tete{display:grid;gap:6px}
+.cm-totaux{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:6px 0}
+@media (min-width:700px){.cm-totaux{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.cm-tot{background:var(--cv);border:1px solid var(--lisiere);border-radius:12px;padding:8px 10px;min-width:0}
+.cm-tot span{display:block;font-size:14px;color:var(--gris);text-transform:uppercase;letter-spacing:.03em}
+.cm-tot b{display:block;font-size:1.25em;line-height:1.2;font-variant-numeric:tabular-nums;color:var(--noir)}
+.cm-tot i{display:block;font-style:normal;font-size:14px;color:var(--gris)}
+.cm-tot.gain b{color:var(--vert)}
+.cm-resume,.cm-comp{margin:4px 0;line-height:1.5}
+.cm-comp{color:var(--texte-note);font-size:.95em}
+.cm-legende{display:flex;flex-wrap:wrap;gap:6px}
+.cm-feu{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 10px;font-weight:700;font-size:14px;white-space:nowrap}
+.cm-feu::before{content:"";width:.7em;height:.7em;border-radius:50%;background:currentColor}
+.cm-feu.vert{color:var(--vert);background:var(--vert-pale)}.cm-feu.jaune{color:var(--ambre);background:var(--ambre-pale)}.cm-feu.rouge{color:var(--rouge);background:var(--rouge-pale)}
+.cm-zone .cm-h2{font-size:1.3em;font-weight:800;margin:18px 0 2px;color:var(--noir)}
+.cm-zone .cm-s{color:var(--gris);font-size:.92em;margin:0 0 8px}
+.cm-fo{margin:6px 0 10px}
+.cm-fo-t{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:1.08em;margin:6px 0 8px}
+.cm-fo-t .cm-fiche-b{min-height:42px;padding:4px 12px;font-size:15px;width:auto;margin-left:auto}
+.cm-grille{display:grid;grid-template-columns:1fr;gap:12px}
+@media (min-width:780px){.cm-grille{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.cm-fiche{background:var(--carte);border:1px solid var(--lisiere);border-radius:14px;overflow:hidden;box-shadow:var(--ombre);min-width:0}
+.cm-fiche.vert{border-top:5px solid var(--vert)}.cm-fiche.jaune{border-top:5px solid var(--ambre)}.cm-fiche.rouge{border-top:5px solid var(--rouge)}
+.cm-fiche.eteinte{opacity:.62}
+.cm-haut{display:grid;grid-template-columns:104px minmax(0,1fr);gap:12px;padding:12px}
+.cm-photo{width:104px;height:104px;object-fit:contain;background:#fff;border:1px solid var(--lisiere);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:34px}
+.cm-qui{min-width:0}
+.cm-n{font-weight:800;color:var(--bleu);font-size:.92em}
+.cm-fiche h3{font-size:1.08em;font-weight:800;line-height:1.25;margin:2px 0;color:var(--noir)}
+.cm-cn{color:var(--gris);font-size:1em}
+.cm-mod{color:var(--gris);font-size:.9em;margin:2px 0 6px;word-break:break-word}
+.cm-prix{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;margin:0;padding:0 12px;font-size:.97em}
+.cm-prix dt{color:var(--gris)}.cm-prix dd{margin:0;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;color:var(--noir)}
+.cm-prix dd small{font-weight:400;color:var(--gris);font-size:14px}
+.cm-prix dd.v{color:var(--vert)}
+.cm-sep{grid-column:1/-1;border-top:1px dashed var(--lisiere);margin:4px 0}
+.cm-max{margin:8px 12px 0;padding:8px 10px;border-radius:8px;background:var(--bleu-pale);font-size:.95em;color:var(--noir)}
+.cm-max.trop{background:var(--ambre-pale)}
+.cm-prend{display:flex;align-items:center;gap:10px;margin:10px 12px 0;font-weight:700;min-height:44px;cursor:pointer}
+.cm-prend input{width:26px;height:26px;accent-color:var(--vert);margin:0;flex:0 0 auto}
+.cm-qte{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 12px 0}
+.cm-pas{width:50px;height:50px;border-radius:12px;border:1.5px solid var(--bord-champ);background:var(--champ);color:var(--noir);font-size:1.5em;font-weight:800;cursor:pointer;line-height:1}
+.cm-qte input{width:4.4em;min-height:50px;text-align:center;border:1.5px solid var(--bord-champ);border-radius:12px;background:var(--champ);color:var(--noir);font-size:1.15em;font-weight:800}
+.cm-egal{font-size:.97em;color:var(--noir)}
+.cm-note{margin:8px 12px 0;font-size:.95em;line-height:1.45;color:var(--texte-note)}
+.cm-det{margin-top:10px;border-top:1px solid var(--lisiere)}
+.cm-det summary{padding:10px 12px;cursor:pointer;color:var(--bleu);font-weight:700;min-height:44px;box-sizing:border-box}
+.cm-det>div{padding:0 12px 12px;display:grid;gap:6px;font-size:.93em}
+.cm-det p{margin:0}
+.cm-fiche>.cm-det:last-child{margin-bottom:0}
+.cm-bon{display:grid;gap:10px}
+.cm-bon h3{font-size:1.12em;margin:0}
+.cm-pre{margin:0;white-space:pre-wrap;word-break:break-word;background:var(--champ);border:1px solid var(--lisiere);border-radius:10px;padding:12px;font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;font-size:15px;line-height:1.55;max-height:20em;overflow-y:auto;color:var(--noir)}
+.cm-boutons{display:flex;flex-wrap:wrap;gap:8px}
+.cm-boutons .b{flex:1 1 200px;min-height:52px;font-size:16px}
+.cm-wx{font-size:15px;line-height:1.45}
+.cm-achat{display:grid;gap:8px}
+.cm-ok{background:var(--vert-pale);color:var(--vert);border-radius:10px;padding:8px 10px;font-weight:700}
+.cm-bloc{margin:16px 0 0}
+.cm-tab{display:grid;gap:8px}
+.cm-tl{background:var(--carte);border:1px solid var(--lisiere);border-radius:12px;padding:10px 12px;display:grid;gap:6px}
+.cm-tl-t{font-weight:800;color:var(--noir)}
+.cm-tl-c{font-size:.95em;line-height:1.45;color:var(--texte-note)}
+.cm-tl-c span{display:block;font-size:14px;color:var(--gris);text-transform:uppercase;letter-spacing:.03em}
+.cm-mat{list-style:none;margin:0;padding:0;background:var(--carte);border:1px solid var(--lisiere);border-radius:14px;overflow:hidden}
+.cm-mat li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;padding:12px 14px;border-bottom:1px solid var(--lisiere)}
+.cm-mat li:last-child{border-bottom:0}
+.cm-mat .m-poste{color:var(--gris);font-size:14px;text-transform:uppercase;letter-spacing:.04em}
+.cm-mat .m-prix{font-weight:800;white-space:nowrap;text-align:right;color:var(--noir)}
+.cm-mat .m-nom{grid-column:1/-1;font-size:1.02em;line-height:1.3;color:var(--noir)}
+.cm-mat .m-pq{grid-column:1/-1;font-size:.95em;color:var(--gris)}
+.cm-mat .m-total{background:var(--bleu-pale)}
+.cm-mat .m-total .m-poste{color:var(--noir);font-weight:800}
+.cm-mat .m-total .m-prix{font-size:1.2em}
+.cm-pts{margin-top:10px}
+.cm-pts ul,.cm-pts ol{margin:0;padding-left:22px;display:grid;gap:6px;line-height:1.45}
+.cm-pts p{margin:8px 0 0;line-height:1.45}
+.cm-bloc-b{margin-top:10px;min-height:52px}
+.cm-methode{margin-top:16px}
+/* B. le vrai carton dans « Qui le vend ? » */
+.eo-g.cc-vol{display:block;margin-top:2px}
+/* C. où le carnet est gardé */
+.me-carte .me-etat{font-size:16px;line-height:1.5;margin:6px 0 10px}
+/* D. WeChat : son nom dans mon WeChat */
+.vw-son-nom{display:grid;gap:6px;margin:8px 0 4px}
+.vw-son-nom label{font-size:15px;color:var(--texte-note)}
+.vw-son-nom-l{display:flex;gap:8px}
+.vw-son-nom-l input{flex:1 1 auto;min-width:0;min-height:48px;font-size:16px}
+.vw-son-nom-l button{flex:0 0 auto;min-height:48px;width:auto;padding:0 16px}
+.vw-cherche small{font-size:14px;color:var(--gris)}
+</style>
+<script>
+// =====================================================================================================
+//  CARNET 1.13.0 — A. LA COMMANDE DANS LE CARNET (28/10/2026)
+//  Riche, 28/10 à 13 h 54, juste après la page « Commande du 29 octobre » (BOMA, Hoffmans, enceintes ZQS) :
+//  « Ajouter sur le carnet de voyage ». Il passe sa commande le 29/10 depuis son téléphone : tout doit être DANS le carnet,
+//  pas dans une page à part.
+//  Une commande arrive par un fichier de Claude (clé « commande », même bouton que les catalogues) : AUCUNE nouvelle version
+//  n'est nécessaire pour la commande suivante. Elle se range dans la réserve du téléphone (IndexedDB) ; la mémoire du carnet
+//  ne garde que la liste des commandes et TES décisions (cartons, « je l'ajoute », passée en achats).
+//  L'écran « 📦 Commande » (onglet ⭐, et en haut de 🏭 Fournisseurs) :
+//   - les totaux (à payer en Chine, bateau + douane, pièces, gain) — LE MÊME calcul que la page et que l'étude, avec tes
+//     « Mes chiffres » de l'étude s'il les a changés ;
+//   - par fournisseur, chaque produit : photo, feu, prix, carton, arrivé, ton prix, prix affiché, gain, prix maximum,
+//     cartons − / + ; « En plus, si tu veux » (à cocher) ;
+//   - le bon de commande de chaque fournisseur en chinois + anglais : 📋 Copier, 💬 Copier et ouvrir WeChat (avec le mot à
+//     taper pour le retrouver), 🛒 Mettre dans mes achats (les achats du carnet : budget, « 📝 Contrat d'achat ») ;
+//   - ce qui manque ou est trop cher, WINNINGSTAR (💰 lui demander ses prix), F105, le matériel du magasin (message pour Tovi),
+//     ce qu'il faut vérifier avant de payer.
+// =====================================================================================================
+const CM_CLE = id => 'commande:' + id;
+const cmDonnees = {}, cmLecture = {};
+function cmListe() { return Array.isArray(C.commandes) ? C.commandes : (C.commandes = []); }
+function cmActuelle() { const L = cmListe(); return L.find(k => k.id === C.commande_actuelle) || L[L.length - 1] || null; }
+function cmChoix(id) {
+  const t = C.commande_choix || (C.commande_choix = {});
+  const c = t[id] || (t[id] = {});
+  c.ctn = c.ctn || {}; c.pris = c.pris || {}; c.achats = c.achats || {};
+  return c;
+}
+function cmLire(e) {
+  if (cmDonnees[e.id]) return Promise.resolve(cmDonnees[e.id]);
+  if (!cmLecture[e.id]) cmLecture[e.id] = ctLire(CM_CLE(e.id)).then(t => { cmDonnees[e.id] = t ? JSON.parse(t) : null; return cmDonnees[e.id]; })
+    .catch(() => { cmDonnees[e.id] = null; return null; });
+  return cmLecture[e.id];
+}
+// ---- le calcul : celui de l'étude (etCalcule), avec tes « Mes chiffres » de l'étude s'il y en a ----
+function cmReg(K) {
+  const P = K.params || {}, t = (C.etude_reg || {})[K.etude] || {};
+  return { budget: t.budget != null ? t.budget : num(P.budget_eur) || 20000, voyage: t.voyage != null ? t.voyage : num(P.frais_voyage_pct),
+    marge: t.marge != null ? t.marge : num(P.marge_riche_pct) || 75, marchand: t.marchand != null ? t.marchand : num(P.ecart_marchandage_pct),
+    fret: t.fret != null ? t.fret : num(P.fret_usd_m3) || 375, douane: t.douane != null ? t.douane : num(P.douane_pct) || 44.85,
+    transit: num(P.transitaire_pct) || 5 };
+}
+function cmCalc(K, r, l) { return etCalcule({ params: K.params }, r, { achat_cny: num(l.prix), volume_m3: num(l.cbm) / (num(l.pcs) || 1), affiche_gnf: num(l.affiche) }); }
+function cmCartons(ch, l) { return ch.ctn[l.modele] != null ? num(ch.ctn[l.modele]) : num(l.cartons); }
+function cmCompte(ch, l) { return l.section === 'liste' || !!ch.pris[l.modele]; }
+function cmNomFo(K, fo) { return (K.noms && K.noms[fo]) || fo; }
+function cmFournisseursDe(K, section) { return K.lignes.filter(l => !section || l.section === section).map(l => l.fournisseur).filter((f, i, a) => a.indexOf(f) === i); }
+// Le fournisseur de la commande dans le carnet : celui relié à l'ajout du fichier, sinon retrouvé par son nom.
+function cmFournisseur(e, K, fo) {
+  const fid = e && e.fids && e.fids[fo]; let f = fid ? mkFournisseur(fid) : null;
+  if (!f && K && K.cles && K.cles[fo]) f = ctTrouverFournisseur({ nom: K.cles[fo] });
+  if (!f) f = ctTrouverFournisseur({ nom: fo });
+  return f || null;
+}
+function cmProduit(f, l) { if (!f) return null; const k = ctCleRef(l.modele); return ctProduits(f).find(p => ctCleRef(p.ref) === k) || null; }
+const cmEn = (v, d) => (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 });
+const cmGnf = v => nf(Math.round((Number(v) || 0) / 500) * 500) + ' GNF';
+function cmTaux(K) { return (K.params && K.params.taux) || {}; }
+const cmEurDeCny = (K, c) => c / (num(cmTaux(K).EUR_CNY) || 7.466);
+const cmUsdDeCny = (K, c) => c / (num(cmTaux(K).USD_CNY) || 6.6702);
+const cmEurDeGnf = (K, g) => g / (num(cmTaux(K).EUR_GNF) || 9863);
+const CM_FEU = { vert: 'Bon : ta marge passe', jaune: 'Un peu juste', rouge: 'Trop cher' };
+
+function cmTotaux(e, K) {
+  const ch = cmChoix(e.id), r = cmReg(K);
+  const t = { cny: 0, apres: 0, gain: 0, vol: 0, pcs: 0, ref: 0 };
+  K.lignes.forEach(l => {
+    if (!cmCompte(ch, l)) return;
+    const c = cmCartons(ch, l), q = c * num(l.pcs); if (!q) return;
+    const k = cmCalc(K, r, l);
+    // comme la page : chaque montant par pièce arrondi au franc, puis multiplié (les totaux tombent au même euro)
+    t.cny += q * num(l.prix); t.apres += q * Math.round(k.arrive - k.achat - k.voyage); t.gain += q * Math.round(k.gain); t.vol += c * num(l.cbm); t.pcs += q; t.ref++;
+  });
+  return t;
+}
+function cmTotauxHtml(e, K) {
+  const t = cmTotaux(e, K);
+  return `<div class="cm-tot"><span>À payer en Chine</span><b>${E(nf(t.cny))} ¥</b><i>${E(nf(cmEurDeCny(K, t.cny)))} € · ${E(nf(cmUsdDeCny(K, t.cny)))} $</i></div>
+    <div class="cm-tot"><span>Bateau + douane</span><b>${E(nf(cmEurDeGnf(K, t.apres)))} €</b><i>transitaire compris · ${E(nf(t.vol, 1))} m³</i></div>
+    <div class="cm-tot"><span>Pièces</span><b>${E(nf(t.pcs))}</b><i>${t.ref} produits</i></div>
+    <div class="cm-tot gain"><span>Gain attendu</span><b>${E(nf(cmEurDeGnf(K, t.gain)))} €</b><i>une fois tout vendu</i></div>`;
+}
+function cmResumeHtml(e, K) {
+  const ch = cmChoix(e.id), r = cmReg(K), ll = K.lignes.filter(l => l.section === 'liste');
+  const nv = ll.filter(l => cmCalc(K, r, l).feu === 'vert').length;
+  const prevu = ll.reduce((s, l) => s + num(l.prix_etude) * num(l.qte_liste), 0), ici = ll.reduce((s, l) => s + cmCartons(ch, l) * num(l.pcs) * num(l.prix), 0);
+  return `<p class="cm-resume"><b>${nv} produits sur ${ll.length} de ta liste passent au vert</b> avec ces catalogues.${K.nouveau ? ' ' + E(K.nouveau) : ''}</p>
+    <p class="cm-comp">Ta liste prévoyait ${E(nf(cmEurDeCny(K, prevu)))} € pour ces ${ll.length} produits ; cette commande les prend pour ${E(nf(cmEurDeCny(K, ici)))} €.
+      Le budget de ${E(nf(r.budget))} € couvre tous les produits de ta liste : ce qui reste dépend des autres fournisseurs.</p>`;
+}
+function cmFicheHtml(e, K, l, i) {
+  const ch = cmChoix(e.id), r = cmReg(K), k = cmCalc(K, r, l), c = cmCartons(ch, l), q = c * num(l.pcs);
+  const f = cmFournisseur(e, K, l.fournisseur), p = cmProduit(f, l), plus = l.section !== 'liste', eteinte = plus && !ch.pris[l.modele];
+  const au = num(l.prix) > k.maxAchat + 1e-9;
+  return `<article class="cm-fiche ${k.feu}${eteinte ? ' eteinte' : ''}" id="cmf_${i}">
+    <div class="cm-haut">${p && p.photo_doc ? `<img class="ct-mini cm-photo" data-doc="${E(p.photo_doc)}" alt="${E(l.nom)}" onclick="cxAgrandir('${E(p.photo_doc)}','')">` : '<span class="cm-photo vide">📦</span>'}
+      <div class="cm-qui">${l.n ? `<div class="cm-n">Liste n° ${E(l.n)}</div>` : ''}<h3>${E(l.nom)}</h3>
+        <div class="cm-cn" lang="zh">${E(l.cn)}</div>
+        <div class="cm-mod">${E(cmNomFo(K, l.fournisseur))} · <b>${E(l.modele)}</b>${l.ou ? ' · ' + E(l.ou) : ''}</div>
+        <span class="cm-feu ${k.feu}">${CM_FEU[k.feu]}</span></div></div>
+    <dl class="cm-prix">
+      <dt>Prix du catalogue</dt><dd>${E(nf(l.prix, 1))} ¥ <small>(${E(nf(cmEurDeCny(K, l.prix), 2))} € · ${E(nf(cmUsdDeCny(K, l.prix), 2))} $)</small></dd>
+      <dt>Carton</dt><dd>${E(nf(l.pcs))} pièces · ${E(nf(l.cbm, 3))} m³</dd>
+      <div class="cm-sep"></div>
+      <dt>Arrivé à ton magasin</dt><dd>${E(cmGnf(k.arrive))}</dd>
+      <dt>Ton prix (+${E(nf(r.marge))} %)</dt><dd>${E(cmGnf(k.kylo))}</dd>
+      <dt>Les autres affichent</dt><dd>${E(cmGnf(l.affiche))}</dd>
+      <dt>Tu gagnes par pièce</dt><dd class="v">${E(cmGnf(k.gain))}</dd></dl>
+    <div class="cm-max${au ? ' trop' : ''}">${au ? `Ton maximum est <b>${E(nf(k.maxAchat, 1))} ¥</b> : négocie à ce prix pour garder tes ${E(nf(r.marge))} %.` : `Tu peux payer jusqu'à <b>${E(nf(k.maxAchat, 1))} ¥</b> et garder tes ${E(nf(r.marge))} %.`}</div>
+    ${plus ? `<label class="cm-prend" for="cmp_${i}"><input type="checkbox" id="cmp_${i}" ${ch.pris[l.modele] ? 'checked' : ''} onchange="cmPrendre(${i},this.checked)"> Je l'ajoute à la commande</label>` : ''}
+    <div class="cm-qte"><button type="button" class="cm-pas" onclick="cmPas(${i},-1)" aria-label="Un carton de moins">−</button>
+      <input id="cmq_${i}" inputmode="numeric" value="${E(c)}" oninput="cmTaper(${i},this.value)" aria-label="Cartons de ${E(l.modele)}">
+      <button type="button" class="cm-pas" onclick="cmPas(${i},1)" aria-label="Un carton de plus">+</button>
+      <span class="cm-egal" id="cme_${i}">${cmEgalHtml(K, l, c)}</span></div>
+    ${l.note ? `<p class="cm-note">${E(l.note)}${l.qte_liste ? ` <span class="cm-gris">Ta liste : ${E(nf(l.qte_liste))}.</span>` : ''}</p>` : ''}
+    <details class="cm-det"><summary>Détail et second choix</summary><div>
+      ${l.second ? `<p><b>Second choix :</b> ${E(l.second)}</p>` : ''}
+      ${l.demande ? `<p><b>Demande en Guinée :</b> ${E(l.demande)}</p>` : ''}
+      ${l.prix_etude ? `<p><b>Ton étude :</b> ${E(nf(l.prix_etude, 1))} ¥ la pièce${l.qte_liste ? ', ' + E(nf(l.qte_liste)) + ' pièces' : ''}. Prix de vente : ${E({ trouve: 'trouvé en Guinée', proxy_regional: 'pris dans un pays voisin', estime: 'estimé' }[l.fiab] || '')}.</p>` : ''}
+      <p><b>2ᵉ prix (après marchandage de ${E(nf(r.marchand))} %) :</b> ${E(cmGnf(k.deuxieme))}</p>
+      ${f ? `<button type="button" class="b contour" onclick="ctOuvrirDossier('${f.id}')">📂 Sa fiche dans le carnet</button>` : ''}</div></details>
+  </article>`;
+}
+function cmEgalHtml(K, l, c) { const q = c * num(l.pcs); return `cartons = <b>${E(nf(q))}</b> pièces · <b>${E(nf(q * num(l.prix)))} ¥</b> (${E(nf(cmEurDeCny(K, q * num(l.prix))))} €)`; }
+
+// ---- le bon de commande d'un fournisseur (chinois + anglais), avec TES quantités ----
+function cmTexteBon(e, K, fo) {
+  const ch = cmChoix(e.id), ls = K.lignes.filter(l => l.fournisseur === fo && cmCompte(ch, l) && cmCartons(ch, l) > 0);
+  if (!ls.length) return '';
+  let tot = 0;
+  const cn = ls.map((l, i) => { const c = cmCartons(ch, l), q = c * num(l.pcs); tot += q * num(l.prix);
+    return `${i + 1}. ${l.modele} ${l.cn}：${c}箱 × ${l.pcs}台 = ${q}台，单价 ¥${cmEn(l.prix, l.prix % 1 ? 1 : 0)}${l.bon_cn || ''}`; });
+  const en = ls.map((l, i) => { const c = cmCartons(ch, l), q = c * num(l.pcs);
+    return `${i + 1}. ${l.modele} ${l.en || l.nom}: ${c} cartons × ${l.pcs} pcs = ${q} pcs, unit price ¥${cmEn(l.prix, l.prix % 1 ? 1 : 0)}${l.bon_en || ''}`; });
+  const x = (K.bons || {})[fo], t = cmEn(tot, 0);
+  return ['您好！我是几内亚 KYLO EURGUINE 公司的 Riche。根据贵司的价格表，这是我的订单草稿，请确认价格和交货期：', '', ...cn, '', `合计：¥${t}`,
+    ...(x && x.cn ? x.cn : ['要求：220-240V 50Hz，欧式圆插头（C/F型）。']),
+    '请确认：1）每款最低起订量；2）交货时间；3）能否送到我的货代仓库（义乌或广州），运费多少；4）能否先寄样品。',
+    '付款：签订购合同后付30%定金，货到货代仓库验货合格后付70%尾款。', '谢谢！', '', '———', '',
+    'Hello! I am Riche from KYLO EURGUINE (Guinea). Based on your price list, here is my draft order. Please confirm prices and delivery time:', '', ...en, '', `Total: ¥${t}`,
+    ...(x && x.en ? x.en : ['Requirements: 220-240V 50Hz, European round plug (type C/F).']),
+    'Please confirm: 1) minimum order per model; 2) delivery time; 3) delivery to my forwarder\'s warehouse (Yiwu or Guangzhou) and its cost; 4) samples first?',
+    'Payment: 30% deposit when we sign the purchase contract, 70% balance after inspection at the forwarder\'s warehouse.', 'Thank you!'].join('\n');
+}
+// Ce qu'il faut taper dans WeChat pour le retrouver (1.13.0 D : le mot, ou ce qu'on sait de lui).
+function cmMotWeChat(f) {
+  if (!f) return '';
+  if (typeof vwMot === 'function' && vwMot(f)) return vwMot(f);
+  const s = typeof vwMotsSecours === 'function' ? vwMotsSecours(f) : [];
+  return s.length ? s[0].mot : '';
+}
+function cmBonHtml(e, K, fo, j) {
+  const t = cmTexteBon(e, K, fo), f = cmFournisseur(e, K, fo), ch = cmChoix(e.id);
+  const achat = ch.achats[fo], A = f ? (C.achats || []).filter(a => a.fournisseur_id === f.id && a.commande === e.id) : [];
+  return `<div class="carte cm-bon" id="cmbon_${j}"><h3>Bon de commande ${E(cmNomFo(K, fo))}${f ? ` <span class="mk-code${typeof vlInfo === 'function' ? ' ' + vlInfo(vlVille(f)).classe : ''}">${E(f.code || '')}</span>` : ''}</h3>
+    ${t ? `<pre class="cm-pre" id="cmb_${j}">${E(t)}</pre>
+      <div class="cm-boutons"><button type="button" class="b vert" onclick="cmCopierBon(${j},false)">📋 Copier</button>
+        <button type="button" class="b wechat" onclick="cmCopierBon(${j},true)">💬 Copier et ouvrir WeChat</button></div>
+      ${f ? `<div class="cm-wx">${typeof vwLigneWeChatHtml === 'function' ? vwLigneWeChatHtml(f, 'cmwx_' + j) : ''}</div>` : ''}
+      ${f ? `<div class="cm-achat">${achat && A.length ? `<div class="cm-ok">✅ Dans tes achats depuis le ${E(mkJour(achat))} : ${A.length} produit(s), ${E(nf(A.reduce((s, a) => s + num(a.quantite) * num(a.prix_unitaire), 0)))} ¥.</div>` : ''}
+        <div class="cm-boutons"><button type="button" class="b ${achat && A.length ? 'contour' : 'vert'}" onclick="cmPasserAchats(${j})">🛒 ${achat && A.length ? 'Mettre à jour mes achats' : 'Mettre dans mes achats'}</button>
+          <button type="button" class="b contour" onclick="ctrBoite('${f.id}')">📝 Contrat d'achat</button></div>
+        <p class="cm-gris">« Mes achats » compte ton budget ; le contrat (chinois + anglais) se remplit avec ces achats.</p></div>`
+        : `<p class="cm-gris">Ce fournisseur n'est pas encore dans ton carnet : ajoute le fichier de Claude (📥).</p>`}`
+      : '<p class="cm-gris">Rien chez lui pour l\'instant.</p>'}</div>`;
+}
+// ---- les blocs du fichier (tableau, liste, prix, message) : rien n'est écrit en dur, la commande suivante n'a pas besoin de version ----
+function cmBlocHtml(e, K, b, j) {
+  let h = `<section class="cm-bloc" id="cmbl_${j}"><div class="cm-h2">${E(b.titre || '')}</div>${b.sous_titre ? `<p class="cm-s">${E(b.sous_titre)}</p>` : ''}`;
+  if (b.type === 'tableau') {
+    const t = Array.isArray(b.entetes) ? b.entetes : [];
+    h += `<div class="cm-tab">${(b.lignes || []).map(r => `<div class="cm-tl"><div class="cm-tl-t">${E(r[0])}</div>${r.slice(1).map((v, k) => `<div class="cm-tl-c"><span>${E(t[k + 1] || '')}</span>${E(v)}</div>`).join('')}</div>`).join('')}</div>`;
+  } else if (b.type === 'prix') {
+    h += `<ul class="cm-mat">${(b.lignes || []).map(x => `<li><span class="m-poste">${E(x.poste)}</span><span class="m-prix">${E(x.prix)}</span><b class="m-nom">${E(x.nom)}</b><span class="m-pq">${E(x.pourquoi)}</span></li>`).join('')}
+      ${b.total ? `<li class="m-total"><span class="m-poste">${E(b.total.texte)}</span><span class="m-prix">${E(b.total.prix)}</span><span class="m-pq">${E(b.total.detail || '')}</span></li>` : ''}</ul>`;
+  }
+  if (Array.isArray(b.points) && b.points.length) {
+    const tag = b.ordonnee ? 'ol' : 'ul';
+    h += `<div class="carte cm-pts">${b.points_titre ? `<p><b>${E(b.points_titre)}</b></p>` : ''}<${tag}>${b.points.map(x => `<li>${E(x)}</li>`).join('')}</${tag}>
+      ${(b.notes || []).map(x => `<p>${E(x)}</p>`).join('')}</div>`;
+  } else if (Array.isArray(b.notes) && b.notes.length) h += `<div class="carte cm-pts">${b.notes.map(x => `<p>${E(x)}</p>`).join('')}</div>`;
+  if (b.note) h += `<p class="cm-gris">${E(b.note)}</p>`;
+  if (b.message && b.message.texte) h += `<div class="carte cm-bon"><h3>${E(b.message.titre || 'Message')}</h3><pre class="cm-pre">${E(b.message.texte)}</pre>
+      <div class="cm-boutons"><button type="button" class="b vert" onclick="cmCopierMessage(${j},false)">📋 Copier</button>
+        <button type="button" class="b wechat" onclick="cmCopierMessage(${j},true)">💬 Copier et ouvrir WeChat</button></div></div>`;
+  if (b.bouton && b.bouton.texte) {
+    const f = cmFournisseur(e, K, b.bouton.fournisseur);
+    h += f ? `<button type="button" class="b contour cm-bloc-b" onclick="cmBlocBouton(${j})">${E(b.bouton.texte)}</button>` : '';
+  }
+  return h + '</section>';
+}
+function cmBlocBouton(j) {
+  const e = cmActuelle(), K = e && cmDonnees[e.id], b = K && (K.blocs || [])[j]; if (!b || !b.bouton) return;
+  const f = cmFournisseur(e, K, b.bouton.fournisseur); if (!f) return;
+  if (b.bouton.action === 'demande_prix') pxBoiteDemande(f.id); else ctOuvrirDossier(f.id);
+}
+function cmCopierMessage(j, wechat) {
+  const e = cmActuelle(), K = e && cmDonnees[e.id], b = K && (K.blocs || [])[j]; if (!b || !b.message) return;
+  const f = b.bouton ? cmFournisseur(e, K, b.bouton.fournisseur) : null, mot = cmMotWeChat(f);
+  mkCopier(b.message.texte, wechat ? '📋 Message copié. WeChat s\'ouvre : 🔍 → ' + (mot ? 'tapez « ' + mot + ' »' : 'son nom') + ' → sa discussion → appui long → Coller → Envoyer.' : '📋 Message copié.');
+  if (wechat) setTimeout(() => ctAller('weixin://'), 700);
+}
+
+// ---- l'écran ----
+function ecranCommande(e) {
+  const K = cmDonnees[e.id];
+  if (K === undefined) { cmLire(e).then(() => { if (ongletActif === 'choix' && cxVue === 'commande') dessiner(); }); return '<div class="carte"><p class="mk-aide" style="font-size:16px">Ouverture de la commande…</p></div>'; }
+  if (!K) return `<div class="carte"><p class="mk-aide" style="font-size:16px">Cette commande n'est plus dans ce téléphone (réserve vidée ?). Ajoutez de nouveau le fichier de Claude.</p>
+    <button class="b vert" onclick="ctBoiteImport()">📥 Ajouter le fichier de Claude</button></div>`;
+  const taille = num(C.etude_taille) || 16, r = cmReg(K);
+  setTimeout(ctRemplirMinis, 0);
+  const fl = cmFournisseursDe(K, 'liste'), fb = cmFournisseursDe(K, '');
+  const fiches = (section, fo) => K.lignes.map((l, i) => ({ l, i })).filter(x => x.l.section === section && (!fo || x.l.fournisseur === fo)).map(x => cmFicheHtml(e, K, x.l, x.i)).join('');
+  return `<div class="et-zone cm-zone" style="--et-t:${taille}px">
+    <div class="carte cm-tete"><div class="et-titre">📦 ${E(K.titre || e.titre)}</div>
+      <div class="cm-gris">${E(K.sous_titre || '')}${K.le ? ' · proposée le ' + E(mkJour(K.le)) : ''}</div>
+      <div class="cm-totaux" id="cm_totaux">${cmTotauxHtml(e, K)}</div>
+      <div id="cm_resume">${cmResumeHtml(e, K)}</div>
+      <div class="cm-legende"><span class="cm-feu vert">Bon : ta marge de ${E(nf(r.marge))} % passe</span><span class="cm-feu jaune">Un peu juste : à négocier</span><span class="cm-feu rouge">Trop cher</span></div>
+      <div class="et-tailles"><span style="align-self:center;font-size:.9em;color:var(--gris)">Taille du texte :</span>
+        ${[[16, 'Normal'], [18, 'Grand'], [21, 'Très grand']].map(([v, n]) => `<button type="button" class="mk-puce${taille === v ? ' on' : ''}" onclick="C.etude_taille=${v};sauverLocal();dessiner()">${n}</button>`).join('')}</div>
+      <p class="cm-gris">Calcul : marge ${E(nf(r.marge))} %, frais du voyage ${E(nf(r.voyage))} %, marchandage ${E(nf(r.marchand))} %, bateau ${E(nf(r.fret))} $/m³, douane ${E(nf(r.douane, 2))} %${(C.etude_reg || {})[K.etude] ? ' (tes « Mes chiffres » de l\'étude)' : ''}.
+        Les quantités que tu changes ici sont gardées ; le bon de commande suit.</p></div>
+    <div class="cm-h2">Sur ta liste : à commander</div><p class="cm-s">${K.lignes.filter(l => l.section === 'liste').length} produits de la liste d'Oumar, en cartons entiers</p>
+    ${fl.map(fo => { const f = cmFournisseur(e, K, fo), n = K.lignes.filter(l => l.section === 'liste' && l.fournisseur === fo).length;
+      return `<div class="cm-fo"><div class="cm-fo-t">${f ? `<span class="mk-code${typeof vlInfo === 'function' ? ' ' + vlInfo(vlVille(f)).classe : ''}">${E(f.code || '')}</span> ` : ''}<b>${E(cmNomFo(K, fo))}</b> — ${n} produit${n > 1 ? 's' : ''}
+        ${f ? `<button type="button" class="b contour cm-fiche-b" onclick="ctOuvrirDossier('${f.id}')">📂 Sa fiche</button>` : ''}</div>
+        <div class="cm-grille">${fiches('liste', fo)}</div></div>`; }).join('')}
+    ${K.lignes.some(l => l.section !== 'liste') ? `<div class="cm-h2">En plus, si tu veux</div><p class="cm-s">Pas sur la liste d'Oumar, mais dans ton étude. Coche ceux que tu ajoutes.</p>
+      <div class="cm-grille">${fiches('plus')}</div>` : ''}
+    <div class="cm-h2">Les bons de commande à envoyer</div><p class="cm-s">Chinois + anglais, avec tes quantités. Ils changent si tu changes une quantité.</p>
+    <div id="cm_bons">${fb.map((fo, j) => cmBonHtml(e, K, fo, j)).join('')}</div>
+    ${(K.blocs || []).map((b, j) => cmBlocHtml(e, K, b, j)).join('')}
+    ${K.methode ? `<p class="cm-gris cm-methode">${E(K.methode)} Même calcul que ta page « Achats Chine KYLO » et que l'étude dans le carnet : arrivé = (achat + bateau) × (1 + douane) + transitaire + frais du voyage ; ton prix = arrivé + ta marge ; 2ᵉ prix = prix affiché − marchandage.</p>` : ''}
+    <button type="button" class="b contour" style="margin:10px 0 20px;min-height:50px" onclick="ctBoiteImport()">📥 Ajouter un fichier de Claude (commande mise à jour…)</button>
+  </div>`;
+}
+// ---- changer une quantité sans tout redessiner (le champ garde le doigt) ----
+function cmMaj(i) {
+  const e = cmActuelle(), K = e && cmDonnees[e.id]; if (!K) return;
+  const l = K.lignes[i], ch = cmChoix(e.id), c = cmCartons(ch, l);
+  const z = document.getElementById('cme_' + i); if (z) z.innerHTML = cmEgalHtml(K, l, c);
+  const q = document.getElementById('cmq_' + i); if (q && document.activeElement !== q) q.value = c;
+  const fi = document.getElementById('cmf_' + i); if (fi && l.section !== 'liste') fi.classList.toggle('eteinte', !ch.pris[l.modele]);
+  const t = document.getElementById('cm_totaux'); if (t) t.innerHTML = cmTotauxHtml(e, K);
+  const rs = document.getElementById('cm_resume'); if (rs) rs.innerHTML = cmResumeHtml(e, K);
+  const fb = cmFournisseursDe(K, ''), j = fb.indexOf(l.fournisseur), b = document.getElementById('cmbon_' + j);
+  if (b) { const tmp = document.createElement('div'); tmp.innerHTML = cmBonHtml(e, K, l.fournisseur, j); b.replaceWith(tmp.firstElementChild); }
+}
+function cmPas(i, d) {
+  const e = cmActuelle(), K = e && cmDonnees[e.id]; if (!K) return;
+  const l = K.lignes[i], ch = cmChoix(e.id);
+  ch.ctn[l.modele] = Math.max(0, cmCartons(ch, l) + d); sauverLocal(); cmMaj(i);
+}
+function cmTaper(i, v) {
+  const e = cmActuelle(), K = e && cmDonnees[e.id]; if (!K) return;
+  const l = K.lignes[i], ch = cmChoix(e.id);
+  ch.ctn[l.modele] = Math.max(0, Math.round(num(String(v).replace(',', '.')))); sauverLocal(); cmMaj(i);
+}
+function cmPrendre(i, oui) {
+  const e = cmActuelle(), K = e && cmDonnees[e.id]; if (!K) return;
+  const l = K.lignes[i], ch = cmChoix(e.id);
+  ch.pris[l.modele] = !!oui; sauverLocal(); cmMaj(i);
+}
+function cmCopierBon(j, wechat) {
+  const e = cmActuelle(), K = e && cmDonnees[e.id]; if (!K) return;
+  const fo = cmFournisseursDe(K, '')[j], t = cmTexteBon(e, K, fo); if (!t) return;
+  const f = cmFournisseur(e, K, fo), mot = cmMotWeChat(f);
+  if (f && typeof vwRetenir === 'function') vwRetenir(f.id);
+  mkCopier(t, wechat ? '📋 Bon copié. WeChat s\'ouvre : 🔍 → ' + (mot ? 'tapez « ' + mot + ' »' : 'cherchez son nom') + ' → sa discussion → appui long dans la case → Coller → Envoyer.' : '📋 Bon copié : collez-le dans sa discussion WeChat.');
+  if (wechat) setTimeout(() => ctAller('weixin://'), 700);
+}
+// ---- 🛒 Mettre dans mes achats : les achats du carnet (budget, Mes achats, contrat d'achat) ----
+async function cmPasserAchats(j) {
+  const e = cmActuelle(), K = e && cmDonnees[e.id]; if (!K) return;
+  const fo = cmFournisseursDe(K, '')[j], f = cmFournisseur(e, K, fo), ch = cmChoix(e.id);
+  if (!f) { avertir('Ce fournisseur n\'est pas dans le carnet : ajoutez le fichier de Claude.'); return; }
+  if (!Array.isArray(C.achats)) C.achats = [];
+  let n = 0, tot = 0, retires = 0; const manque = [];
+  for (const l of K.lignes.filter(x => x.fournisseur === fo)) {
+    const p = cmProduit(f, l), c = cmCartons(ch, l), qte = cmCompte(ch, l) ? c * num(l.pcs) : 0;
+    if (!p) { if (qte) manque.push(l.modele); continue; }
+    const ln = pxTrouverLigne(f, 'p:' + p.id); if (!ln) { if (qte) manque.push(l.modele); continue; }
+    const { c: comp, o } = pxOffrePour(f, ln);
+    let a = pxAchatDe(o);
+    if (!qte) {          // enlevé de la commande : son achat (fait par la commande) part aussi
+      if (a && a.commande === e.id) { C.achats = C.achats.filter(x => x !== a); delete o.achat_id; if (comp.choisi === o.id) { delete comp.decision; delete comp.decide_le; comp.transforme = false; } retires++; }
+      continue;
+    }
+    if (!a) { a = { id: idUnique('a'), categorie: '', famille: '', code_barres: '', marge: 0.75, prix_grossiste_gnf: 0, conformite: { requise: false, verifie: false, note: '' } }; C.achats.push(a); }
+    let photo = a.photo || '';
+    if (!photo && p.photo_doc) { try { photo = ctMiniCache[p.photo_doc] || (await ctLire(p.photo_doc + '~m')) || ''; } catch (err) { photo = ''; } }
+    Object.assign(a, { nom: l.nom + ' ' + l.modele, reference: l.modele, fournisseur: mkNomFournisseur(f), fournisseur_id: f.id,
+      quantite: qte, prix_unitaire: num(l.prix), devise: 'CNY', qte_carton: num(l.pcs), cartons: c,
+      dim_l: num(o.dim_l) || '', dim_la: num(o.dim_la) || '', dim_h: num(o.dim_h) || '', photo, prix_detail_gnf: num(l.affiche) || num(a.prix_detail_gnf) || 0,
+      note: (K.titre || 'Commande') + ' · prix du catalogue', commande: e.id,
+      px: { cid: comp.id, oid: o.id, niveau: o.niveau || '', palier: 0, prix_main: false, le: mkMaintenant() } });
+    o.achat_id = a.id; o.prix = num(l.prix);
+    comp.choisi = o.id; comp.decision = 'acheter'; comp.decide_le = mkMaintenant().slice(0, 10); comp.transforme = true; comp.quantite = qte;
+    n++; tot += qte * num(l.prix);
+  }
+  if (n) ch.achats[fo] = mkMaintenant(); else delete ch.achats[fo];
+  sauverLocal(); dessiner();
+  avertir((n ? '🛒 ' + n + ' produit(s) chez ' + mkNomFournisseur(f) + ' dans tes achats : ' + nf(tot) + ' ¥.\nTotal de mes achats : ' + gnfStrict(totalAchatsGnf()) : 'Plus rien de cette commande chez lui dans tes achats.')
+    + (retires ? '\n' + retires + ' enlevé(s).' : '') + (manque.length ? '\n⚠ Pas trouvé dans sa fiche : ' + manque.join(', ') + '.' : ''), 7000);
+}
+// « Envoyer à Claude » emporte tes décisions de commande.
+function cmDecisionsPourClaude() { const t = C.commande_choix || {}; return Object.keys(t).map(id => ({ commande: id, choix: t[id] })); }
+
+// ---- l'arrivée d'une commande par fichier de Claude ----
+async function cmRanger(K) {
+  const id = String(K.id);
+  await ctEcrire(CM_CLE(id), JSON.stringify(K));
+  cmDonnees[id] = K; delete cmLecture[id];
+  const L = cmListe(); let e = L.find(x => x.id === id);
+  if (!e) { e = { id, titre: K.titre, le: K.le, fids: {} }; L.push(e); }
+  e.titre = K.titre || e.titre; e.le = K.le || e.le; e.nb = K.lignes.length; e.recue_le = mkMaintenant(); e.fids = e.fids || {};
+  C.commande_actuelle = id;
+  return e;
+}
+const cmApercuImportAvant = ctApercuImport;
+ctApercuImport = async function () {
+  await cmApercuImportAvant.apply(this, arguments);
+  const imp = ctImportEnCours, z = document.getElementById('ct_apercu_import');
+  if (imp && z && imp.commande && Array.isArray(imp.commande.lignes)) {
+    const K = imp.commande, fos = cmFournisseursDe(K, '');
+    z.insertAdjacentHTML('beforeend', `<p style="margin:6px 0;font-size:16px">📦 <b>${E(K.titre || 'Commande')}</b> : ${E(K.lignes.length)} produits chez ${E(fos.length)} fournisseurs, avec les bons à envoyer (onglet ⭐ → 📦).</p>`);
+    const bouton = document.getElementById('ct_bouton_import'); if (bouton) bouton.disabled = false;
+  }
+};
+const cmAppliquerImportAvant = ctAppliquerImport;
+ctAppliquerImport = async function () {
+  const imp = ctImportEnCours;
+  const K = imp && imp.commande && Array.isArray(imp.commande.lignes) ? imp.commande : null;
+  if (!K) return cmAppliquerImportAvant.apply(this, arguments);
+  const bouton = document.getElementById('ct_bouton_import');
+  if (bouton) { bouton.disabled = true; bouton.textContent = '⏳ Rangement de la commande…'; }
+  let e = null;
+  try { e = await cmRanger(K); }
+  catch (err) { avertir('⚠ La commande n\'a pas pu être rangée (mémoire pleine ?) : ' + (err && err.message || err), 8000); if (bouton) { bouton.disabled = false; bouton.textContent = '✅ Ajouter au carnet'; } return; }
+  const fos = (imp.fournisseurs || []).slice();
+  delete imp.commande;
+  if (bouton) bouton.textContent = '✅ Ajouter au carnet';
+  await cmAppliquerImportAvant.apply(this, arguments);       // les fournisseurs, leurs modèles et leurs photos
+  fos.forEach(x => { if (!x || !x.commande_cle) return; const f = ctTrouverFournisseur(x); if (f) e.fids[x.commande_cle] = f.id; });
+  sauverLocal();
+  cxVue = 'commande'; allerA('choix');
+  avertir('📦 ' + (K.titre || 'Commande') + ' : ' + K.lignes.length + ' produits, ' + fos.length + ' fournisseurs avec leurs photos et leurs prix.', 7000);
+};
+// ---- onglet ⭐ : une 3e vue « 📦 Commande » ----
+const cmEcranChoixAvant = ecranChoix;
+ecranChoix = function () {
+  const k = cmActuelle();
+  if (!k) return cmEcranChoixAvant.apply(this, arguments);
+  const bouton = `<button type="button" class="cm-vue${cxVue === 'commande' ? ' on' : ''}" onclick="cxVue='commande';dessiner()">📦 ${E(k.titre)}<small>${E(nf(k.nb || 0))} produits · les bons à envoyer</small></button>`;
+  try { if (cxVue === 'commande') localStorage.setItem('kylo_onglet', 'choix_commande'); else if (localStorage.getItem('kylo_onglet') === 'choix_commande') localStorage.removeItem('kylo_onglet'); } catch (err) {}
+  if (cxVue === 'commande') {
+    const e = etActuelle(), nCx = cxListe().filter(c => !c.retire).length;
+    return `<div class="et-vues">
+      <button type="button" onclick="cxVue='choix';dessiner()">⭐ Choix de Claude<small>${E(nf(nCx, 0))} produits</small></button>
+      ${e ? `<button type="button" onclick="cxVue='etude';dessiner()">📊 ${E(e.titre)}<small>${E(nf(e.nb || 0, 0))} produits · par groupes</small></button>` : ''}${bouton}</div>` + ecranCommande(k);
+  }
+  const h = cmEcranChoixAvant.apply(this, arguments);
+  if (h.startsWith('<div class="et-vues">')) { const i = h.indexOf('</div>'); return h.slice(0, i) + bouton + h.slice(i); }
+  return `<div class="et-vues"><button type="button" class="on">⭐ Choix de Claude</button>${bouton}</div>` + h;
+};
+// ---- le carnet se rouvre sur la commande (retour de WeChat après avoir collé un bon : l'iPhone a pu fermer le carnet) ----
+const cmAllerAAvant = allerA;
+allerA = function (nom) {
+  const r = cmAllerAAvant.apply(this, arguments);
+  try {
+    if (nom === 'choix' && cxVue === 'commande') localStorage.setItem('kylo_onglet', 'choix_commande');
+    else if (nom !== 'choix' && localStorage.getItem('kylo_onglet') === 'choix_commande' && TR_ONGLETS_GARDES.indexOf(nom) < 0) localStorage.removeItem('kylo_onglet');
+  } catch (e) {}
+  return r;
+};
+(function cmRouvrir() {
+  let o = ''; try { o = localStorage.getItem('kylo_onglet') || ''; } catch (e) {}
+  if (o !== 'choix_commande') return;
+  ongletActif = 'choix'; cxVue = 'commande';
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('actif', b.dataset.onglet === 'choix'));
+})();
+// ---- l'entrée en haut de 🏭 Fournisseurs ----
+function cmOuvrir() { cxVue = 'commande'; allerA('choix'); }
+const cmRencontresAvant = ecranRencontres;
+ecranRencontres = function () {
+  const h = cmRencontresAvant.apply(this, arguments);
+  const k = cmActuelle(); if (!k) return h;
+  const K = cmDonnees[k.id];
+  if (K === undefined) cmLire(k).then(K2 => { if (K2 && ongletActif === 'rencontres') dessiner(); });
+  const t = K ? cmTotaux(k, K) : null;
+  const b = `<button type="button" class="b cm-entree" onclick="cmOuvrir()">📦 ${E(k.titre)}<small>${E(nf(k.nb || 0))} produits${t ? ' · ' + E(nf(t.cny)) + ' ¥ à payer en Chine' : ''} · les bons à envoyer</small></button>`;
+  const i = h.indexOf('<button type="button" class="b wechat vw-entree"');
+  return i < 0 ? b + h : h.slice(0, i) + b + h.slice(i);
+};
+
+// =====================================================================================================
+//  CARNET 1.13.0 — B. « QUI LE VEND ? » COMPTE LE VRAI CARTON DU FOURNISSEUR (28/10/2026)
+//  Dans l'étude, « 🏭 Qui le vend ? » comparait le prix d'un fournisseur au prix maximum calculé avec le volume ESTIMÉ de l'étude.
+//  Avec les vrais catalogues (BOMA, Hoffmans, ZQS), le carton réel change le bateau : l'extracteur de jus BOMA BM-993
+//  (0,0175 m³ la pièce au lieu de 0,03) passait « ⛔ au-dessus » dans le carnet alors que la page de commande disait 🟢.
+//  Maintenant, quand le fournisseur a donné son carton (dimensions, ou m³ dans un fichier de Claude : offres[].carton.m3),
+//  le verdict se calcule avec SON carton, et le carnet le dit.
+// =====================================================================================================
+const ccFusionAvant = ctFusion;
+ctFusion = function (imp, appliquer) {
+  const bilan = ccFusionAvant.apply(this, arguments);
+  if (!appliquer) return bilan;
+  (imp.fournisseurs || []).forEach((x, i) => {
+    const f = (bilan[i] && bilan[i].id && mkFournisseur(bilan[i].id)) || ctTrouverFournisseur(x); if (!f) return;
+    (Array.isArray(x.offres) ? x.offres : []).forEach(xo => {
+      const m3 = num(xo && xo.carton && xo.carton.m3), pcs = num(xo && xo.carton && xo.carton.pcs);
+      if (!(m3 > 0) || !xo.modele) return;
+      const p = ctProduits(f).find(y => ctCleRef(y.ref) && ctCleRef(y.ref) === ctCleRef(xo.modele));
+      if (p) { p.cbm_carton = m3; if (pcs && !num(p.colisage)) p.colisage = pcs; }
+      mkOffresDe(f).forEach(({ o }) => {
+        if ((p && o.produit_id === p.id) || (o.modele && normaliserNom(o.modele) === normaliserNom(xo.modele))) { o.cbm_carton = m3; if (pcs && !num(o.qte_carton)) o.qte_carton = pcs; }
+      });
+    });
+  });
+  return bilan;
+};
+// Le volume d'UNE pièce d'après le carton du fournisseur (0 si on ne le connaît pas).
+function ccVolumePiece(o, p) {
+  const q = num(o && o.qte_carton) || num(p && p.colisage);
+  if (!(q > 0)) return 0;
+  const m3 = num(o && o.cbm_carton) || num(p && p.cbm_carton);
+  if (m3 > 0) return m3 / q;
+  const src = num(o && o.dim_l) ? o : p;
+  const l = num(src && src.dim_l), la = num(src && src.dim_la), h = num(src && src.dim_h);
+  return l > 0 && la > 0 && h > 0 ? l * la * h / 1e6 / q : 0;
+}
+const ccVerdictAvant = eoVerdictHtml;
+eoVerdictHtml = function (e, D, r, p, prixCny, o) {
+  let pr = null;
+  try { const f = o && o.fournisseur_id ? mkFournisseur(o.fournisseur_id) : null; pr = f && o.produit_id ? ctProduit(f, o.produit_id) : null; } catch (err) { pr = null; }
+  const v = o ? ccVolumePiece(o, pr) : 0;
+  if (!(v > 0) || !(prixCny > 0) || Math.abs(v - num(p.volume_m3)) < 1e-7) return ccVerdictAvant.apply(this, arguments);
+  return ccVerdictAvant.call(this, e, D, r, Object.assign({}, p, { volume_m3: v }), prixCny)
+    + `<span class="eo-g cc-vol">Calcul avec son carton : ${E(nf(v, 4))} m³ la pièce (l'étude comptait ${E(nf(num(p.volume_m3), 4))} m³).</span>`;
+};
+
+// =====================================================================================================
+//  CARNET 1.13.0 — C. « LA MÉMOIRE EST PLEINE » : PLUS D'ALARME QUAND RIEN N'EST PERDU (28/10/2026)
+//  Riche, 28/10 à 4 h 34 : « il faut tenir compte aussi le carnet, il commence à montrer que la mémoire est saturée ».
+//  Ce qu'il voyait : le bandeau ambre « ⚠ La mémoire du carnet est pleine ». Avec les catalogues de milliers de modèles,
+//  le carnet dépasse la petite mémoire de 5 Mo du navigateur ; il est alors gardé ENTIER dans la réserve du téléphone
+//  (IndexedDB, bien plus grande) — c'est prévu depuis la 1.0 et rien n'est perdu. Le bandeau revenait pourtant à chaque
+//  ouverture, comme une panne.
+//  Maintenant :
+//   - la réserve qui garde tout n'est plus une alarme : un seul message calme par jour (« 💾 … rien n'est perdu ») ;
+//   - le bandeau ROUGE reste quand un changement n'a VRAIMENT pas pu être gardé (ou lecture seule) ;
+//   - le carnet demande au téléphone de ne jamais effacer sa réserve (stockage « persistant ») ;
+//   - onglet Voyage : « 💾 Où ton carnet est gardé » — mémoire ou réserve, la place utilisée, et le fichier de secours.
+// =====================================================================================================
+//  Et un défaut trouvé en testant : quand le carnet est dans la réserve, la petite mémoire restait PLEINE de la dernière copie
+//  qui y tenait. Les petites choses ne s'y écrivaient plus : l'onglet où l'on était, le brouillon « Au stand », les filtres.
+//  Maintenant, la petite mémoire garde une COPIE ALLÉGÉE (tout sauf les modèles de catalogue sans prix ni ⭐), qui sert de
+//  secours si la réserve disparaissait, et laisse la place aux petites choses. À l'ouverture, la réserve passe toujours devant
+//  (la copie allégée porte le numéro 0) ; si la réserve a disparu, le carnet le dit en rouge et ouvre la copie allégée.
+let meDitAujourdhui = false, meDurable = null, meLegerMin = null;
+const ME_LEGER_MAX = 1500000;          // caractères : la copie allégée laisse de la place aux petites choses
+function meCopieLegere() {
+  meLegerMin = null;
+  if (kyloEtatMemoire !== 'reserve' || kyloModeLecture) return;
+  let t = '';
+  try {
+    const garde = p => p && (num(p.prix) > 0 || p.interesse || p.source === 'stand');
+    const leger = Object.assign({}, C, { rang_enregistrement: 0, copie_allegee: mkMaintenant(),
+      fournisseurs: fournisseursListe().map(f => Array.isArray(f.produits) && f.produits.length > 40
+        ? Object.assign({}, f, { produits: f.produits.filter(garde).slice(0, 400), produits_omis: f.produits.length }) : f) });
+    t = JSON.stringify(leger, kyloAlleger);
+  } catch (e) { t = ''; }
+  try { if (t && t.length < ME_LEGER_MAX) { localStorage.setItem(CLE, t); return; } } catch (e) {}
+  try { localStorage.removeItem(CLE); } catch (e) {}      // trop gros même allégé : la place va aux petites choses
+}
+const meMemoireAvant = kyloMemoire;
+kyloMemoire = function (etat) {
+  if (etat === 'reserve') {
+    kyloBandeauFerme = true;          // le bandeau ambre ne s'affiche plus : la réserve a tout
+    meDireUneFois();
+    clearTimeout(meLegerMin); meLegerMin = setTimeout(meCopieLegere, 2500);
+  }
+  const r = meMemoireAvant.apply(this, arguments);
+  const z = document.getElementById('me_etat'); if (z) meMesurer();
+  return r;
+};
+function meDireUneFois() {
+  if (meDitAujourdhui) return;
+  meDitAujourdhui = true;
+  const jour = new Date().toISOString().slice(0, 10);
+  let deja = '';
+  try { deja = localStorage.getItem('kylo_reserve_dit') || ''; } catch (e) {}
+  if (deja === jour) return;
+  try { localStorage.setItem('kylo_reserve_dit', jour); } catch (e) {}
+  setTimeout(() => avertir('💾 Ton carnet est gros : il est gardé dans la réserve du téléphone. Rien n\'est perdu.', 5000), 1200);
+}
+// Le téléphone ne doit jamais vider la réserve du carnet tout seul.
+(function meDemanderDurable() {
+  try {
+    if (!(navigator.storage && navigator.storage.persisted)) return;
+    navigator.storage.persisted().then(p => {
+      if (p) { meDurable = true; return; }
+      if (navigator.storage.persist) navigator.storage.persist().then(ok => { meDurable = !!ok; }).catch(() => {});
+    }).catch(() => {});
+  } catch (e) {}
+})();
+function meMo(octets) { return nf(octets / 1048576, octets < 10485760 ? 1 : 0) + ' Mo'; }
+async function meMesurer() {
+  const z = document.getElementById('me_etat'); if (!z) return;
+  let utilise = 0, quota = 0, texte = 0;
+  try { if (navigator.storage && navigator.storage.estimate) { const s = await navigator.storage.estimate(); utilise = num(s.usage); quota = num(s.quota); } } catch (e) {}
+  try { texte = JSON.stringify(C, typeof kyloAlleger === 'function' ? kyloAlleger : undefined).length * 2; } catch (e) {}
+  const ou = kyloEtatMemoire === 'perdu' ? '<b style="color:var(--rouge)">⛔ Le dernier changement n\'a pas pu être gardé.</b> Touchez « Enregistrer maintenant ».'
+    : kyloEtatMemoire === 'lecture' ? '<b style="color:var(--rouge)">⛔ Ouvert en lecture seule</b> : fermez complètement l\'application et rouvrez-la.'
+    : kyloEtatMemoire === 'reserve' ? '✅ Dans la <b>réserve du téléphone</b> : le carnet est plus gros que la petite mémoire du navigateur (5 Mo). C\'est normal, rien n\'est perdu.'
+    : '✅ Dans la <b>mémoire du carnet</b>.';
+  z.innerHTML = `${ou}<br>Taille du carnet : <b>${E(meMo(texte))}</b>${utilise ? ` · place utilisée par le carnet et ses photos : <b>${E(meMo(utilise))}</b>${quota ? ' sur ' + E(meMo(quota)) : ''}` : ''}.
+    <br>${meDurable === true ? '🔒 Le téléphone a accepté de ne jamais effacer cette réserve tout seul.' : 'Le téléphone n\'a pas promis de garder la réserve : enregistrez le fichier du carnet de temps en temps.'}`;
+}
+// La réserve a disparu (téléphone nettoyé…) et le carnet a rouvert sa copie allégée : on le dit, en rouge, avec quoi faire.
+function meVerifierCopieAllegee() {
+  if (!kyloReserveLue) { setTimeout(meVerifierCopieAllegee, 500); return; }
+  if (!C || !C.copie_allegee) return;
+  const quand = C.copie_allegee;
+  delete C.copie_allegee;
+  const omis = fournisseursListe().reduce((s, f) => s + num(f.produits_omis), 0);
+  let b = document.getElementById('alerteCopieLegere');
+  if (!b) { b = document.createElement('div'); b.id = 'alerteCopieLegere'; b.className = 'memoire-rouge'; b.setAttribute('role', 'alert'); document.body.insertBefore(b, document.body.firstChild); }
+  b.innerHTML = `<div class="am-texte"><b>⛔ La réserve du téléphone n'a pas été retrouvée.</b> Le carnet a rouvert sa copie de secours du ${E(mkJour(quand))} :
+    tes fournisseurs, achats et notes sont là${omis ? ', mais pas les ' + E(nf(omis)) + ' modèles de catalogue sans prix' : ''}.
+    Pour tout retrouver, touche <b>Ouvrir</b> (en bas) et choisis ton dernier fichier enregistré.</div>
+    <div class="am-actions"><button type="button" class="b gris" onclick="this.closest('#alerteCopieLegere').remove()">J'ai compris</button></div>`;
+}
+window.addEventListener('load', () => setTimeout(meVerifierCopieAllegee, 800));
+const meCarteAvant = carteSauvegardeCarnet;
+carteSauvegardeCarnet = function () {
+  setTimeout(meMesurer, 0);
+  return meCarteAvant.apply(this, arguments) + `<div class="carte me-carte"><h2>💾 Où ton carnet est gardé</h2>
+    <p id="me_etat" class="me-etat">…</p>
+    <button type="button" class="b contour" onclick="enregistrerCarnet()">💾 Enregistrer le fichier de secours maintenant</button></div>`;
+};
+
+// =====================================================================================================
+//  CARNET 1.13.0 — D. WECHAT : PLUS DE « F59- » QUI NE TROUVE RIEN (28/10/2026)
+//  Riche, 28/10 à 3 h 56 (capture de WeChat) : il a tapé « F59- » dans la recherche de WeChat → aucun résultat. Le carnet
+//  montrait le code avec le tiret alors que F59 n'avait pas encore été renommé dans WeChat. Et à 4 h 07 : renommer chaque
+//  fournisseur dans WeChat (numéro, code, un par un) « c'est une perte de temps » — ne plus le lui demander.
+//  Maintenant, pour un fournisseur qui ne porte pas son code dans WeChat :
+//   - le carnet ne montre JAMAIS « F59- » comme mot à taper ;
+//   - il propose ce qu'on sait déjà de lui : son prénom, sa marque, son ID WeChat (le nom qu'il a mis lui-même dans WeChat
+//     contient souvent son prénom ou sa marque) ;
+//   - une case « Son nom dans mon WeChat » : il le recopie UNE fois depuis WeChat (sans rien renommer dans WeChat), et le
+//     carnet dit ensuite exactement quoi taper ;
+//   - donner son code dans WeChat reste possible, mais replié (« facultatif »).
+// =====================================================================================================
+function vwMotsSecours(f) {
+  if (!f) return [];
+  const res = [], vu = new Set();
+  const ajouter = (mot, quoi) => {
+    mot = String(mot || '').trim().replace(/[.,;:]+$/, '');
+    if (mot.length < 2 || /^[FY]\d+-?$/i.test(mot) || vu.has(mot.toLowerCase())) return;
+    vu.add(mot.toLowerCase()); res.push({ mot, quoi });
+  };
+  if (f.contact) ajouter(String(trPrenom(f.contact) || '').split(/\s+/)[0], 'son prénom');
+  if (f.societe) {
+    let m = trMarque(f.societe);
+    // « Le Tian Stationery » donne « Le » : trop court, on prend les deux premiers mots (« Le Tian »).
+    if (m.length <= 2) m = String(f.societe).replace(/[一-鿿]+/g, ' ').replace(/[^A-Za-z0-9&\s-]+/g, ' ').trim().split(/\s+/).slice(0, 2).join(' ') || m;
+    ajouter(m, 'sa marque');
+  }
+  const nom = String(f.nom || '').replace(/^[FY]\d+\s*[·\-–—]?\s*/, '').split(/[\s(),·—–\/]+/).filter(Boolean)[0];
+  ajouter(nom, 'son nom dans le carnet');
+  const id = typeof wxIdentifiant === 'function' ? wxIdentifiant(f) : '';
+  if (id) ajouter(id, 'son ID WeChat');
+  return res.slice(0, 3);
+}
+function vwSecoursHtml(f) {
+  const s = vwMotsSecours(f);
+  return s.length ? `Dans WeChat : <b>🔍</b> → tapez ${s.map(x => `<span class="vw-mot">${E(x.mot)}</span> <small>(${E(x.quoi)})</small>`).join(' ou ')}.`
+    : 'Dans WeChat : <b>🔍</b> → tapez le début du nom qu\'il porte dans votre WeChat.';
+}
+// La ligne « comment le retrouver » + la case « son nom dans mon WeChat » (fiche, « À qui ? », bons de commande).
+function vwLigneWeChatHtml(f, idChamp) {
+  if (!f) return '';
+  if (vwNomme(f)) return vwLigneMotHtml(f);
+  return `<div class="vw-cherche">${vwSecoursHtml(f)}</div>
+    <div class="vw-son-nom"><label for="${E(idChamp)}">Son nom dans mon WeChat (recopiez-le une fois depuis sa discussion) :</label>
+      <div class="vw-son-nom-l"><input id="${E(idChamp)}" placeholder="ex : Lisa 义乌五金" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <button type="button" class="b contour" onclick="vwGarderAutreNom('${f.id}','${E(idChamp)}')">Garder</button></div></div>`;
+}
+// « À qui envoyez-vous ? » : l'étape à suivre.
+vwEtapeAQui = function (f) {
+  if (!f) return '';
+  const mot = vwMot(f);
+  if (mot) return `Dans WeChat : touchez <b>🔍</b> (en haut), tapez <span class="vw-mot">${E(mot)}</span>${f.wechat_nom ? ` → « ${E(f.wechat_nom)} »` : ''} → sa discussion.<br>Puis appui long dans la case → <b>Coller</b> → Envoyer.${vwMotAvertissement(f) ? '<br><small>' + E(vwMotAvertissement(f)) + '</small>' : ''}`;
+  return `${vwSecoursHtml(f)} → sa discussion.<br>Puis appui long dans la case → <b>Coller</b> → Envoyer.`;
+};
+vwAQuiBlocHtml = function (f) {
+  if (!f || vwNomme(f)) return '<div class="vw-aqui"></div>';
+  const k = vwCleRecherche(f);
+  return `<div class="une-fois vw-aqui">
+    <div class="vw-son-nom"><label for="vw_nom_aqui">Pour la prochaine fois — son nom dans mon WeChat (recopiez-le depuis sa discussion) :</label>
+      <div class="vw-son-nom-l"><input id="vw_nom_aqui" placeholder="ex : Lisa 义乌五金" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <button type="button" class="cp" onclick="vwGarderAutreNom('${f.id}','vw_nom_aqui')">Garder</button></div></div>
+    <details class="vw-autre"><summary>Lui donner son code dans WeChat (facultatif)</summary>
+      <p class="mk-aide" style="font-size:15px">Dans WeChat : <b>⋯</b> → <b>Remarque</b> (备注) → mettez <b>${E((f.code || '') + '-')}</b> devant son nom. Ensuite « ${E((f.code || '') + '-')} » le trouve tout de suite.</p>
+      ${k ? `<button type="button" class="cp" onclick="vwCopierNumero('${f.id}')">📋 Copier ${E(k.quoi)} (${E(k.v)}) et ouvrir WeChat</button>` : ''}
+      <button type="button" class="cp" onclick="vwCopierNom('${f.id}')">📋 Copier le nom « ${E(vwNomPropose(f))} »</button>
+      <button type="button" class="cp" onclick="vwFait('${f.id}')">✓ C'est fait : il s'appelle ${E((f.code || '') + '-')} dans WeChat</button></details></div>`;
+};
+// Sa fiche : comment le retrouver, avant tout.
+vwFicheHtml = function (f) {
+  if (vwNomme(f)) return `<div class="vw-fiche ok">${vwLigneMotHtml(f)}
+      <details class="vw-autre"><summary>✏️ Le nom qu'il porte dans mon WeChat</summary>
+        <input id="vw_nom_${f.id}" value="${E(f.wechat_nom || '')}" placeholder="${E(vwNomPropose(f))}" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <div class="mk-deux"><button type="button" class="b contour" onclick="vwGarderAutreNom('${f.id}','vw_nom_${f.id}')">Garder ce nom</button>
+        <button type="button" class="b gris" onclick="vwOublier('${f.id}')">↩️ Je ne connais pas son nom</button></div></details></div>`;
+  const k = vwCleRecherche(f);
+  return `<div class="vw-fiche">
+    <div class="vw-titre">💬 Le retrouver dans WeChat</div>
+    ${vwLigneWeChatHtml(f, 'vw_nom_' + f.id)}
+    <details class="vw-autre"><summary>Lui donner son code dans WeChat (facultatif)</summary>
+      <p class="mk-aide" style="font-size:15px">Dans WeChat : <b>⋯</b> → <b>Remarque</b> (备注) → mettez <b>${E(f.code || '')}-</b> devant son nom.</p>
+      <div class="vw-btns">
+        ${k ? `<button type="button" class="b wechat" onclick="vwCopierNumero('${f.id}')">📋 Copier ${E(k.quoi)} et ouvrir WeChat</button>` : ''}
+        <button type="button" class="b contour" onclick="vwCopierNom('${f.id}')">📋 Copier le nom « ${E(vwNomPropose(f))} »</button>
+        <button type="button" class="b vert" onclick="vwFait('${f.id}')">✅ C'est fait</button></div></details></div>`;
+};
+// « 💬 Mes fournisseurs dans WeChat » : la ligne d'un fournisseur pas encore nommé dit quoi taper, sans « mettez F59- ».
+const vwLigneAvant113 = vwLigneHtml;
+vwLigneHtml = function (f) {
+  const h = vwLigneAvant113.apply(this, arguments);
+  if (vwNomme(f)) return h;
+  return h.replace(/<div class="vw-a">[\s\S]*?<\/div>/, `<div class="vw-a">${vwSecoursHtml(f)}</div>`);
+};
 </script>
 <script>
 

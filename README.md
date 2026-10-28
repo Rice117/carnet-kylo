@@ -212,6 +212,27 @@ Fichiers `suivi-1.12.0-*.js` + `suivi-1.12.0.css`, `construire-1.12.0.py` (part 
 `tests/test-carnet-1120.py`. Rien de retiré.
 ⚠ Même remarque pour `KYLO-Achats.html`.
 
+Version 1.13.0 — 28/10/2026 : **La commande dans le carnet, le vrai carton, la mémoire calme, WeChat sans « F59- »**.
+A. « 📦 Commande » (onglet ⭐, 3ᵉ vue, et en haut de 🏭 Fournisseurs) : une commande arrive par un fichier de Claude (clé
+`commande`, même bouton que les catalogues ; aucune version pour la suivante), rangée dans la réserve du téléphone. Totaux (à payer
+en Chine, bateau + douane, pièces, gain) avec le calcul de l'étude et tes « Mes chiffres » ; par fournisseur, chaque produit (photo,
+feu, prix, carton, arrivé, ton prix, prix affiché, gain, prix maximum, cartons − / +) ; « En plus » à cocher ; le bon de commande
+chinois + anglais de chaque fournisseur (📋 Copier, 💬 Copier et ouvrir WeChat avec le mot à taper, 🛒 Mettre dans mes achats →
+budget et « 📝 Contrat d'achat ») ; les blocs du fichier (manque, catalogue sans prix → « 💰 Lui demander ses prix », matériel,
+à vérifier). Le carnet se rouvre sur la commande. « Envoyer à Claude » emporte `commandes_choix`.
+B. « 🏭 Qui le vend ? » (étude) : le verdict se calcule avec le carton du fournisseur quand il est connu (dimensions, ou
+`offres[].carton.m3` d'un fichier de Claude), et le dit.
+C. Mémoire : un carnet gardé dans la réserve du téléphone n'affiche plus le bandeau ambre (un message calme par jour) ; la petite
+mémoire garde une copie allégée (numéro 0 : la réserve passe devant) qui laisse la place aux petites choses (onglet, brouillon
+« Au stand », filtres) et sert de secours ; si la réserve disparaît, alerte rouge et copie allégée ; Voyage : « 💾 Où ton carnet
+est gardé » ; stockage persistant demandé.
+D. WeChat : un fournisseur pas encore nommé dans WeChat n'a plus « F59- » comme mot à taper ; le carnet propose son prénom, sa
+marque, son ID WeChat, et la case « Son nom dans mon WeChat » (recopié une fois) ; lui donner son code reste facultatif (replié).
+Fichiers `suivi-1.13.0-*.js` + `suivi-1.13.0.css`, `construire-1.13.0.py` (part de la 1.12.0). Tests rejouables :
+`tests/test-carnet-1130.py` (51 contrôles) et `tests/test-carnet-1130-reprise.py` (les 57 de la 1.12.0 ; E4, E6, E13 changés
+exprès pour D). Rien de retiré.
+⚠ Même remarque pour `KYLO-Achats.html`.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

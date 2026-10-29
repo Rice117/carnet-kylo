@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.16.0';
+window.KYLO_APPLICATION = '1.17.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -20267,6 +20267,754 @@ ecranAchats = function () {
   return h.slice(0, debut) + neuf + '<div style="height:10px"></div>' + haGroupesHtml() + neuf + h.slice(fin + bouton.length);
 };
 </script>
+<style>
+/* ===================== 1.17.0 — 30/10/2026 (Yiwu) =====================
+   À faire maintenant · paiements de chaque contrat · réception chez le cargo · colisage et facture · licence du vendeur.
+   Textes jamais sous 14 px. Couleurs = variables du carnet. */
+.pi-entree{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;min-height:62px;margin:0 0 10px;font-size:18px;font-weight:900;
+  border:3px solid var(--bleu);background:var(--bleu-pale);color:var(--bleu);border-radius:14px;padding:10px 14px;text-align:left}
+.pi-entree small{font-size:15px;font-weight:700;color:var(--noir)}
+.pi-entree.rouge{border-color:var(--rouge);background:var(--rouge-pale);color:var(--rouge)}
+.pi-l{display:grid;grid-template-columns:40px 1fr;gap:8px;align-items:start;padding:10px 12px;margin:8px 0;border-radius:12px;border:2px solid var(--lisiere);background:var(--carte)}
+.pi-l .ic{font-size:26px;line-height:1.1}
+.pi-l b{font-size:16px}
+.pi-l .d{font-size:15px;line-height:1.4;color:var(--texte-note);margin-top:2px}
+.pi-l .b{min-height:48px;font-size:16px;margin-top:8px;width:100%}
+.pi-l.rouge{border-color:var(--rouge);background:var(--rouge-pale)}
+.pi-l.ambre{border-color:#d97706;background:#fff7e6}
+.pi-l.vert{border-color:var(--vert);background:var(--vert-pale)}
+.pi-qui{font-size:16px;font-weight:900;color:var(--bleu);margin:14px 0 2px}
+.rg-barre{height:16px;border-radius:9px;background:var(--gris-clair);overflow:hidden;margin:6px 0}
+.rg-barre span{display:block;height:100%;background:var(--vert)}
+.rg-chiffres{font-size:16px;line-height:1.5}
+.rg-chiffres b{font-size:17px}
+.rg-p{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--lisiere);font-size:15px;line-height:1.4}
+.rg-p img{width:56px;height:56px;object-fit:cover;border-radius:8px;cursor:zoom-in}
+.rg-p .x{border:0;background:none;color:var(--rouge);font-size:22px;min-width:44px;min-height:44px}
+.rg-choix{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.rg-choix label{display:flex;gap:6px;align-items:center;font-size:16px;font-weight:800;min-height:48px;margin:0;padding:6px 10px;border:2px solid var(--lisiere);border-radius:12px;cursor:pointer}
+.rg-choix label.on{border-color:var(--vert);background:var(--vert-pale)}
+.rg-choix input{width:22px;height:22px}
+.rc-c{display:grid;grid-template-columns:minmax(0,1fr) auto;overflow-wrap:anywhere;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--lisiere);font-size:15px}
+.rc-c .n{font-size:20px;font-weight:900;min-width:64px;text-align:center}
+.rc-c .n.ok{color:var(--vert)} .rc-c .n.ko{color:var(--rouge)}
+.rc-c .pm{display:flex;gap:6px;align-items:center}
+.rc-c .pm button{min-width:48px;min-height:48px;font-size:22px;font-weight:900;border-radius:12px;border:2px solid var(--lisiere);background:var(--carte)}
+.rc-p{padding:10px;margin:8px 0;border:2px solid var(--lisiere);border-radius:12px}
+.rc-p.ok{border-color:var(--vert);background:var(--vert-pale)} .rc-p.ko{border-color:var(--rouge);background:var(--rouge-pale)}
+.rc-p .t{display:grid;grid-template-columns:64px 1fr;gap:10px;align-items:center}
+.rc-p img{width:64px;height:64px;object-fit:cover;border-radius:10px}
+.rc-p .pbs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.rc-p .pbs label{display:flex;gap:6px;align-items:center;font-size:15px;margin:0;padding:6px 8px;border:1px solid var(--lisiere);border-radius:10px;background:var(--carte)}
+.rc-p .pbs input{width:20px;height:20px}
+.rc-verdict{font-size:17px;font-weight:900;padding:12px;border-radius:12px;margin:10px 0}
+.rc-verdict.ok{background:var(--vert-pale);color:var(--vert)} .rc-verdict.ko{background:var(--rouge-pale);color:var(--rouge)} .rc-verdict.att{background:#fff7e6;color:#92400e}
+.rc-msg{white-space:pre-wrap;font-size:15px;line-height:1.45;background:var(--gris-clair);border-radius:10px;padding:10px;margin:6px 0}
+.lc-info{font-size:15px;line-height:1.45;border-radius:10px;padding:8px 10px;margin:4px 0 8px}
+.lc-info.ok{background:var(--vert-pale);color:var(--vert)} .lc-info.ko{background:var(--rouge-pale);color:var(--rouge);font-weight:700} .lc-info.att{background:#fff7e6;color:#92400e}
+.cl-l{padding:8px 0;border-top:1px solid var(--lisiere);font-size:15px;line-height:1.4}
+.cl-l .g{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px}
+.cl-l .g label{font-size:14px;margin:0}
+.cl-l .g input{font-size:17px;min-height:44px;width:100%;box-sizing:border-box}
+</style>
+<script>
+// =====================================================================================================
+//  CARNET 1.17.0 — 30/10/2026 (Yiwu, nuit)
+//  Riche : « fais-moi la liste des grandes améliorations… que je n'ai pas encore pensées… tu les mets en place, puis tu me décris
+//  ce que chacune apporte ». Cinq idées, choisies parce que la commande Y09 vient de montrer où l'argent et les cartons se perdent :
+//   A. 🧭 À faire maintenant : la prochaine chose à faire, fournisseur par fournisseur, calculée sur ses données ;
+//   B. 💵 Les paiements de chaque contrat : acompte, solde, reçus en photo, reste à payer, pénalité de retard (article 4) ;
+//   C. 📦 La réception chez le cargo : compter les cartons au scanner (leur code « -C »), contrôler chaque produit, puis payer le
+//      solde ou envoyer la réclamation de l'article 7 en chinois ;
+//   D. 🧾 Liste de colisage + facture (français + chinois) pour le cargo et la douane de Conakry ;
+//   E. 🔎 La licence du vendeur : le code de crédit social chinois vérifié par son chiffre de contrôle (norme GB 32100-2015),
+//      son type (société ou commerçant individuel) et sa ville — sans Internet.
+//  Rien n'est retiré. Les nouvelles données vivent dans le contrat du fournisseur (f.contrat.paiements, f.contrat.reception).
+// =====================================================================================================
+window.KYLO_PILOTE = '1.17.0';
+
+// ---------- 0. Les chiffres d'un contrat ----------
+function rgJour(d) { const x = d ? new Date(d) : new Date(); return isNaN(x) ? '' : x.toLocaleDateString('fr-CA'); }      // « 2026-10-30 », jour du téléphone
+function rgEcartJours(a, b) { const x = Date.parse(String(a).slice(0, 10) + 'T00:00:00Z'), y = Date.parse(String(b).slice(0, 10) + 'T00:00:00Z'); return isNaN(x) || isNaN(y) ? null : Math.round((y - x) / 864e5); }
+function rgTauxOk(devise) { return (devise || 'CNY') === 'CNY' || (tauxDe(devise) > 0 && tauxDe('CNY') > 0); }
+function rgEnCny(montant, devise) { const d = devise || 'CNY'; if (d === 'CNY') return num(montant); const t = tauxDe('CNY') || 0; return t ? enGnf(num(montant), d) / t : 0; }
+function rgLignes(f) { return (C.achats || []).filter(a => a.fournisseur_id === f.id && num(a.quantite) > 0 && num(a.prix_unitaire) > 0); }
+function rgTotal(f) { return rgLignes(f).reduce((s, a) => s + rgEnCny(num(a.quantite) * num(a.prix_unitaire), deviseDe(a)), 0); }
+function rgPaiements(k) { if (!Array.isArray(k.paiements)) k.paiements = []; return k.paiements; }
+// Le montant en ¥ est figé au moment du paiement (un taux changé plus tard ne change pas ce qui a été payé).
+function rgCny(p) { return num(p.cny) > 0 ? num(p.cny) : rgEnCny(p.montant, p.devise); }
+// Ce qui compte pour le contrat : l'acompte et le solde. « Autre » (une dépense à part chez lui) est montré, pas compté.
+function rgPaye(k) { return rgPaiements(k).filter(p => p.quoi !== 'autre').reduce((s, p) => s + rgCny(p), 0); }
+// Lire un contrat SANS le créer : le contrat (son numéro, sa date) ne naît que quand Riche ouvre un de ses écrans.
+function rgK(f, creer) {
+  if (f.contrat || creer) return ctrContrat(f);
+  return { no: '', etapes: {}, acompte: 30, penalite: 0.5, penalite_max: 10, retard_max: 15, livraison: '', paiements: [], paiement: [] };
+}
+function rgEtat(f, creer) {
+  const k = rgK(f, creer), total = rgTotal(f), ac = num(k.acompte) || 30, paye = rgPaye(k), e = k.etapes || {}, acDu = total * ac / 100;
+  const recu = k.reception && k.reception.le ? k.reception.le : '';
+  // Le retard et sa pénalité ne comptent que pour un contrat SIGNÉ (c'est la signature qui l'engage).
+  const signe = !!(e.signe || e.accepte), ecart = signe && k.livraison ? rgEcartJours(k.livraison, recu || rgJour()) : null;
+  const jours = ecart !== null && ecart > 0 ? ecart : 0;
+  const pct = Math.min(num(k.penalite_max) || 10, (num(k.penalite) || 0.5) * jours), penalite = total * pct / 100;
+  const acPaye = rgPaiements(k).filter(p => p.quoi === 'acompte').reduce((s, p) => s + rgCny(p), 0);
+  // Les étapes cochées à la main (avant la 1.17.0) sans montant noté : on les croit, et on demande le montant.
+  const acNoteSansMontant = !!e.acompte && acPaye === 0, soldeNote = !!e.solde;
+  const payeEstime = soldeNote ? Math.max(paye, total - penalite) : Math.max(paye, acNoteSansMontant ? acDu : 0);
+  const soldeDu = soldeNote ? 0 : Math.max(0, total - payeEstime - penalite);
+  return { k, total, ac, acDu, paye, payeEstime, acPaye, acNoteSansMontant, soldeNoteSansMontant: soldeNote && paye + penalite < total - 0.5,
+    reste: soldeDu, soldeDu, jours, pct, penalite, recu, ecart, signe, annulable: jours > (num(k.retard_max) || 15), controle: e.controle_ok ? 'ok' : e.controle_ko ? 'ko' : '' };
+}
+function rgY(n) { return nf(n, 2).replace(/,00$/, '') + ' ¥'; }
+const RG_MODES = { alipay: '🔵 Alipay', wechat: '🟢 WeChat Pay', especes: '💵 Espèces', virement: '🏦 Virement' };
+const RG_QUOI = { acompte: 'Acompte', solde: 'Solde', autre: 'Autre (pas compté dans le contrat)' };
+function rgSuggestion(s, quoi) {
+  if (quoi === 'acompte') return Math.max(0, s.acDu - s.acPaye);
+  if (quoi === 'solde') return s.soldeNoteSansMontant ? Math.max(0, s.total - s.penalite - s.paye - (s.acNoteSansMontant ? s.acDu : 0)) : s.soldeDu;
+  return 0;
+}
+// Ce qui est déjà compté AVANT ce nouveau paiement (pour dire « vous payez trop ») : les montants notés, plus l'acompte coché
+// à la main sans montant — sauf si c'est justement lui qu'on note. Le solde coché sans montant n'est pas ajouté : on le note.
+function rgDejaCompte(s, quoi) { return s.paye + (s.acNoteSansMontant && quoi !== 'acompte' ? s.acDu : 0); }
+
+// ---------- B. 💵 Les paiements d'un contrat ----------
+let rgF = '', rgNouveau = null;
+function rgBoite(fid, quoi) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const s = rgEtat(f, true), k = s.k;
+  rgF = fid;
+  const q = quoi || (s.acPaye + 0.005 < s.acDu ? 'acompte' : 'solde');
+  const modes = typeof payModes === 'function' ? payModes(k) : [];
+  rgNouveau = { quoi: q, mode: modes[0] || 'especes', recu: '', montant: rgSuggestion(s, q) };
+  rgDessiner();
+}
+function rgDessiner() {
+  const f = mkFournisseur(rgF); if (!f) return;
+  const s = rgEtat(f, true), k = s.k, P = rgPaiements(k), pct = s.total > 0 ? Math.min(100, s.payeEstime / s.total * 100) : 0, n = rgNouveau, e = k.etapes || {};
+  const sugg = rgSuggestion(s, n.quoi);
+  mkBoite(`<div class="mk-dlg ct-champs"><h3>💵 Paiements — ${E(mkNomFournisseur(f))}</h3>
+    ${s.total > 0 ? `<div class="rg-chiffres">Contrat ${E(k.no)} : <b>${E(rgY(s.total))}</b><br>
+      Acompte ${E(nf(s.ac))} % = <b>${E(rgY(s.acDu))}</b> · solde = <b>${E(rgY(s.total - s.acDu))}</b></div>
+      <div class="rg-barre" aria-hidden="true"><span style="width:${pct.toFixed(1)}%"></span></div>
+      <div class="rg-chiffres">Payé (noté) : <b>${E(rgY(s.paye))}</b> · reste à payer : <b>${E(rgY(s.soldeDu))}</b> = ${E(gnfStrict(enGnf(s.soldeDu, 'CNY')))}${s.penalite > 0 ? ' (pénalité de ' + E(rgY(s.penalite)) + ' déjà retirée)' : ''}</div>`
+      : '<div class="ctr-attention">Pas encore d\'achat avec un prix et une quantité chez lui : le contrat n\'a pas de total.</div>'}
+    ${s.acNoteSansMontant ? `<div class="ctr-attention">L'étape « acompte payé » est cochée (le ${E(mkJour(e.acompte))}) mais son montant n'est pas noté : notez-le ici, avec la photo du reçu. Le carnet le compte comme payé.</div>` : ''}
+    ${s.soldeNoteSansMontant ? `<div class="ctr-attention">L'étape « solde payé » est cochée (le ${E(mkJour(e.solde))}) mais le montant n'est pas noté : notez-le ici. Le carnet compte le contrat comme soldé.</div>` : ''}
+    ${s.jours > 0 ? `<div class="ctr-attention">⏰ Livraison ${s.recu ? 'arrivée' : 'pas encore arrivée'} avec <b>${E(s.jours)} jour${s.jours > 1 ? 's' : ''} de retard</b> (promise le ${E(k.livraison)}).
+      Article 4 : ${E(nf(k.penalite, 1))} % par jour, au plus ${E(nf(k.penalite_max))} % → <b>pénalité ${E(rgY(s.penalite))}</b>, à retirer du solde : il reste <b>${E(rgY(s.soldeDu))}</b> à payer.
+      ${s.annulable ? '<br>Plus de ' + E(k.retard_max) + ' jours : vous pouvez annuler le contrat, il rembourse tout (article 4).' : ''}</div>` : ''}
+    <div class="px-titre">Déjà payé (${P.length})</div>
+    ${P.length ? P.map(p => `<div class="rg-p"><div>${p.recu ? `<img src="${E(p.recu)}" alt="Reçu" onclick="mkApercu(this.src, 'Reçu')" style="float:left;margin-right:10px">` : ''}
+        <b>${E(rgY(rgCny(p)))}</b>${p.devise && p.devise !== 'CNY' ? ' (' + E(nf(p.montant, 2) + ' ' + p.devise) + ')' : ''} — ${E(RG_QUOI[p.quoi] || p.quoi)}<br>
+        ${E(RG_MODES[p.mode] || p.mode || '')} · le ${E(p.le)}${p.recu ? ' · 🧾 reçu en photo' : ' · <span style="color:var(--rouge)">sans reçu</span>'}${p.note ? '<br>' + E(p.note) : ''}</div>
+        <button type="button" class="x" aria-label="Retirer ce paiement" onclick="rgRetirer('${E(p.id)}')">🗑</button></div>`).join('') : '<p class="px-aide">Rien encore.</p>'}
+    <div class="px-titre">Noter un paiement</div>
+    <div class="rg-choix">${['acompte', 'solde', 'autre'].map(x => `<label class="${n.quoi === x ? 'on' : ''}"><input type="radio" name="rg_quoi" ${n.quoi === x ? 'checked' : ''} onchange="rgChoisir('quoi','${x}')">${E(RG_QUOI[x])}</label>`).join('')}</div>
+    <div class="duo"><div><label for="rg_montant">Montant</label><input id="rg_montant" inputmode="decimal" value="${n.montant ? E(Math.round(n.montant * 100) / 100) : ''}" placeholder="${sugg > 0 ? E(nf(sugg, 2)) : ''}" oninput="rgNouveau.montant=pxNombre(this.value);rgAvis()"></div>
+      <div><label for="rg_devise">Devise</label><select id="rg_devise" onchange="rgAvis()">${codesDevises().map(d => `<option value="${d}"${d === 'CNY' ? ' selected' : ''}>${d}</option>`).join('')}</select></div></div>
+    ${sugg > 0 ? `<p class="px-aide">${n.quoi === 'acompte' ? 'Acompte' : 'Solde'} à payer : <b>${E(rgY(sugg))}</b>. Tapez le montant VRAIMENT payé.</p>` : ''}
+    <div class="rg-choix">${Object.keys(RG_MODES).map(x => `<label class="${n.mode === x ? 'on' : ''}"><input type="radio" name="rg_mode" ${n.mode === x ? 'checked' : ''} onchange="rgChoisir('mode','${x}')">${RG_MODES[x]}</label>`).join('')}</div>
+    <div class="duo"><div><label for="rg_le">Payé le</label><input id="rg_le" type="date" value="${E(rgJour())}"></div>
+      <div><label for="rg_note">Note</label><input id="rg_note" placeholder="ex : reçu n° 0153"></div></div>
+    <div class="champ-photo" style="margin-top:8px"><div class="vignette" id="rg_recu">${n.recu ? `<img src="${E(n.recu)}" alt="">` : '🧾'}</div>
+      <div style="flex:1"><label class="b contour" for="rg_recu_f" style="display:block;text-align:center;cursor:pointer">📷 Photo du reçu (收据) ou de l'écran Alipay</label>
+      <input type="file" id="rg_recu_f" accept="image/*" class="champ-cache" onchange="rgPhoto(this)"></div></div>
+    <p class="px-aide">La photo est la preuve du paiement, s'il y a un désaccord. Espèces : le reçu signé et tamponné, avec le n° du contrat.</p>
+    <div id="rg_avis"></div>
+    <div class="mk-boutons"><button class="b vert" onclick="rgNoter()">✅ Noter ce paiement</button>
+      <button class="b contour" onclick="ctrBoite('${f.id}')">📝 Son contrat</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+  rgAvis();
+}
+function rgChoisir(champ, v) {
+  const f = mkFournisseur(rgF); if (!f) return;
+  rgNouveau[champ] = v;
+  if (champ === 'quoi') { rgNouveau.montant = rgSuggestion(rgEtat(f, true), v); const m = document.getElementById('rg_montant'); if (m) m.value = rgNouveau.montant ? Math.round(rgNouveau.montant * 100) / 100 : ''; }
+  document.querySelectorAll('input[name="rg_' + champ + '"]').forEach(i => { if (i.parentElement) i.parentElement.classList.toggle('on', i.checked); });
+  rgAvis();
+}
+function rgAvis() {
+  const f = mkFournisseur(rgF), z = document.getElementById('rg_avis'); if (!f || !z) return;
+  const s = rgEtat(f, true), n = rgNouveau, dev = (document.getElementById('rg_devise') || {}).value || 'CNY', m = rgEnCny(n.montant, dev), al = [];
+  if (!rgTauxOk(dev)) al.push('⛔ Pas de taux pour ' + dev + ' dans le carnet : choisissez CNY, ou mettez le taux dans Voyage.');
+  const deja = rgDejaCompte(s, n.quoi);
+  if (m > 0 && n.quoi !== 'autre' && s.total > 0 && deja + m > s.total - s.penalite + 0.5) al.push('⚠ Avec ce paiement, vous payez ' + rgY(deja + m - (s.total - s.penalite)) + ' DE PLUS que ce qui reste à payer' + (s.penalite > 0 ? ' (pénalité retirée)' : '') + '.');
+  if (n.quoi === 'solde' && s.controle !== 'ok') al.push('⚠ Le contrôle n\'est pas noté « conforme ». Le contrat dit : le solde APRÈS un contrôle conforme (📦 Réception).');
+  if (n.quoi === 'acompte' && !s.signe) al.push('Le contrat n\'est pas encore noté « signé et tamponné ». L\'acompte se paie après la signature.');
+  if (n.mode === 'virement' && typeof payCompteAcheteur === 'function' && f.vendeur_legal && (payCompteAcheteur(f.vendeur_legal).length || payCarte(f.vendeur_legal.compte))) al.push('⛔ Le compte bancaire noté chez lui ressemble au VÔTRE : vérifiez avant de virer.');
+  if (n.mode === 'especes' && !n.recu) al.push('💵 Espèces : prenez en photo son reçu signé et tamponné.');
+  z.innerHTML = al.map(x => `<div class="${/^⛔|DE PLUS/.test(x) ? 'ctr-attention' : 'px-aide'}">${E(x)}</div>`).join('');
+}
+async function rgPhoto(input) {
+  const d = typeof haReduirePhoto === 'function' ? await haReduirePhoto(input) : ''; if (!d) { avertir('Photo illisible : réessayez.'); return; }
+  rgNouveau.recu = d; const z = document.getElementById('rg_recu'); if (z) z.innerHTML = '<img src="' + E(d) + '" alt="">'; rgAvis();
+}
+function rgNoter() {
+  const f = mkFournisseur(rgF); if (!f) return;
+  const n = rgNouveau, val = (id) => String((document.getElementById(id) || {}).value || '').trim();
+  const montant = pxNombre(val('rg_montant')), devise = val('rg_devise') || 'CNY';
+  if (!(montant > 0)) { avertir('Tapez le montant payé.'); return; }
+  if (!rgTauxOk(devise)) { avertir('Pas de taux pour ' + devise + ' dans le carnet : choisissez CNY, ou mettez le taux dans Voyage.', 6000); return; }
+  const s = rgEtat(f, true), cny = rgEnCny(montant, devise), deja = rgDejaCompte(s, n.quoi);
+  if (n.quoi !== 'autre' && s.total > 0 && deja + cny > s.total - s.penalite + 0.5
+    && !confirmerEnDeuxTemps('rg-trop-' + f.id, 'Ce paiement dépasse ce qui reste à payer de ' + rgY(deja + cny - (s.total - s.penalite)) + '.')) return;
+  const p = { id: idUnique('pay'), quoi: n.quoi, montant, devise, cny: Math.round(cny * 100) / 100, mode: n.mode, le: val('rg_le') || rgJour(), note: val('rg_note'), recu: n.recu || '', note_le: mkMaintenant() };
+  // ctrContrat() refait l'objet du contrat à chaque appel : on écrit TOUJOURS sur f.contrat tel qu'il est à cet instant.
+  ctrContrat(f); rgPaiements(f.contrat).push(p);
+  const apres = rgEtat(f, true), kk = f.contrat; kk.etapes = Object.assign({}, kk.etapes); kk.etapes_auto = Object.assign({}, kk.etapes_auto);
+  if (p.quoi === 'acompte' && !kk.etapes.acompte) { kk.etapes.acompte = mkMaintenant(); kk.etapes_auto.acompte = true; }
+  if (p.quoi !== 'autre' && apres.total > 0 && apres.paye + apres.penalite >= apres.total - 0.5 && !kk.etapes.solde) { kk.etapes.solde = mkMaintenant(); kk.etapes_auto.solde = true; }
+  sauverLocal();
+  const fin = rgEtat(f, true);
+  // Le formulaire repart VIDE : un 2e appui sur « Noter » ne note pas un paiement qui n'a pas eu lieu.
+  rgNouveau = { quoi: fin.soldeDu > 0.5 ? 'solde' : 'autre', mode: n.mode, recu: '', montant: 0 };
+  rgDessiner();
+  avertir('💵 Noté : ' + rgY(cny) + ' (' + (RG_QUOI[p.quoi] || '') + ', ' + (RG_MODES[p.mode] || '') + ').\nReste à payer : ' + rgY(fin.soldeDu) + (fin.penalite > 0 ? ' (pénalité de ' + rgY(fin.penalite) + ' retirée)' : '') + '.', 5000);
+}
+function rgRetirer(pid) {
+  const f = mkFournisseur(rgF); if (!f) return;
+  const k = ctrContrat(f), p = rgPaiements(k).find(x => x.id === pid); if (!p) return;
+  if (!confirmerEnDeuxTemps('rg-ret-' + pid, 'Retirer ce paiement de ' + rgY(rgCny(p)) + ' ?')) return;
+  ctrContrat(f); f.contrat.paiements = rgPaiements(f.contrat).filter(x => x.id !== pid);
+  const kk = f.contrat; kk.etapes = Object.assign({}, kk.etapes); const auto = Object.assign({}, kk.etapes_auto);
+  // On ne décoche que ce que le carnet avait coché lui-même (une étape cochée à la main reste).
+  if (p.quoi === 'acompte' && auto.acompte && !kk.paiements.some(x => x.quoi === 'acompte')) { delete kk.etapes.acompte; delete auto.acompte; }
+  if (auto.solde && kk.etapes.solde) { delete kk.etapes.solde; const s = rgEtat(f, true); if (s.paye + s.penalite >= s.total - 0.5) kk.etapes.solde = mkMaintenant(); else delete auto.solde; }
+  f.contrat.etapes_auto = auto;
+  sauverLocal(); rgDessiner();
+}
+
+// ---------- E. 🔎 La licence du vendeur : le code de crédit social (统一社会信用代码, norme GB 32100-2015) ----------
+const LC_CAR = '0123456789ABCDEFGHJKLMNPQRTUWXY', LC_POIDS = [1, 3, 9, 27, 19, 26, 16, 17, 20, 29, 25, 13, 8, 24, 10, 30, 28];
+const LC_PROV = { '11': '北京 Pékin', '12': '天津 Tianjin', '13': '河北 Hebei', '14': '山西 Shanxi', '15': '内蒙古 Mongolie-Intérieure', '21': '辽宁 Liaoning', '22': '吉林 Jilin',
+  '23': '黑龙江 Heilongjiang', '31': '上海 Shanghai', '32': '江苏 Jiangsu', '33': '浙江 Zhejiang', '34': '安徽 Anhui', '35': '福建 Fujian', '36': '江西 Jiangxi', '37': '山东 Shandong',
+  '41': '河南 Henan', '42': '湖北 Hubei', '43': '湖南 Hunan', '44': '广东 Guangdong', '45': '广西 Guangxi', '46': '海南 Hainan', '50': '重庆 Chongqing', '51': '四川 Sichuan',
+  '52': '贵州 Guizhou', '53': '云南 Yunnan', '54': '西藏 Tibet', '61': '陕西 Shaanxi', '62': '甘肃 Gansu', '63': '青海 Qinghai', '64': '宁夏 Ningxia', '65': '新疆 Xinjiang',
+  '71': '台湾 Taïwan', '81': '香港 Hong Kong', '82': '澳门 Macao' };
+const LC_VILLE = { '330782': '义乌 Yiwu', '330784': '永康 Yongkang', '330281': '余姚 Yuyao', '330282': '慈溪 Cixi', '440606': '顺德 Shunde', '3301': '杭州 Hangzhou', '3302': '宁波 Ningbo',
+  '3303': '温州 Wenzhou', '3307': '金华 Jinhua', '3310': '台州 Taizhou', '4401': '广州 Guangzhou', '4403': '深圳 Shenzhen', '4405': '汕头 Shantou', '4406': '佛山 Foshan',
+  '4407': '江门 Jiangmen', '4413': '惠州 Huizhou', '4419': '东莞 Dongguan', '4420': '中山 Zhongshan', '4451': '潮州 Chaozhou', '4452': '揭阳 Jieyang', '3502': '厦门 Xiamen',
+  '3505': '泉州 Quanzhou', '3201': '南京 Nankin', '3202': '无锡 Wuxi', '3205': '苏州 Suzhou', '3702': '青岛 Qingdao', '3100': '上海 Shanghai', '1100': '北京 Pékin' };
+// Les caractères 9 à 17 sont le code d'organisation (组织机构代码, norme GB 11714) : il a SON chiffre de contrôle.
+function lcOrgOk(o) {
+  const v = (x) => /\d/.test(x) ? +x : x.charCodeAt(0) - 55, P = [3, 7, 9, 10, 5, 8, 4, 2];
+  const r = 11 - P.reduce((t, w, i) => t + v(o[i]) * w, 0) % 11, cle = r === 10 ? 'X' : r === 11 ? '0' : String(r);
+  return { ok: cle === o[8], cle };
+}
+function lcAnalyse(code) {
+  const brut = String(code || '').toUpperCase().replace(/[\s-]/g, ''), c = brut.replace(/O/g, '0').replace(/I/g, '1');
+  if (!c) return { etat: 'vide' };
+  if (c.length !== 18) return { etat: 'faux', c, raison: c.length + ' caractères au lieu de 18' };
+  const bad = [...c].find(x => LC_CAR.indexOf(x) < 0);
+  if (bad) return { etat: 'faux', c, raison: 'le caractère « ' + bad + ' » n\'existe pas dans ces codes (jamais de I, O, S, V ni Z)' };
+  const s = LC_POIDS.reduce((t, w, i) => t + LC_CAR.indexOf(c[i]) * w, 0), cle = LC_CAR[(31 - s % 31) % 31];
+  if (cle !== c[17]) return { etat: 'faux', c, raison: 'le dernier caractère devrait être « ' + cle + ' » : faute de frappe, ou faux code' };
+  const t2 = c.slice(0, 2);
+  const type = t2 === '91' ? { fr: 'une société (企业)', soc: true } : t2 === '92' ? { fr: 'un commerçant individuel (个体工商户), pas une société', soc: false }
+    : t2 === '93' ? { fr: 'une coopérative agricole (农民专业合作社)', soc: true } : c[0] === '1' ? { fr: 'un organisme public', soc: true } : c[0] === '5' ? { fr: 'une association', soc: true } : { fr: 'un autre organisme', soc: true };
+  const reg = c.slice(2, 8), prov = LC_PROV[reg.slice(0, 2)] || '', ville = LC_VILLE[reg] || LC_VILLE[reg.slice(0, 4)] || '';
+  const org = lcOrgOk(c.slice(8, 17));
+  return { etat: 'ok', c, type, prov, ville, reg, corrige: c !== brut, org: org.ok, orgCle: org.cle };
+}
+function lcInfoHtml(code, f) {
+  const r = lcAnalyse(code);
+  if (r.etat === 'vide') return '<div class="lc-info att">🔎 Demandez la photo de sa licence (营业执照) et recopiez le code à 18 caractères : le carnet le vérifie.</div>';
+  if (r.etat === 'faux') return '<div class="lc-info ko">⛔ Code FAUX : ' + E(r.raison) + '. Relisez sa licence (营业执照) ; si le code est bien celui-là, méfiez-vous.</div>';
+  const vf = f && typeof VL_VILLES !== 'undefined' && VL_VILLES[f.ville] ? VL_VILLES[f.ville].cn : '', autre = vf && r.ville && r.ville.indexOf(vf) < 0 && (r.prov || '').indexOf(vf) < 0;
+  return '<div class="lc-info ' + (r.org ? 'ok' : 'att') + '">✅ Code valide (chiffre de contrôle juste)' + (r.corrige ? ' — « O » lu comme le chiffre 0 (ou « I » comme 1) : corrigé en ' + E(r.c) : '') + '. C\'est ' + E(r.type.fr) + (r.ville || r.prov ? ', enregistré à ' + E([r.ville, r.prov].filter(Boolean).join(', ')) : '') + '.'
+    + (!r.type.soc ? '<br>Commerçant individuel : son compte est à SON nom (celui de la licence, 经营者), et c\'est normal.' : '')
+    + (autre ? '<br>⚠ Sa licence n\'est pas enregistrée à ' + E(vf) + ' : demandez-lui pourquoi (dépôt, usine ailleurs ?).' : '')
+    + (!r.org ? '<br>⚠ Mais le code d\'organisation (caractères 9 à 17) a un 2e chiffre de contrôle anormal (« ' + E(r.orgCle) + ' » attendu) : un code fabriqué peut avoir le 1er juste et pas le 2e. Vérifiez-le sur gsxt.gov.cn avant l\'acompte.' : '')
+    + '<br>Pour voir s\'il est toujours en activité : gsxt.gov.cn (存续 = en activité).</div>';
+}
+const lcAlertesAvant = ctrAlertes;
+ctrAlertes = function (f) {
+  let al = lcAlertesAvant.apply(this, arguments);
+  const v = ctrVendeur(f), r = lcAnalyse(v.code);
+  al = al.filter(x => !/^Code de crédit social \(18 caractères\)/.test(x));
+  if (r.etat === 'vide') al.push('Code de crédit social (18 caractères) : demandez la photo de sa licence (营业执照) et recopiez le code.');
+  if (r.etat === 'faux') al.push('⛔ Le code de crédit social est FAUX (' + r.raison + ').');
+  if (r.etat === 'ok' && !r.org) al.push('⚠ Code de crédit social : le code d\'organisation (caractères 9 à 17) a un chiffre de contrôle anormal. Vérifiez sur gsxt.gov.cn avant l\'acompte.');
+  if (r.etat === 'ok' && !r.type.soc) al = al.map(x => /^⚠ Le compte bancaire n'est PAS au nom de la société/.test(x)
+    ? 'Commerçant individuel (个体工商户) : le compte doit être au nom de la personne inscrite sur sa licence (经营者). Vérifiez ce nom.' : x);
+  return al;
+};
+const lcDessinerAvant = ctrDessiner;
+ctrDessiner = function () {
+  lcDessinerAvant.apply(this, arguments);
+  const f = mkFournisseur(ctrFid), d = document.getElementById('contenuBoite'); if (!f || !d) return;
+  const champ = document.getElementById('ctr_v_code');
+  if (champ && !document.getElementById('lc_info')) {
+    champ.parentElement.insertAdjacentHTML('afterend', '<div id="lc_info" class="plein">' + lcInfoHtml(ctrVendeur(f).code, f) + '</div>');
+    champ.addEventListener('input', () => { const z = document.getElementById('lc_info'); if (z) z.innerHTML = lcInfoHtml(champ.value, f); });
+  }
+  // 9. L'argent et la réception : les deux nouveaux boutons, dans le contrat.
+  const t8 = [...d.querySelectorAll('.px-titre')].find(x => /^8\./.test(x.textContent.trim()));
+  if (t8 && !document.getElementById('rg_resume')) {
+    const s = rgEtat(f);
+    const etapes = d.querySelector('.ctr-etapes');
+    (etapes || t8).insertAdjacentHTML('afterend', `<div class="px-titre">9. L'argent et la réception</div>
+      <div id="rg_resume" class="rg-chiffres">Payé <b>${E(rgY(s.paye))}</b> sur ${E(rgY(s.total))} · reste <b>${E(rgY(s.soldeDu))}</b>${s.jours > 0 ? ' · ⏰ ' + E(s.jours) + ' j de retard (pénalité ' + E(rgY(s.penalite)) + ' retirée)' : ''}${s.acNoteSansMontant || s.soldeNoteSansMontant ? '<br>' + (s.soldeNoteSansMontant ? 'Solde' : 'Acompte') + ' coché payé, montant pas noté : touchez « 💵 Paiements ».' : ''}</div>
+      <div class="px-boutons"><button type="button" class="b vert" onclick="rgBoite('${f.id}')">💵 Paiements et reçus</button>
+        <button type="button" class="b contour" onclick="rcBoite('${f.id}')">📦 Réception chez le cargo (compter, contrôler)</button>
+        <button type="button" class="b contour" onclick="clBoite('${f.id}')">🧾 Liste de colisage et facture</button></div>`);
+  }
+};
+const lcGarderAvant = ctrGarderChamps;
+ctrGarderChamps = function () {
+  const r = lcGarderAvant.apply(this, arguments);
+  const f = mkFournisseur(ctrFid), z = document.getElementById('lc_info'); if (!f) return r;
+  // « O » tapé à la place du chiffre 0 (ou « I » à la place de 1) : si le code corrigé est juste, on le garde corrigé.
+  const v = ctrVendeur(f), avant = v.code, a = lcAnalyse(avant);
+  if (a.etat === 'ok' && a.c !== v.code) { v.code = a.c; const ch = document.getElementById('ctr_v_code'); if (ch && document.activeElement !== ch) ch.value = a.c; sauverLocal(); }
+  if (z) z.innerHTML = lcInfoHtml(avant, f);     // avec « corrigé en … » si le code tapé avait un O ou un I
+  return r;
+};
+</script>
+<script>
+// ---------- C. 📦 La réception chez le cargo : compter les cartons, contrôler chaque produit, puis payer ou réclamer ----------
+// Le contrat (articles 6 et 7) dit : contrôle AVANT le solde ; si ce n'est pas conforme, il remplace sous 10 jours ou rembourse
+// tout sous 7 jours. Ici, ce contrôle se fait vraiment : les cartons se comptent en scannant leur code (« …-C25 »), chaque produit
+// se coche, et le carnet dit « conforme → payer le solde » ou prépare la réclamation en chinois.
+const RC_PB = [['manque', 'Il en manque'], ['abime', 'Abîmé / cassé'], ['autre', 'Pas le bon produit'], ['qualite', 'Qualité moins bonne que l\'échantillon'],
+  ['notice', 'Pas de notice / boîte en français'], ['prise', 'Mauvaise prise électrique'], ['code', 'Pas de code-barres sur la boîte']];
+const RC_PB_CN = { manque: ['数量不足', 'quantity short'], abime: ['货物损坏', 'damaged goods'], autre: ['发错货（与样品不符）', 'wrong product (not the sample)'],
+  qualite: ['质量比样品差', 'quality lower than the sample'], notice: ['没有法语彩盒/说明书', 'no French colour box / manual'], prise: ['插头不对（应为欧标C/F型）', 'wrong plug (must be European C/F)'],
+  code: ['包装上没有条形码', 'no barcode on the package'] };
+let rcF = '';
+function rcLignes(f) { return typeof ctnAchatsDe === 'function' ? ctnAchatsDe(f.id) : rgLignes(f).map((a, i) => ({ a, n: i + 1 })); }
+// Seulement les lignes du contrat (avec un prix et une quantité) : un achat sans prix n'est ni attendu, ni facturé.
+function rcContrat(f) { return rcLignes(f).filter(x => x.n > 0); }
+function rcR(k) { if (!k.reception) k.reception = {}; const r = k.reception; ['cartons', 'pieces', 'ok', 'pb', 'photos', 'vus'].forEach(x => { if (!r[x] || typeof r[x] !== 'object') r[x] = {}; }); return r; }
+function rcPlan(f) { return ctnPlan(rcContrat(f).filter(x => String(x.a.code_barres || '').trim())); }
+// La liste de colisage : TOUTES les lignes du contrat (avec ou sans code-barres).
+function clPlan(f) { return ctnPlan(rcContrat(f)); }
+// Ce que doit compter chaque code de carton (des cartons pareils ont le même code).
+function rcAttendu(f) { const m = {}; rcPlan(f).lignes.forEach(x => { const c = ctnCodeCarton(x.a, x.pcs); m[c] = (m[c] || 0) + x.nb; }); return m; }
+function rcVerdict(f) {
+  const k = ctrContrat(f), r = rcR(k), att = rcAttendu(f), L = rcContrat(f), plan = rcPlan(f);
+  const cartonsOk = Object.keys(att).every(c => num(r.cartons[c]) === att[c]) && Object.keys(att).length > 0;
+  const manqueCartons = Object.keys(att).reduce((s, c) => s + Math.max(0, att[c] - num(r.cartons[c])), 0);
+  const tropCartons = Object.keys(att).reduce((s, c) => s + Math.max(0, num(r.cartons[c]) - att[c]), 0);
+  const produits = L.map(x => { const a = x.a, q = r.pieces[a.id] !== undefined ? num(r.pieces[a.id]) : null, pb = r.pb[a.id] || [];
+    const vu = r.ok[a.id] === true || r.ok[a.id] === false;
+    return { a, n: x.n, q, pb, ok: r.ok[a.id] === true && pb.length === 0 && (q === null || q >= num(a.quantite)), ko: r.ok[a.id] === false || pb.length > 0 || (q !== null && q < num(a.quantite)), vu }; });
+  const tousVus = produits.every(p => p.vu || p.pb.length), koP = produits.filter(p => p.ko);
+  return { att, cartonsOk, manqueCartons, tropCartons, produits, tousVus, koP, ok: (cartonsOk || !plan.lignes.length) && tousVus && !koP.length, total: plan.total, sans: plan.sans };
+}
+function rcBoite(fid) { const f = mkFournisseur(fid); if (!f) return; rcF = fid; rcR(ctrContrat(f)); rcDessiner(); }
+function rcDessiner() {
+  const f = mkFournisseur(rcF); if (!f) return;
+  const k = ctrContrat(f), r = rcR(k), v = rcVerdict(f), s = rgEtat(f, true), att = v.att, codes = Object.keys(att);
+  const compte = codes.reduce((t, c) => t + num(r.cartons[c]), 0);
+  mkBoite(`<div class="mk-dlg ct-champs"><h3>📦 Réception — ${E(mkNomFournisseur(f))}</h3>
+    <p class="px-aide">Chez le cargo (ou à son dépôt), avant de payer le solde : comptez les cartons, regardez chaque produit. Le contrat le prévoit (articles 6 et 7).</p>
+    <div class="duo"><div><label for="rc_le">Reçu le${r.le ? '' : ' (pas encore)'}</label><input id="rc_le" type="date" value="${E(r.le || '')}" onchange="rcGarder()"></div>
+      <div><label for="rc_ou">Où</label><input id="rc_ou" value="${E(r.lieu || '')}" placeholder="entrepôt du cargo" onchange="rcGarder()"></div></div>
+    ${k.livraison ? `<p class="px-aide">Livraison promise le ${E(k.livraison)}${s.jours > 0 ? ' : <b style="color:var(--rouge)">' + E(s.jours) + ' jour' + (s.jours > 1 ? 's' : '') + ' de retard → pénalité ' + E(rgY(s.penalite)) + ' (article 4)</b>' : ''}.</p>` : ''}
+    <div class="px-titre">1. Les cartons (${E(compte)} compté${compte > 1 ? 's' : ''} sur ${E(v.total)})</div>
+    ${codes.length ? `<button type="button" class="b vert" style="min-height:56px;font-size:17px" onclick="rcScanner(true)">📷 Scanner les cartons (l'un après l'autre)</button>
+      <div class="duo" style="margin-top:6px"><div><input id="rc_tape" placeholder="ou tapez le code lu sur le carton" style="font-size:16px"></div>
+        <div><button type="button" class="b contour" onclick="rcTape()">Compter ce code</button></div></div>
+      <input id="rc_scan" class="champ-cache" aria-hidden="true" tabindex="-1">
+      ${codes.map((c, i) => { const n = num(r.cartons[c]), a = att[c]; return `<div class="rc-c"><div><b>${E(c)}</b><br>${E(rcNomDuCode(f, c))} · ${E(a)} carton${a > 1 ? 's' : ''} attendu${a > 1 ? 's' : ''}</div>
+        <div class="pm"><button type="button" aria-label="Un de moins" onclick="rcPlusI(${i},-1)">−</button><span class="n ${n === a ? 'ok' : n > a ? 'ko' : ''}">${E(n)} / ${E(a)}</span><button type="button" aria-label="Un de plus" onclick="rcPlusI(${i},1)">+</button></div></div>`; }).join('')}`
+      : '<div class="ctr-attention">Pas de code de carton : 🏷 Codes-barres → « Chacun dans un seul carton » ou « Qté / carton » dans chaque achat.</div>'}
+    ${v.sans.length ? `<p class="px-aide">Sans « pièces par carton » : ${E(v.sans.map(a => a.nom).join(', '))} (comptez-les à la main plus bas).</p>` : ''}
+    <div class="px-titre">2. Chaque produit</div>
+    ${v.produits.map(p => { const a = p.a, ph = r.photos[a.id];
+      return `<div class="rc-p ${p.ko ? 'ko' : p.ok ? 'ok' : ''}"><div class="t">${a.photo ? `<img src="${E(a.photo)}" alt="L'échantillon" onclick="mkApercu(this.src,'L\\'échantillon (photo du stand)')">` : '<span style="font-size:30px">📦</span>'}
+        <div><b>${p.n ? 'Ligne ' + E(p.n) + ' · ' : ''}${E(a.nom || 'Sans nom')}</b><br>${E(nf(a.quantite))} pièces commandées${r.vus[a.id] ? ' · 🏷 code de la boîte lu' : ''}</div></div>
+        <div class="duo" style="margin-top:8px"><div><label for="rc_q_${a.id}">Pièces comptées</label><input id="rc_q_${a.id}" inputmode="numeric" value="${p.q === null ? '' : E(p.q)}" placeholder="${E(nf(a.quantite))}" onchange="rcGarder()"></div>
+          <div><label>Comme l'échantillon ?</label><div class="rg-choix" style="margin:0">
+            <label class="${r.ok[a.id] === true ? 'on' : ''}"><input type="radio" name="rc_ok_${a.id}" ${r.ok[a.id] === true ? 'checked' : ''} onchange="rcOk('${a.id}',true)">✅ Oui</label>
+            <label class="${r.ok[a.id] === false ? 'on' : ''}"><input type="radio" name="rc_ok_${a.id}" ${r.ok[a.id] === false ? 'checked' : ''} onchange="rcOk('${a.id}',false)">❌ Non</label></div></div></div>
+        <div class="pbs">${RC_PB.filter(([c]) => (c !== 'notice' || k.francais) && (c !== 'prise' || /lectri|ventil|bouilloire|mixeur|cuiseur|fer|s[eè]che|tondeuse|lisseur|robot|gonfleur|chargeur|lampe/i.test(a.nom || '') || (p.pb || []).indexOf('prise') >= 0))
+          .map(([c, t]) => `<label><input type="checkbox" ${(p.pb || []).indexOf(c) >= 0 ? 'checked' : ''} onchange="rcPb('${a.id}','${c}',this.checked)">${E(t)}</label>`).join('')}</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">${ph ? `<img src="${E(ph)}" alt="Ce qui est arrivé" style="width:64px;height:64px;object-fit:cover;border-radius:10px" onclick="mkApercu(this.src,'Ce qui est arrivé')">` : ''}
+          <label class="b contour" for="rc_ph_${a.id}" style="flex:1;text-align:center;cursor:pointer;min-height:48px">📷 Photo de ce qui est arrivé</label>
+          <input type="file" id="rc_ph_${a.id}" accept="image/*" class="champ-cache" onchange="rcPhoto('${a.id}', this)"></div></div>`; }).join('') || '<p class="px-aide">Aucun achat chez lui.</p>'}
+    <div class="rc-verdict ${v.ok ? 'ok' : v.koP.length ? 'ko' : 'att'}">${v.ok ? '✅ Tout est là et conforme.' : v.koP.length ? '❌ Pas conforme : ' + E(v.koP.length) + ' produit' + (v.koP.length > 1 ? 's' : '') + ' à réclamer.'
+      : v.tropCartons && !v.manqueCartons ? '⚠ ' + E(v.tropCartons) + ' carton' + (v.tropCartons > 1 ? 's' : '') + ' en TROP compté' + (v.tropCartons > 1 ? 's' : '') + ' : scanné deux fois ? Corrigez avec « − ».'
+      : '⏳ Contrôle pas fini' + (v.manqueCartons ? ' : il manque ' + E(v.manqueCartons) + ' carton' + (v.manqueCartons > 1 ? 's' : '') : '') + (!v.tousVus ? (v.manqueCartons ? ' ; ' : ' : ') + 'des produits ne sont pas encore cochés ✅ ou ❌' : '') + '.'}</div>
+    <div class="mk-boutons">
+      ${v.ok ? `<button class="b vert" onclick="rcConforme()">✅ Noter « conforme » et payer le solde (${E(rgY(s.soldeDu))})</button>` : ''}
+      ${v.koP.length || v.manqueCartons ? `<button class="b rouge" onclick="rcReclamer()">❌ Pas conforme : le message au fournisseur (article 7)</button>` : ''}
+      <button class="b gris" onclick="fermerBoite()">Fermer</button></div>
+    <div id="rc_message"></div></div>`);
+}
+function rcNomDuCode(f, code) { const x = rcPlan(f).lignes.find(l => ctnCodeCarton(l.a, l.pcs) === code); return x ? (x.a.nom || '') + ' · ' + nf(x.pcs) + ' pièce' + (x.pcs > 1 ? 's' : '') + ' par carton' : ''; }
+function rcGarder() {
+  const f = mkFournisseur(rcF); if (!f) return;
+  const r = rcR(ctrContrat(f)), val = (id) => { const e = document.getElementById(id); return e ? String(e.value || '').trim() : null; };
+  const le = val('rc_le'); if (le !== null && le !== (r.le || '')) r.le = le;     // seulement si Riche l'a changée
+  if (val('rc_ou') !== null) r.lieu = val('rc_ou');
+  rcLignes(f).forEach(({ a }) => { const q = val('rc_q_' + a.id); if (q === null) return; if (q === '') delete r.pieces[a.id]; else r.pieces[a.id] = Math.round(pxNombre(q)); });
+  sauverLocal();
+}
+function rcRedessiner() { const d = document.getElementById('boite'), y = d ? d.scrollTop : 0; rcDessiner(); if (d) d.scrollTop = y; }
+function rcOk(aid, oui) { rcGarder(); const f = mkFournisseur(rcF); if (!f) return; const r = rcR(ctrContrat(f)); r.ok[aid] = oui; if (!r.le) r.le = rgJour(); sauverLocal(); rcRedessiner(); }
+function rcPb(aid, c, oui) {
+  rcGarder(); const f = mkFournisseur(rcF); if (!f) return; const r = rcR(ctrContrat(f)), L = new Set(r.pb[aid] || []);
+  if (oui) L.add(c); else L.delete(c); r.pb[aid] = [...L]; if (oui) { r.ok[aid] = false; if (!r.le) r.le = rgJour(); } sauverLocal(); rcRedessiner();
+}
+async function rcPhoto(aid, input) {
+  const d = typeof haReduirePhoto === 'function' ? await haReduirePhoto(input) : ''; if (!d) { avertir('Photo illisible : réessayez.'); return; }
+  rcGarder(); const f = mkFournisseur(rcF); if (!f) return; rcR(ctrContrat(f)).photos[aid] = d; sauverLocal(); rcRedessiner();
+}
+function rcPlus(code, n) {
+  rcGarder(); const f = mkFournisseur(rcF); if (!f) return; const r = rcR(ctrContrat(f));
+  r.cartons[code] = Math.max(0, num(r.cartons[code]) + n); if (n > 0 && !r.le) r.le = rgJour(); sauverLocal(); rcRedessiner();
+}
+function rcPlusI(i, n) { const f = mkFournisseur(rcF); if (!f) return; const c = Object.keys(rcAttendu(f))[i]; if (c) rcPlus(c, n); }
+// Un code lu (scanner ou tapé) : un carton de ce contrat → compté ; le code d'une PIÈCE → « code de la boîte lu » ; sinon on le dit.
+function rcCompter(lu) {
+  const f = mkFournisseur(rcF); if (!f) return { ok: false };
+  const code = String(lu || '').trim().toUpperCase().replace(/\s/g, ''), att = rcAttendu(f), r = rcR(ctrContrat(f));
+  if (!code) return { ok: false };
+  const cle = Object.keys(att).find(c => c.toUpperCase() === code);
+  if (cle) {
+    r.cartons[cle] = num(r.cartons[cle]) + 1; if (!r.le) r.le = rgJour(); sauverLocal();
+    const n = r.cartons[cle], a = att[cle], tout = Object.keys(att).every(c => num(r.cartons[c]) >= att[c]);
+    avertir((n > a ? '⚠ ' : '✅ ') + 'Carton ' + cle + ' : ' + n + ' / ' + a + (n > a ? ' — un de TROP (scanné deux fois ? « − » pour corriger)' : '') + (tout ? '\nTous les cartons sont comptés.' : ''), 3500);
+    return { ok: true, tout };
+  }
+  const piece = rcContrat(f).find(x => String(x.a.code_barres || '').replace(/\s/g, '') === code.replace(/-C\d+$/, ''));
+  if (piece && !/-C\d+$/.test(code)) { r.vus[piece.a.id] = true; sauverLocal(); avertir('🏷 Code de la PIÈCE « ' + (piece.a.nom || '') + ' » : il est bien sur la boîte. (Pour compter les cartons, scannez l\'étiquette du carton.)', 4500); return { ok: true, piece: true }; }
+  avertir('⚠ Le code ' + code + ' n\'est pas un carton de ce contrat. Autre fournisseur ? Mauvaise étiquette ?', 5000);
+  return { ok: false };
+}
+function rcTape() { const e = document.getElementById('rc_tape'); if (!e) return; const r = rcCompter(e.value); if (r.ok) { e.value = ''; rcRedessiner(); } }
+// Le scanner du carnet (le même que « Scanner » dans un achat). Il se rouvre tout seul pour le carton suivant ; « Annuler » arrête.
+// - Le résultat s'affiche APRÈS la fermeture de l'écran de scan (sinon le message disparaît avec lui).
+// - Il se rouvre 2 s plus tard, si la fenêtre Réception est toujours ouverte.
+// - La même étiquette lue DÈS l'ouverture (moins d'1 s après que la caméra est prête) est celle qui était encore devant :
+//   pas comptée deux fois, et le scanner s'arrête (un AUTRE carton pareil se compte avec « + »). Un appui sur 📷 compte toujours.
+// - Le verrou est toujours rendu : Annuler, rien lu en 3 minutes (la caméra est fermée), caméra refusée, fenêtre fermée.
+let rcScanEnCours = false, rcDernier = { code: '', t: 0 };
+function rcBoiteOuverte() { const b = document.getElementById('boite'); return !!(b && (b.open || b.hasAttribute('open')) && document.getElementById('rc_scan')); }
+function rcScanner(enchainer, auto) {      // auto : rouvert tout seul après un carton (pas un appui sur 📷)
+  if (rcScanEnCours) return;
+  const champ = document.getElementById('rc_scan'); if (!champ) return;
+  champ.value = ''; rcScanEnCours = true;
+  let appelFini = false, vuVoile = false, pret = 0;
+  Promise.resolve().then(() => scannerCodeBarres('rc_scan')).catch(() => {}).then(() => { appelFini = true; });
+  const debut = Date.now(), lacher = () => { rcScanEnCours = false; };
+  const traiter = (v, lu) => {
+    if (document.querySelector('.voile-scan')) { setTimeout(() => traiter(v, lu), 100); return; }      // l'écran de scan se ferme
+    lacher();
+    const code = v.toUpperCase().replace(/\s/g, ''), relu = !!auto && code === rcDernier.code && lu - rcDernier.t < 10000 && (!pret || lu - pret < 1000);
+    rcDernier = { code, t: lu };
+    if (relu) { avertir('↺ La même étiquette, lue dès l\'ouverture : pas comptée deux fois.\nUn AUTRE carton pareil ? Touchez « + ». Pour continuer : 📷 Scanner.', 6000); return; }
+    const r = rcCompter(v); if (rcBoiteOuverte()) rcRedessiner();
+    if (enchainer && r.ok && !r.tout) setTimeout(() => { if (rcBoiteOuverte()) rcScanner(true, true); }, 2000);
+  };
+  const guetter = () => {
+    const c = document.getElementById('rc_scan'), v = c ? String(c.value || '').trim() : '';
+    if (v) { c.value = ''; traiter(v, Date.now()); return; }
+    const voile = document.querySelector('.voile-scan');
+    if (voile) { vuVoile = true; const et = voile.querySelector('.scan-etat'); if (!pret && et && /^Visez/.test(et.textContent)) pret = Date.now(); }
+    if (!voile && (vuVoile || appelFini)) { lacher(); return; }          // Annuler, caméra refusée, ou pas de lecteur
+    if (Date.now() - debut > 180000) {                                   // rien lu en 3 minutes : on ferme la caméra
+      const an = document.querySelector('.voile-scan .scan-annuler'); if (an) an.click();
+      lacher(); return;
+    }
+    setTimeout(guetter, 250);
+  };
+  setTimeout(guetter, 250);
+}
+function rcConforme() {
+  rcGarder(); const f = mkFournisseur(rcF); if (!f) return;
+  ctrContrat(f); const k = f.contrat; k.etapes = Object.assign({}, k.etapes, { controle_ok: mkMaintenant() }); delete k.etapes.controle_ko;
+  const r = rcR(k); r.verdict = 'ok'; if (!r.le) r.le = rgJour(); sauverLocal();
+  avertir('✅ Contrôle noté conforme. Maintenant : le solde.', 3500);
+  rgBoite(f.id, 'solde');
+}
+function rcMessage(f) {
+  const k = ctrContrat(f), v = rcVerdict(f), r = rcR(k), s = rgEtat(f, true), lignesCn = [], lignesEn = [], lignesFr = [];
+  Object.keys(v.att).forEach(c => { const m = v.att[c] - num(r.cartons[c]); if (m > 0) { const x = rcPlan(f).lignes.find(l => ctnCodeCarton(l.a, l.pcs) === c), n = x && x.n ? x.n : '';
+    lignesCn.push('· ' + (n ? '第' + n + '项 ' : '') + '少了 ' + m + ' 箱（' + c + '）'); lignesEn.push('· ' + (n ? 'Item ' + n + ': ' : '') + m + ' carton(s) missing (' + c + ')'); lignesFr.push('· ' + (n ? 'Ligne ' + n + ' : ' : '') + 'il manque ' + m + ' carton(s) (' + c + ')'); } });
+  v.koP.forEach(p => {
+    const pbs = (p.pb || []).slice(); if (p.q !== null && p.q < num(p.a.quantite) && pbs.indexOf('manque') < 0) pbs.push('manque');
+    if (!pbs.length) pbs.push('autre');
+    const q = p.q !== null && p.q < num(p.a.quantite) ? '（应为 ' + num(p.a.quantite) + ' 个，实收 ' + p.q + ' 个）' : '';
+    const qe = p.q !== null && p.q < num(p.a.quantite) ? ' (ordered ' + num(p.a.quantite) + ', received ' + p.q + ')' : '';
+    const qf = p.q !== null && p.q < num(p.a.quantite) ? ' (commandé ' + num(p.a.quantite) + ', reçu ' + p.q + ')' : '';
+    lignesCn.push('· ' + (p.n ? '第' + p.n + '项 ' : '') + pbs.map(x => RC_PB_CN[x][0]).join('、') + q);
+    lignesEn.push('· ' + (p.n ? 'Item ' + p.n + ': ' : '') + pbs.map(x => RC_PB_CN[x][1]).join(', ') + qe);
+    lignesFr.push('· ' + (p.n ? 'Ligne ' + p.n + ' (' + (p.a.nom || '') + ') : ' : '') + pbs.map(x => (RC_PB.find(y => y[0] === x) || [x, x])[1].toLowerCase()).join(', ') + qf);
+  });
+  const pen = s.jours > 0 ? '\n另外，交货逾期 ' + s.jours + ' 天，按第四条违约金为 ' + rgPt(s.penalite, 2) + ' 元，将从余款中扣除。' : '';
+  const penEn = s.jours > 0 ? '\nAlso, delivery was ' + s.jours + ' day(s) late: under Article 4 the penalty is ¥' + rgPt(s.penalite, 2) + ', to be deducted from the balance.' : '';
+  const penFr = s.jours > 0 ? '\nEn plus, ' + s.jours + ' jour(s) de retard : pénalité de ' + rgY(s.penalite) + ' (article 4), retirée du solde.' : '';
+  const cn = '您好！合同 ' + k.no + ' 验货结果（' + (r.le || rgJour()) + '）：\n' + lignesCn.join('\n') + pen
+    + '\n根据合同第七条，请您选择：(1) 在 ' + k.remplace_jours + ' 天内免费更换或补足；或 (2) 在 ' + k.rembourse_jours + ' 天内全额退还已付款项（包括预付款）。照片附上。请尽快回复，谢谢！';
+  const en = 'Hello! Inspection of contract ' + k.no + ':\n' + lignesEn.join('\n') + penEn + '\nUnder Article 7, please either (1) replace or complete free of charge within '
+    + k.remplace_jours + ' days, or (2) refund all amounts paid, including the advance, within ' + k.rembourse_jours + ' days. Photos attached. Please reply soon, thank you.';
+  const fr = 'Contrat ' + k.no + ' — contrôle du ' + (r.le || rgJour()) + ' :\n' + lignesFr.join('\n') + penFr + '\nArticle 7 : il remplace ou complète gratuitement sous ' + k.remplace_jours
+    + ' jours, OU il rembourse tout (acompte compris) sous ' + k.rembourse_jours + ' jours. Ne payez pas le solde.';
+  return { cn, en, fr, texte: cn + '\n\n' + en };
+}
+function rcReclamer() {
+  rcGarder(); const f = mkFournisseur(rcF); if (!f) return;
+  ctrContrat(f); const k = f.contrat; k.etapes = Object.assign({}, k.etapes, { controle_ko: mkMaintenant() }); delete k.etapes.controle_ok; const r = rcR(k); r.verdict = 'ko'; if (!r.le) r.le = rgJour(); sauverLocal();
+  const m = rcMessage(f), z = document.getElementById('rc_message');
+  if (z) { z.innerHTML = `<div class="px-titre">Le message (chinois + anglais), copié</div><div class="rc-msg">${E(m.texte)}</div>
+    <div class="px-titre">Ce qu'il dit, en français</div><div class="rc-msg">${E(m.fr)}</div>
+    <p class="px-aide">Collez-le dans sa discussion WeChat${typeof vwMot === 'function' && vwMot(f) ? ' (cherchez « ' + E(vwMot(f)) + ' »)' : ''}, avec les photos de ce qui est arrivé. <b>Ne payez pas le solde</b> tant qu'il n'a pas répondu par écrit.</p>
+    <button type="button" class="b" style="background:#1aad19;color:#fff" onclick="rcCopierOuvrir()">💬 Copier et ouvrir WeChat</button>`; z.scrollIntoView({ block: 'start' }); }
+  mkCopier(m.texte, 'Réclamation copiée (chinois + anglais).');
+}
+function rcCopierOuvrir() { const f = mkFournisseur(rcF); if (!f) return; mkCopier(rcMessage(f).texte, 'Copié. Dans WeChat : sa discussion → collez.'); setTimeout(() => ctAller('weixin://'), 600); }
+
+// ---------- D. 🧾 Liste de colisage + facture (français + chinois) pour le cargo et la douane de Conakry ----------
+let clF = '';
+function clPoids(a) { if (num(a.poids_carton_kg) > 0) return num(a.poids_carton_kg); const o = a.px && a.px.oid ? (C.comparaisons || []).flatMap(c => c.offres || []).find(x => x.id === a.px.oid) : null; return o && num(o.poids_kg) > 0 ? num(o.poids_kg) : 0; }
+function clM3(a) { return num(a.dim_l) > 0 && num(a.dim_la) > 0 && num(a.dim_h) > 0 ? num(a.dim_l) * num(a.dim_la) * num(a.dim_h) / 1e6 : 0; }
+function clBoite(fid) {
+  const f = mkFournisseur(fid); if (!f) return; clF = fid;
+  const L = rcContrat(f), plan = clPlan(f);
+  mkBoite(`<div class="mk-dlg ct-champs"><h3>🧾 Colisage et facture — ${E(mkNomFournisseur(f))}</h3>
+    <p class="px-aide">Deux pages, en <b>français</b> (la douane de Conakry) et en <b>chinois</b> (le fournisseur, le cargo) :<br>
+      1. <b>La liste de colisage</b> (装箱单) : chaque carton, ce qu'il contient, son poids, son volume — <b>sans prix</b>, pour le cargo.<br>
+      2. <b>La facture commerciale</b> (商业发票) avec les prix du contrat, que le VENDEUR signe et tamponne — pour la douane.</p>
+    ${plan.sans.length ? `<div class="ctr-attention">Pièces par carton pas notées : ${E(plan.sans.map(a => a.nom).join(', '))} (🏷 Codes-barres → « Chacun dans un seul carton »).</div>` : ''}
+    <div class="px-titre">Le poids et la taille d'UN carton (ce qu'il vous dit, ou la balance du cargo)</div>
+    ${L.length ? '' : '<div class="ctr-attention">Pas encore de ligne de contrat chez lui (un achat avec une quantité et un prix).</div>'}
+    ${L.map(({ a, n }) => `<div class="cl-l"><b>${n ? 'Ligne ' + E(n) + ' · ' : ''}${E(a.nom || 'Sans nom')}</b> — ${E(nf(a.quantite))} pièces${ctnPcs(a) > 0 ? ', ' + E(nf(ctnPcs(a))) + ' par carton' : ''}
+      <div class="g"><div><label for="cl_kg_${a.id}">kg / carton</label><input id="cl_kg_${a.id}" inputmode="decimal" value="${clPoids(a) || ''}" onchange="clGarder()"></div>
+        <div><label for="cl_l_${a.id}">L cm</label><input id="cl_l_${a.id}" inputmode="decimal" value="${num(a.dim_l) || ''}" onchange="clGarder()"></div>
+        <div><label for="cl_la_${a.id}">l cm</label><input id="cl_la_${a.id}" inputmode="decimal" value="${num(a.dim_la) || ''}" onchange="clGarder()"></div>
+        <div><label for="cl_h_${a.id}">H cm</label><input id="cl_h_${a.id}" inputmode="decimal" value="${num(a.dim_h) || ''}" onchange="clGarder()"></div></div></div>`).join('')}
+    <div id="cl_total" class="rg-chiffres" style="margin-top:8px"></div>
+    <div class="px-boutons"><button type="button" class="b" style="background:#1aad19;color:#fff" onclick="clEnvoyer()">📤 Le PDF (colisage + facture) → WeChat</button></div>
+    <div id="cl_apercu" class="ctr-apercu"></div>
+    <p class="px-aide">La facture dit les vrais prix du contrat : une facture plus basse que le vrai prix est une fraude à la douane, et elle vous laisse sans preuve en cas de litige.</p>
+    <div class="mk-boutons"><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+  clTotal();
+}
+function clGarder() {
+  const f = mkFournisseur(clF); if (!f) return;
+  const val = (id) => { const e = document.getElementById(id); return e ? pxNombre(e.value) : null; };
+  rcContrat(f).forEach(({ a }) => { const kg = val('cl_kg_' + a.id); if (kg !== null) a.poids_carton_kg = kg || '';
+    [['dim_l', 'cl_l_'], ['dim_la', 'cl_la_'], ['dim_h', 'cl_h_']].forEach(([c, p]) => { const x = val(p + a.id); if (x !== null) a[c] = x || ''; }); });
+  sauverLocal(); clTotal();
+}
+function clTotaux(f) {
+  const plan = clPlan(f); let kg = 0, m3 = 0, sansKg = 0;
+  plan.lignes.forEach(x => { const p = clPoids(x.a), v = clM3(x.a); if (p > 0) kg += p * x.nb * (x.dernier && ctnPcs(x.a) > 0 ? x.pcs / ctnPcs(x.a) : 1); else sansKg += x.nb; m3 += v * x.nb; });
+  return { cartons: plan.total, pieces: rcContrat(f).reduce((s, x) => s + num(x.a.quantite), 0), kg, m3, sansKg, valeur: rgTotal(f) };
+}
+function clTotal() {
+  const f = mkFournisseur(clF), z = document.getElementById('cl_total'); if (!f || !z) return;
+  const t = clTotaux(f);
+  z.innerHTML = `Total : <b>${E(nf(t.cartons))} carton${t.cartons > 1 ? 's' : ''}</b> · ${E(nf(t.pieces))} pièces · <b>${E(nf(t.kg, 1))} kg</b> · <b>${E(nf(t.m3, 3))} m³</b>${t.sansKg ? ' <span style="color:var(--rouge)">(' + E(t.sansKg) + ' carton(s) sans poids)</span>' : ''}`;
+}
+async function clPages(fid) {
+  const f = mkFournisseur(fid), k = ctrContrat(f), v = ctrVendeur(f), a0 = ctrAcheteur(), plan = clPlan(f), L = rcContrat(f), t = clTotaux(f);
+  const W = CTR_W, H = CTR_H, M = 70, pages = [];
+  const cg = typeof cgListe === 'function' && C.cargo_choisi ? cgListe().find(c => c.id === C.cargo_choisi) : null;
+  const page = (titreCn, titreFr, titreEn) => {
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); pages.push(c);
+    g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.fillStyle = '#0d3f85'; g.fillRect(0, 0, W, 14);
+    g.textAlign = 'center'; g.font = 'bold 44px ' + CTR_POLICE; g.fillText(titreCn, W / 2, 76); g.font = 'bold 30px ' + CTR_POLICE; g.fillText(titreFr + ' — ' + titreEn, W / 2, 118); g.textAlign = 'left';
+    g.fillStyle = '#16233a'; g.font = '21px ' + CTR_POLICE;
+    const lignes = [['合同号 / Contrat n°', k.no + '   ' + (k.date || '')], ['卖方 / Vendeur (expéditeur)', [v.nom, v.adresse, v.tel].filter(Boolean).join(' — ')],
+      ['买方 / Acheteur (destinataire)', a0.societe + ' — ' + a0.adresse + (a0.representant ? ' — ' + a0.representant : '') + (a0.tel ? ' — ' + a0.tel : '')],
+      ['唛头 / Marquage', 'KYLO EURGUINE / ' + k.no + ' / 箱号 C/No. 1–' + t.cartons], ['货代 / Transitaire', cg ? (cg.nom || '') + (cg.qui ? ' — ' + cg.qui : '') : (k.lieu || '________')]];
+    let y = 160; lignes.forEach(([a, b]) => { g.font = 'bold 20px ' + CTR_POLICE; g.fillText(a, M, y); g.font = '20px ' + CTR_POLICE; ctrLignes(g, b, W - 2 * M - 330).slice(0, 2).forEach((l, i) => g.fillText(l, M + 330, y + i * 26)); y += 52; });
+    return { g, y: y + 6 };
+  };
+  const tableau = (g, y, cols, entetes, rangees, totaux) => {
+    const L2 = W - 2 * M; g.lineWidth = 2; g.strokeStyle = '#9fb3d1';
+    g.fillStyle = '#e8effb'; g.fillRect(M, y, L2, 64); g.strokeRect(M, y, L2, 64); let x = M; g.fillStyle = '#16233a';
+    entetes.forEach((e, i) => { g.font = 'bold 18px ' + CTR_POLICE; g.fillText(e[0], x + 6, y + 26); g.font = '15px ' + CTR_POLICE; g.fillText(e[1], x + 6, y + 50); x += cols[i]; });
+    y += 64;
+    rangees.forEach(r => { const h = 70; g.strokeRect(M, y, L2, h); x = M;
+      r.forEach((t, i) => { g.font = (i === 1 ? 'bold ' : '') + '17px ' + CTR_POLICE; g.fillStyle = '#16233a'; ctrLignes(g, String(t), cols[i] - 10).slice(0, 2).forEach((l, j) => g.fillText(l, x + 6, y + 26 + j * 24)); if (i) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + h); g.stroke(); } x += cols[i]; });
+      y += h; });
+    if (totaux) { g.fillStyle = '#f3f6fb'; g.fillRect(M, y, L2, 50); g.strokeRect(M, y, L2, 50); g.fillStyle = '#16233a'; g.font = 'bold 19px ' + CTR_POLICE; g.fillText(totaux, M + 8, y + 32); y += 50; }
+    return y;
+  };
+  const nomCn = (a) => { const n = String(a.nom || '').split(' — ')[0], cn = typeof pxNomChinois === 'function' ? pxNomChinois(n) : ''; return n + (cn ? ' / ' + cn : '') + (a.reference ? ' · ' + a.reference : ''); };
+  // Page 1 : la liste de colisage (sans prix)
+  let p = page('装箱单', 'LISTE DE COLISAGE', 'PACKING LIST');
+  const rang1 = plan.lignes.map(x => { const kg = clPoids(x.a), part = x.dernier && ctnPcs(x.a) > 0 ? x.pcs / ctnPcs(x.a) : 1, m3 = clM3(x.a);
+    return [x.n || '—', nomCn(x.a), (x.nb > 1 ? x.de + '–' + (x.de + x.nb - 1) : String(x.de)) + ' / ' + plan.total, nf(x.nb), nf(x.pcs), nf(x.pcs * x.nb), kg ? nf(kg * part * x.nb, 1) : '—', m3 ? nf(m3 * x.nb, 3) : '—']; });
+  let y = tableau(p.g, p.y, [60, 390, 150, 90, 110, 110, 90, 100], [['序号', 'N°'], ['品名 / 型号', 'Désignation'], ['箱号', 'Cartons n°'], ['箱数', 'Nb'], ['每箱', 'Pcs/carton'], ['总数', 'Pièces'], ['毛重', 'kg'], ['体积', 'm³']], rang1,
+    '合计 Total : ' + nf(t.cartons) + ' 箱 cartons · ' + nf(t.pieces) + ' 个 pièces · ' + nf(t.kg, 1) + ' kg · ' + nf(t.m3, 3) + ' m³' + (t.sansKg ? '  (' + t.sansKg + ' sans poids)' : ''));
+  p.g.font = '18px ' + CTR_POLICE; p.g.fillStyle = '#3d4a5f';
+  p.g.fillText('每箱贴有箱唛和条形码（KYLO EURGUINE / 合同号 / 箱号）。 Chaque carton porte son étiquette KYLO et son code-barres.', M, Math.min(H - 120, y + 40));
+  // Page 2 : la facture commerciale (les vrais prix du contrat), à faire signer et tamponner par le vendeur
+  p = page('商业发票', 'FACTURE COMMERCIALE', 'COMMERCIAL INVOICE');
+  const rang2 = L.map(({ a, n }) => [n || '—', nomCn(a), nf(a.quantite), nf(a.prix_unitaire, 2) + ' ' + mkSym(deviseDe(a)), nf(num(a.quantite) * num(a.prix_unitaire), 2) + ' ' + mkSym(deviseDe(a))]);
+  y = tableau(p.g, p.y, [60, 520, 140, 190, 190], [['序号', 'N°'], ['品名 / 型号', 'Désignation'], ['数量', 'Quantité'], ['单价', 'Prix unitaire'], ['金额', 'Montant']], rang2,
+    '合计 Total : ' + nf(t.valeur, 2) + ' ¥ (' + (typeof ctrMajuscules === 'function' ? '人民币' + ctrMajuscules(t.valeur) : 'RMB') + ')');
+  const g2 = p.g; g2.font = '19px ' + CTR_POLICE; g2.fillStyle = '#16233a';
+  let yy = Math.min(H - 420, y + 40);
+  ['原产地 Origine : 中国 Chine (China)', '目的地 Destination : 科纳克里，几内亚 Conakry, République de Guinée', '付款 Paiement : ' + (typeof payModes === 'function' ? PAY_MODES.filter(m => payModes(k).indexOf(m.k) >= 0).map(m => m.cn + ' ' + m.fr).join('、') || '—' : '—')]
+    .forEach(l => { g2.fillText(l, M, yy); yy += 34; });
+  g2.strokeStyle = '#16233a'; g2.lineWidth = 2; g2.strokeRect(W - M - 520, yy + 20, 520, 220);
+  g2.font = 'bold 21px ' + CTR_POLICE; g2.fillText('卖方签字并盖章 — Signature et cachet du vendeur', W - M - 505, yy + 56);
+  g2.font = '19px ' + CTR_POLICE; g2.fillText(v.nom || '', W - M - 505, yy + 92); g2.fillText('日期 Date : ____________', W - M - 505, yy + 216);
+  pages.forEach((c, i) => { const h = c.getContext('2d'); h.font = '17px ' + CTR_POLICE; h.fillStyle = '#5a6b85'; h.fillText(k.no + ' · ' + (i + 1) + '/' + pages.length, M, H - 50); });
+  return pages;
+}
+async function clEnvoyer() {
+  clGarder(); const f = mkFournisseur(clF); if (!f) return;
+  const z = document.getElementById('cl_apercu'); if (z) z.innerHTML = '<p class="px-aide">⏳ Le PDF se prépare…</p>';
+  try {
+    const pages = await clPages(f.id);
+    const jpegs = pages.map(c => { const u = c.toDataURL('image/jpeg', 0.9), b = atob(u.split(',')[1]), o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return { w: c.width, h: c.height, octets: o }; });
+    if (z) z.innerHTML = pages.map((c, i) => `<img src="${c.toDataURL('image/jpeg', 0.6)}" alt="Page ${i + 1}" onclick="mkApercu(this.src, 'Page ${i + 1}')">`).join('');
+    await remettreFichier(ctrPdf(jpegs), 'Colisage-Facture-装箱单-发票-' + ctrContrat(f).no + '.pdf');
+  } catch (e) { if (z) z.innerHTML = '<div class="ctr-attention">Le PDF n\'a pas pu être préparé : ' + E(e.message || e) + '</div>'; }
+}
+</script>
+<script>
+// ---------- A. 🧭 À faire maintenant : la prochaine chose à faire, calculée sur le carnet ----------
+// Rien n'est tapé deux fois : chaque ligne vient des données (contrats, paiements, livraison, contrôle, codes, prix demandés,
+// copie de sécurité, budget) et son bouton ouvre directement le bon écran.
+// Dans les messages en chinois et en anglais, les nombres s'écrivent avec un POINT (441.65), pas une virgule.
+function rgPt(n, d) { const x = Math.round((Number(n) || 0) * Math.pow(10, d || 0)) / Math.pow(10, d || 0); return String(x); }
+function piRelance(f, s) {
+  const k = s.k, j = s.jours, avant = k.livraison ? rgEcartJours(rgJour(), k.livraison) : null;
+  if (j > 0) return '您好！合同 ' + k.no + ' 的交货日期是 ' + k.livraison + '，今天已逾期 ' + j + ' 天。按合同第四条，每天违约金 ' + rgPt(k.penalite, 1) + '%（目前 ' + rgPt(s.penalite, 2)
+    + ' 元，最高 ' + rgPt(k.penalite_max) + '%）。请告诉我准确的交货时间，并发送包装好的货物照片。谢谢！\n\nHello! Contract ' + k.no + ' was due on ' + k.livraison + ', now ' + j
+    + ' day(s) late. Under Article 4 the penalty is ' + rgPt(k.penalite, 1) + '% per day (now ¥' + rgPt(s.penalite, 2) + '). Please tell me the exact delivery date and send photos of the packed goods. Thank you!';
+  return '您好！合同 ' + k.no + ' 的交货日期是 ' + k.livraison + (avant !== null ? '（还有 ' + avant + ' 天）' : '') + '。请发送包装好的货物照片（第三条），并确认按时送到我们的货代仓库。谢谢！\n\nHello! Contract '
+    + k.no + ' is due on ' + k.livraison + '. Please send photos of the packed goods (Article 3) and confirm delivery on time to our forwarder\'s warehouse. Thank you!';
+}
+function piCopierRelance(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  mkCopier(piRelance(f, rgEtat(f)), 'Message copié (chinois + anglais).' + (typeof vwMot === 'function' && vwMot(f) ? ' Dans WeChat, cherchez « ' + vwMot(f) + ' ».' : ''));
+  setTimeout(() => ctAller('weixin://'), 700);
+}
+function piLignes() {
+  const L = [], add = (niv, qui, ic, titre, detail, bouton, action) => L.push({ niv, qui, ic, titre, detail, bouton, action });
+  const four = fournisseursListe();
+  four.forEach(f => {
+    const A = (C.achats || []).filter(a => a.fournisseur_id === f.id); if (!A.length) return;
+    const nom = mkNomFournisseur(f), k = f.contrat, e = (k && k.etapes) || {}, enContrat = rgLignes(f);
+    const s = enContrat.length ? rgEtat(f) : null;
+    const sansPrix = A.filter(a => !(num(a.quantite) > 0) || !(num(a.prix_unitaire) > 0));
+    if (sansPrix.length) add('ambre', nom, '✏️', sansPrix.length + ' achat(s) sans quantité ou sans prix', sansPrix.map(a => a.nom).join(', ') + ' : le contrat ne les prend pas.', '🛒 Compléter', `haProduits('${f.id}')`);
+    if (s && s.total > 0) {
+      const v = f.vendeur_legal || {}, lc = typeof lcAnalyse === 'function' ? lcAnalyse(v.code) : { etat: 'ok' };     // lu, jamais créé ici
+      if (typeof payCompteAcheteur === 'function' && payModes(s.k).indexOf('virement') >= 0 && (payCompteAcheteur(v).length || payCarte(v.compte)))
+        add('rouge', nom, '⛔', 'Le compte bancaire de son contrat ressemble au VÔTRE', 'Corrigez-le avant d\'envoyer ou de payer.', '📝 Son contrat', `ctrBoite('${f.id}')`);
+      if (lc.etat === 'faux') add('rouge', nom, '⛔', 'Code de sa licence FAUX', lc.raison + '.', '📝 Son contrat', `ctrBoite('${f.id}')`);
+      if (!e.envoye) add('bleu', nom, '📝', 'Lui envoyer son contrat (' + rgY(s.total) + ')', enContrat.length + ' produit(s). ' + (lc.etat === 'vide' ? 'Demandez aussi la photo de sa licence.' : ''), '📝 Faire son contrat', `ctrBoite('${f.id}')`);
+      else if (!e.signe) add('bleu', nom, '✍️', 'Contrat envoyé le ' + mkJour(e.envoye) + ' : le faire signer et tamponner', 'Puis l\'acompte de ' + rgY(s.acDu) + '.', '📝 Son contrat', `ctrBoite('${f.id}')`);
+      // Étapes cochées à la main (1.16.0) sans montant : on ne redemande pas de payer, on demande de NOTER le montant.
+      if (s.acNoteSansMontant && !e.solde) add('bleu', nom, '💵', 'Acompte noté payé le ' + mkJour(e.acompte) + ' : notez son montant', 'Avec la photo du reçu (Alipay ou 收据) : c\'est votre preuve.', '💵 Noter le montant', `rgBoite('${f.id}','acompte')`);
+      else if (e.signe && !e.acompte && s.acPaye + 0.5 < s.acDu) add('ambre', nom, '💵', 'Payer l\'acompte : ' + rgY(s.acDu - s.acPaye), 'Gardez le reçu en photo.', '💵 Paiements', `rgBoite('${f.id}','acompte')`);
+      if (s.soldeNoteSansMontant) add('bleu', nom, '💵', 'Solde noté payé le ' + mkJour(e.solde) + ' : notez son montant', 'Pour garder la preuve de chaque yuan.', '💵 Noter le montant', `rgBoite('${f.id}','solde')`);
+      const recu = s.recu, avant = s.k.livraison ? rgEcartJours(rgJour(), s.k.livraison) : null;
+      if (!recu && s.jours > 0) add('rouge', nom, '⏰', 'En retard de ' + s.jours + ' jour' + (s.jours > 1 ? 's' : '') + ' (promis le ' + s.k.livraison + ')', 'Pénalité prévue : ' + rgY(s.penalite) + (s.annulable ? ' · plus de ' + s.k.retard_max + ' jours : vous pouvez annuler, il rembourse tout.' : '') + ' Le message de relance est prêt.', '💬 Copier la relance et ouvrir WeChat', `piCopierRelance('${f.id}')`);
+      else if (!recu && e.signe && avant !== null && avant >= 0 && avant <= 3) add('ambre', nom, '📦', 'Livraison dans ' + avant + ' jour' + (avant > 1 ? 's' : '') + ' (' + s.k.livraison + ')', 'Demandez les photos des cartons fermés (article 3).', '💬 Copier le message et ouvrir WeChat', `piCopierRelance('${f.id}')`);
+      const fin = C.voyage && /^\d{4}-\d{2}-\d{2}/.test(String(C.voyage.fin || '')) ? String(C.voyage.fin).slice(0, 10) : '';
+      if (!recu && fin && s.k.livraison && s.k.livraison > fin) add('ambre', nom, '✈️', 'Livraison le ' + s.k.livraison + ', APRÈS votre départ (' + fin + ')',
+        'Qui comptera les cartons et contrôlera avant le solde ? ' + (String(s.k.controleur || '').trim() ? 'Le contrat nomme « ' + s.k.controleur + ' » : prévenez-le, donnez-lui la liste de colisage.' : 'Personne n\'est nommé dans le contrat (article 6) : choisissez un contrôleur ou le cargo.'), '📝 Son contrat', `ctrBoite('${f.id}')`);
+      if ((recu || (avant !== null && avant < 0)) && s.controle === '' && e.signe) add('ambre', nom, '🔎', 'Contrôle à faire chez le cargo', 'Comptez les cartons et regardez chaque produit AVANT le solde.', '📦 Réception', `rcBoite('${f.id}')`);
+      if (s.controle === 'ko') add('rouge', nom, '❌', 'Contrôle PAS conforme : il doit remplacer ou rembourser', 'Ne payez pas le solde. La réclamation (article 7) est prête.', '📦 Réception', `rcBoite('${f.id}')`);
+      if (s.controle === 'ok' && s.soldeDu > 0.5) add('ambre', nom, '💰', 'Payer le solde : ' + rgY(s.soldeDu), s.penalite > 0 ? 'Pénalité de retard déjà retirée : ' + rgY(s.penalite) + '.' : 'Contrôle conforme : vous pouvez payer.', '💵 Paiements', `rgBoite('${f.id}','solde')`);
+      const sansRecu = rgPaiements(s.k).filter(p => !p.recu).length;
+      if (sansRecu) add('ambre', nom, '🧾', sansRecu + ' paiement(s) sans reçu en photo', 'La photo est votre preuve en cas de désaccord.', '💵 Paiements', `rgBoite('${f.id}')`);
+    }
+    const sansCode = A.filter(a => !String(a.code_barres || '').trim());
+    if (sansCode.length) add('ambre', nom, '🏷', sansCode.length + ' produit(s) sans code-barres', 'Le fournisseur doit les imprimer avant l\'emballage.', '🏷 Codes-barres', `ctnBoite('${f.id}')`);
+    const sansCarton = A.filter(a => String(a.code_barres || '').trim() && !(ctnPcs(a) > 0));
+    if (sansCarton.length) add('bleu', nom, '📦', sansCarton.length + ' produit(s) : pièces par carton à noter', 'Sans elles, pas de code de carton.', '🏷 Codes-barres', `ctnBoite('${f.id}')`);
+  });
+  // Fournisseurs : prix demandés sans réponse ; à contacter.
+  const sansRep = four.filter(f => f.demande_le && !f.prix_recus_le && (rgEcartJours(f.demande_le, rgJour()) || 0) >= 2);
+  if (sansRep.length) add('ambre', 'Fournisseurs', '🔁', sansRep.length + ' fournisseur(s) n\'ont pas répondu à la demande de prix (2 jours et plus)', sansRep.slice(0, 6).map(f => f.code || f.nom).join(', ') + (sansRep.length > 6 ? '…' : '') + ' : relancez-les sur WeChat.', '🏭 Fournisseurs', `fermerBoite();allerA('rencontres')`);
+  const aCont = four.filter(f => f.decision === 'contacter' && !f.contacte_le).length;
+  if (aCont) add('bleu', 'Fournisseurs', '✅', aCont + ' fournisseur(s) cochés « à contacter »', 'La liste est en haut de 🏭 Fournisseurs.', '🏭 Fournisseurs', `fermerBoite();allerA('rencontres')`);
+  // Codes-barres, copie de sécurité, budget.
+  if (blocDuCarnet() && resteDuBloc() < 60) add(resteDuBloc() <= 0 ? 'rouge' : 'ambre', 'Codes-barres', '🏷', 'Plus que ' + resteDuBloc() + ' code(s)-barres dans le bloc', 'Ajoutez le bloc suivant (onglet Voyage).', '🧳 Voyage', `fermerBoite();allerA('voyage')`);
+  const j = joursDepuisEnregistrement();
+  if ((C.achats || []).length && (j === null || j >= 1)) add(j === null || j >= 3 ? 'rouge' : 'ambre', 'Sécurité', '💾', j === null ? 'Aucune copie de sécurité du carnet' : 'Dernière copie de sécurité il y a ' + j + ' jour' + (j > 1 ? 's' : ''),
+    'Si le téléphone est perdu ou volé, contrats, paiements et reçus partent avec. « Enregistrer » fait un fichier : envoyez-le-vous sur WeChat (文件传输助手).', '💾 Enregistrer maintenant', `fermerBoite();enregistrerCarnet()`);
+  const budget = typeof budgetMarchandiseGnf === 'function' ? budgetMarchandiseGnf() : 0, tot = totalAchatsGnf();
+  if (budget > 0 && tot > budget) add('rouge', 'Budget', '⚠', 'Budget dépassé de ' + gnfStrict(tot - budget), 'Achats : ' + gnfStrict(tot) + ' pour ' + gnfStrict(budget) + '.', '🛒 Mes achats', `fermerBoite();allerA('achats')`);
+  const ordre = { rouge: 0, ambre: 1, bleu: 2 };
+  return L.sort((a, b) => ordre[a.niv] - ordre[b.niv]);
+}
+function piBoite() {
+  let L = []; try { L = piLignes(); } catch (e) { L = []; }
+  const qui = [...new Set(L.map(x => x.qui))];
+  mkBoite(`<div class="mk-dlg"><h3>🧭 À faire maintenant</h3>
+    <p class="px-aide">Calculé sur votre carnet : contrats, paiements, livraisons, contrôle, codes-barres, prix demandés, copie de sécurité. Le plus urgent en premier (rouge, puis orange).</p>
+    ${L.length ? qui.map(q => `<div class="pi-qui">${E(q)}</div>` + L.filter(x => x.qui === q).map(x => `<div class="pi-l ${x.niv === 'rouge' ? 'rouge' : x.niv === 'ambre' ? 'ambre' : ''}"><div class="ic" aria-hidden="true">${x.ic}</div>
+        <div><b>${E(x.titre)}</b>${x.detail ? `<div class="d">${E(x.detail)}</div>` : ''}<button type="button" class="b ${x.niv === 'rouge' ? 'rouge' : 'contour'}" onclick="${x.action}">${E(x.bouton)}</button></div></div>`).join('')).join('')
+      : '<div class="pi-l vert"><div class="ic">✅</div><div><b>Rien d\'urgent.</b><div class="d">Aucun contrat, paiement, contrôle ou code-barres en attente.</div></div></div>'}
+    <div class="mk-boutons"><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+}
+function piEntreeHtml() {
+  let L = []; try { L = piLignes(); } catch (e) { return ''; }
+  const r = L.filter(x => x.niv === 'rouge').length;
+  return `<button type="button" class="b pi-entree${r ? ' rouge' : ''}" onclick="piBoite()">🧭 À faire maintenant${L.length ? ' (' + L.length + ')' : ''}<small>${L.length ? (r ? r + ' urgent' + (r > 1 ? 's' : '') + ' · ' : '') + E(L[0].titre) : 'Rien d\'urgent'}</small></button>`;
+}
+// En haut de 🏭 Fournisseurs (là où le carnet s'ouvre) et de 🛒 Achats.
+const piRencontresAvant = ecranRencontres;
+ecranRencontres = function () { return piEntreeHtml() + piRencontresAvant.apply(this, arguments); };
+const piAchatsAvant = ecranAchats;
+ecranAchats = function () {
+  const h = piAchatsAvant.apply(this, arguments);
+  return C.achats.length ? piEntreeHtml() + h : h;
+};
+// Les boutons de chaque fournisseur dans 🛒 Achats : 💵 Paiements, 📦 Réception, 🧾 Colisage.
+const piGroupesAvant = haGroupesHtml;
+haGroupesHtml = function () {
+  return piGroupesAvant.apply(this, arguments).replace(/<button class="b contour" onclick="ctnBoite\('([^']+)'\)">🏷 Codes-barres : pièces et cartons<\/button>/g, (m, fid) => {
+    const f = mkFournisseur(fid); if (!f || !rgLignes(f).length) return m;
+    const s = rgEtat(f), note = s.acNoteSansMontant || s.soldeNoteSansMontant;
+    return m + `\n        <button class="b contour" onclick="rgBoite('${fid}')">💵 Paiements : ${note ? (s.soldeDu > 0.5 ? 'reste ' + E(rgY(s.soldeDu)) + ' · ' : '') + 'noté payé — notez le montant' : E(rgY(s.paye)) + ' payé · reste ' + E(rgY(s.soldeDu))}</button>
+        <button class="b contour" onclick="rcBoite('${fid}')">📦 Réception chez le cargo${s.controle === 'ok' ? ' ✅' : s.controle === 'ko' ? ' ❌' : ''}</button>
+        <button class="b contour" onclick="clBoite('${fid}')">🧾 Colisage et facture</button>`;
+  });
+};
+// La ligne « 📝 contrat » et le bilan de sa livraison, sur sa fiche dans 🏭 Fournisseurs : on se souvient de qui a bien livré.
+function piBilanHtml(f) {
+  const k = f && f.contrat; if (!k || !(k.etapes && Object.keys(k.etapes).length) && !(k.paiements && k.paiements.length)) return '';
+  const s = rgEtat(f), e = k.etapes || {}, morceaux = [];
+  morceaux.push(e.solde ? 'soldé' : e.signe ? 'signé' : e.envoye ? 'envoyé' : 'en cours');
+  if (s.total > 0) morceaux.push(rgY(s.paye) + ' payé sur ' + rgY(s.total));
+  if (s.recu) morceaux.push(s.jours > 0 ? 'livré avec ' + s.jours + ' j de retard' : 'livré à l\'heure');
+  else if (s.jours > 0) morceaux.push('⏰ ' + s.jours + ' j de retard');
+  if (s.controle) morceaux.push(s.controle === 'ok' ? 'conforme ✅' : 'pas conforme ❌');
+  return `<div class="det" style="font-weight:700">📝 ${E(k.no || 'Contrat')} : ${E(morceaux.join(' · '))}</div>`;
+}
+const piCarteAvant = mkCarteFournisseurHtml;
+mkCarteFournisseurHtml = function (f) {
+  const h = piCarteAvant.apply(this, arguments); let b = '';
+  try { b = piBilanHtml(f); } catch (e) { b = ''; }
+  if (!b) return h;
+  const i = h.indexOf('<div class="mk-decision">');
+  return i < 0 ? h : h.slice(0, i) + b + h.slice(i);
+};
+// Onglet Argent (Frais → Argent) : ce que je dois encore aux fournisseurs, à côté des poches.
+const piArgentAvant = ecranArgent;
+ecranArgent = function () {
+  const h = piArgentAvant.apply(this, arguments);
+  const F = fournisseursListe().filter(f => rgLignes(f).length);
+  if (!F.length) return h;
+  let tot = 0, payeT = 0, especes = 0, resteT = 0;
+  const lignes = F.map(f => { const s = rgEtat(f); tot += s.total; payeT += s.paye; resteT += s.soldeDu;
+    const note = s.acNoteSansMontant || s.soldeNoteSansMontant;
+    if (typeof payModes === 'function' && payModes(s.k).length && payModes(s.k).every(m => m === 'especes')) especes += s.soldeDu;
+    return `<div class="rg-p"><div><b>${E(mkNomFournisseur(f))}</b><br>${E(rgY(s.paye))} payé sur ${E(rgY(s.total))} · reste <b>${E(rgY(s.soldeDu))}</b>${s.penalite > 0 ? ' (pénalité ' + E(rgY(s.penalite)) + ' retirée)' : ''}${note ? '<br>' + (s.soldeNoteSansMontant ? 'Solde' : 'Acompte') + ' noté payé, montant pas noté : touchez 💵.' : ''}</div>
+      <button type="button" class="b contour" style="width:auto;min-height:48px" onclick="rgBoite('${f.id}')">💵</button></div>`; }).join('');
+  const carte = `<div class="carte" id="pi-dettes"><h2>💵 Ce que je dois encore aux fournisseurs</h2>
+    <div class="rg-chiffres">Contrats : <b>${E(rgY(tot))}</b> · payé <b>${E(rgY(payeT))}</b> · reste <b>${E(rgY(resteT))}</b> = ${E(gnfStrict(enGnf(resteT, 'CNY')))}
+      ${especes > 0 ? '<br>dont <b>' + E(rgY(especes)) + '</b> en espèces (contrats payés seulement en espèces) : prévoyez-les dans vos poches.' : ''}</div>${lignes}</div>`;
+  const i = h.indexOf('<div class="carte" id="arme-14">');
+  return i < 0 ? h + carte : h.slice(0, i) + carte + h.slice(i);
+};
+</script>
+
 
 
 <script>

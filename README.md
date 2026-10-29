@@ -296,6 +296,28 @@ fenêtre ouverte, `fermerBoite` le rend à la page) ; remplacer par un produit d
 carte chinoise du vendeur pas confondue avec celle de l'acheteur ; IBAN FR/GN reconnus ; « Consignes pour le fournisseur » : un code
 par carton. `tests/test-carnet-1160.js` : 112 contrôles.
 
+Version 1.17.0 — 30/10/2026 : **L'argent, les cartons et les contrats ne se perdent plus**. 🧭 « À faire maintenant » en haut de
+Fournisseurs et d'Achats : la prochaine chose à faire, fournisseur par fournisseur, calculée sur le carnet (contrat à envoyer, à faire
+signer, acompte, livraison proche, retard avec la relance chinoise prête, contrôle, solde, paiement sans reçu, codes-barres, pièces par
+carton, demandes de prix sans réponse, bloc de codes qui s'épuise, budget, copie de sécurité), le plus urgent en rouge, chaque ligne avec
+son bouton ; lu sans créer de contrat. 💵 Paiements de chaque contrat (acompte, solde, « autre » montré mais pas compté ; mode, date,
+photo du reçu ; montant en ¥ figé au paiement ; devise sans taux refusée ; trop-payé en deux appuis ; étapes « acompte / solde payé »
+cochées toutes seules et seules celles-là décochées au retrait ; étapes cochées à la main avant la 1.17.0 crues, avec « notez le montant »).
+⏰ Pénalité de l'article 4 (par jour, plafonnée, annulation possible) comptée seulement pour un contrat signé, retirée du « reste » partout.
+📦 Réception chez le cargo : scanner des codes de carton à la chaîne (résultat affiché après la fermeture de l'écran de scan ; même
+étiquette relue à la réouverture pas comptée deux fois ; caméra fermée après 3 minutes sans lecture ; verrou toujours rendu), carton en
+trop signalé, code de pièce reconnu, contrôle de chaque produit (pièces, comme l'échantillon, problèmes, photo), date de réception
+seulement au 1er carton ou au verdict ; ✅ conforme → solde (pénalité retirée) ; ❌ → réclamation de l'article 7 en chinois + anglais,
+avec sa traduction. Seules les lignes du contrat (prix et quantité) sont attendues, contrôlées, facturées. 🧾 Liste de colisage (sans prix,
+toutes les lignes du contrat) et facture commerciale (prix du contrat, case signature et cachet du vendeur) en un PDF de 2 pages.
+🔎 Code de crédit social du vendeur vérifié sans Internet (GB 32100-2015, et le 2e chiffre de contrôle du code d'organisation, GB 11714),
+type (société / commerçant individuel) et ville d'enregistrement ; « O » tapé pour 0 corrigé et gardé. ✈️ Livraison après la fin du
+voyage : qui contrôlera. Bilan de chaque fournisseur sur sa fiche. Argent : « Ce que je dois encore aux fournisseurs ».
+Fichiers `suivi-1.17.0.html`, `suivi-1.17.0-reception.html`, `suivi-1.17.0-pilote.html`, `construire-1.17.0.py` (part de la 1.16.0).
+Tests : `tests/test-carnet-1170.js` (99 contrôles), la suite 1.16.0 rejouée (112), `test-maj-1170.js` (7), `test-reserve-1170.js` (10).
+Relecture indépendante avant mise en ligne, toutes ses remarques corrigées et rejouées dans le test. Rien de retiré.
+⚠ Même remarque pour `KYLO-Achats.html`.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

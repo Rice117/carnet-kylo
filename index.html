@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.15.0';
+window.KYLO_APPLICATION = '1.16.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -19241,6 +19241,1033 @@ ctAppliquerImport = async function () {
   setTimeout(() => avertir(blTexteBilan(r), 7000), 7200);
 };
 </script>
+<style>
+/* ===================== 1.16.0 — 30/10/2026 (Yiwu) =====================
+   Achats reliés au fournisseur · code-barres du carton · contrat : Alipay / espèces / WeChat Pay / virement, la ville du voyage.
+   Textes jamais sous 14 px. Couleurs = variables du carnet. */
+.ha-four{display:flex;gap:12px;align-items:center;width:100%;text-align:left;min-height:58px;padding:10px 12px;margin:6px 0;
+  border:2px solid var(--lisiere);border-radius:12px;background:var(--carte);color:var(--noir);font:inherit;font-size:16px;cursor:pointer}
+.ha-four b{font-size:17px}
+.ha-four small{font-size:14px;color:var(--texte-note);line-height:1.35}
+.ha-code{font-weight:900;color:var(--bleu);min-width:46px;font-size:17px}
+.ha-info{font-size:15px;line-height:1.45;background:var(--bleu-pale);border-radius:12px;padding:10px 12px;margin:6px 0}
+.ha-ligne{display:grid;grid-template-columns:30px 64px 1fr;gap:10px;align-items:start;padding:10px;margin:8px 0;
+  border:2px solid var(--lisiere);border-radius:12px;background:var(--carte)}
+.ha-ligne.on{border-color:var(--vert);background:var(--vert-pale)}
+.ha-ligne input[type=checkbox]{width:28px;height:28px;margin:18px 0 0}
+.ha-ligne img,.ha-ligne .ha-vide{width:64px;height:64px;object-fit:cover;border-radius:10px;background:var(--bleu-pale);
+  display:flex;align-items:center;justify-content:center;font-size:28px}
+.ha-ligne.rempl{grid-template-columns:64px 1fr}
+.ha-n{font-size:16px;font-weight:800;line-height:1.3;overflow-wrap:anywhere}
+.ha-p{font-size:15px;color:var(--texte-note);line-height:1.4;overflow-wrap:anywhere}
+.ha-champs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.ha-champs label{font-size:14px;font-weight:700;margin:0 0 2px;display:block}
+.ha-champs input{font-size:18px;font-weight:800;min-height:46px;width:100%;box-sizing:border-box}
+.ha-total{font-size:17px;line-height:1.45;font-weight:800;color:var(--bleu);margin:10px 0}
+.ha-total .att{color:var(--rouge);font-size:15px}
+.ha-nouveau{border:2px dashed var(--bleu);border-radius:12px;padding:10px 12px;margin:10px 0}
+.ha-nouveau label{font-size:15px;font-weight:700}
+.ha-nouveau input,.ha-nouveau textarea{font-size:17px}
+.ha-groupe .ha-g-tete{font-size:16px;line-height:1.4;margin-bottom:6px}
+.ha-groupe .ha-g-tete b{font-size:18px}
+.ha-groupe .ha-g-tete small{font-size:15px;color:var(--texte-note)}
+.ha-g-btns{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.ha-g-btns .b{min-height:52px;font-size:16px}
+.ha-carton{font-size:14px;color:var(--texte-note)}
+.as-prod .modif{flex:none;border:0;background:none;font-size:22px;min-width:44px;min-height:44px;color:var(--bleu)}
+.ctn-zone{margin:12px 0;padding:10px 12px;border-radius:12px;background:var(--bleu-pale);font-size:15px;line-height:1.45}
+.ctn-zone p{margin:6px 0;font-size:15px}
+.ctn-titre{font-size:16px;font-weight:900;color:var(--bleu)}
+.ctn-svg{text-align:center;margin:6px 0;overflow-x:auto}
+.ctn-svg svg{max-width:100%;height:auto;background:#fff;border-radius:6px}
+.ctn-l{font-size:15px;line-height:1.4;padding:8px 0;border-top:1px solid var(--lisiere)}
+.ctn-l svg{max-width:100%;height:auto;background:#fff;display:block;margin:6px auto 0}
+.pay-modes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0}
+.pay-modes label{display:flex;gap:8px;align-items:center;font-size:16px;font-weight:800;min-height:56px;margin:0;line-height:1.2;
+  border:2px solid var(--lisiere);border-radius:12px;padding:8px 10px;background:var(--carte);cursor:pointer}
+.pay-modes label small{display:block;font-size:14px;font-weight:700;color:var(--texte-note)}
+.pay-modes label.on{border-color:var(--vert);background:var(--vert-pale)}
+.pay-modes input{width:24px;height:24px;flex:none}
+.pay-z{margin:6px 0 10px}
+.pay-z[hidden]{display:none}
+</style>
+<script>
+// =====================================================================================================
+//  CARNET 1.16.0 — 30/10/2026 (Yiwu, 1 h 17 du matin)
+//  Riche, après sa première commande signée à Yiwu (5 produits, un contrat du carnet) :
+//   - « les produits par unités doivent avoir leur code-barres, mais dans le carton auquel ils sont, il doit aussi avoir un
+//     code-barres » → le code du carton (Code 128) dans chaque achat, et les étiquettes pièces + cartons à envoyer au fournisseur ;
+//   - « on m'a demandé de remplir avec mon numéro de carte bancaire… la plupart des paiements se font sur Alipay ou espèces, rare
+//     que ce soit par virement » → le contrat demande COMMENT on paie (Alipay, WeChat Pay, espèces, virement) ; le compte écrit
+//     est celui DU VENDEUR, et le carnet crie s'il ressemble au sien ou à une carte ;
+//   - « il s'est pointé automatiquement à Guangzhou et pourtant on est à Yiwu : il faut que le contrat s'adapte » → la ville
+//     du fournisseur (Yiwu = 义乌) partout dans le contrat ;
+//   - « quand tu rentres dans achat, il doit te demander le fournisseur… tous les produits que tu as sélectionnés là-bas avec
+//     leur prix… tu peux sélectionner, le reste peut partir… ajouter un autre produit de son magasin même s'il n'était pas
+//     enregistré » → « 🛒 Ajouter un achat » commence par le fournisseur, puis ses produits à cocher ;
+//   - « je ne pouvais pas enlever la photo déjà prise pour la remplacer par un nouveau produit avec une nouvelle description »
+//     → enlever / changer la photo, le nom, la description d'un produit noté et d'un achat, ou remplacer l'achat par un autre produit.
+//  Rien n'est retiré du carnet : ce qui n'est pas coché reste dans la fiche du fournisseur.
+// =====================================================================================================
+window.KYLO_ACHATS_RELIES = '1.16.0';
+
+// ---------- 1. Le Code 128 (le code du carton : chiffres, tiret et lettre) ----------
+// Table standard des 106 symboles + l'arrêt (largeurs barre/espace), vérifiée contre python-barcode.
+const C128_L = ('212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 112232 122132 122231 113222 123122 123221 223211 221132 '
+  + '221231 213212 223112 312131 311222 321122 321221 312212 322112 322211 212123 212321 232121 111323 131123 131321 112313 132113 132311 211313 231113 231311 '
+  + '112133 112331 132131 113123 113321 133121 313121 211331 231131 213113 213311 213131 311123 311321 331121 312113 312311 332111 314111 221411 431111 111224 '
+  + '111422 121124 121421 141122 141221 112214 112412 122114 122411 142112 142211 241211 221114 413111 241112 134111 111242 121142 121241 114212 124112 124211 '
+  + '411212 421112 421211 212141 214121 412121 111143 111341 131141 114113 114311 411113 411311 113141 114131 311141 411131 211412 211214 211232 2331112').split(' ');
+function c128Valeurs(t) {
+  t = String(t || '');
+  if (!t || /[^\x20-\x7e]/.test(t)) throw new Error('code 128 : caractères non permis');
+  const chiffres = (k) => { let n = 0; while (k + n < t.length && t.charCodeAt(k + n) >= 48 && t.charCodeAt(k + n) <= 57) n++; return n; };
+  const v = []; let jeu, i = 0;
+  if (chiffres(0) >= 4) { jeu = 'C'; v.push(105); } else { jeu = 'B'; v.push(104); }
+  while (i < t.length) {
+    const n = chiffres(i);
+    if (jeu === 'C') {
+      if (n >= 2) { v.push(Number(t.substr(i, 2))); i += 2; continue; }
+      v.push(100); jeu = 'B'; continue;
+    }
+    if (n >= 6) {
+      if (n % 2) { v.push(t.charCodeAt(i) - 32); i++; }
+      v.push(99); jeu = 'C'; continue;
+    }
+    v.push(t.charCodeAt(i) - 32); i++;
+  }
+  let s = v[0]; for (let j = 1; j < v.length; j++) s += v[j] * j;
+  v.push(s % 103);
+  return v;
+}
+function c128Bits(t) {
+  let b = '';
+  c128Valeurs(t).concat([106]).forEach(x => { C128_L[x].split('').forEach((w, j) => { b += (j % 2 ? '0' : '1').repeat(Number(w)); }); });
+  return b;
+}
+function c128Svg(t, h, lm) {
+  let bits; try { bits = c128Bits(t); } catch (e) { return ''; }
+  h = h || 50; lm = lm || 1.6;
+  const q = 10 * lm, tt = Math.max(14, Math.round(h * 0.28));   // les chiffres sous les barres : jamais sous 14 px
+  let d = '', x = q;
+  for (let i = 0; i < bits.length;) {
+    if (bits[i] === '1') { let n = 0; while (bits[i + n] === '1') n++; d += 'M' + x.toFixed(2) + ' 3h' + (n * lm).toFixed(2) + 'v' + h + 'h-' + (n * lm).toFixed(2) + 'z'; x += n * lm; i += n; }
+    else { x += lm; i++; }
+  }
+  const L = 2 * q + bits.length * lm, H = 3 + h + tt * 1.45;
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + L.toFixed(0) + '" height="' + H.toFixed(0) + '" viewBox="0 0 ' + L.toFixed(2) + ' ' + H.toFixed(2)
+    + '" shape-rendering="crispEdges" role="img" aria-label="Code-barres ' + E(t) + '"><rect width="' + L.toFixed(2) + '" height="' + H.toFixed(2) + '" fill="#fff"/>'
+    + '<path fill="#000" d="' + d + '"/><text x="' + (L / 2).toFixed(2) + '" y="' + (3 + h + tt * 1.15).toFixed(2) + '" text-anchor="middle" font-family="monospace" font-weight="700" font-size="'
+    + tt + '" shape-rendering="auto">' + E(t) + '</text></svg>';
+}
+// Le code de la pièce dessiné dans les fenêtres du carnet : chiffres à 14 px au moins (la règle des écritures). La planche
+// d'étiquettes du magasin (plancheEtiquettes) garde son dessin d'avant : elle ne change pas de taille.
+function e13Grand(code) { return ean13Svg(code, 58, 1.5); }
+// Les barres d'un EAN-13 (les mêmes que ean13Svg, pour les dessiner dans une image).
+function e13Bits(code) {
+  const c = String(code || '').replace(/\D/g, '');
+  if (!ean13Valide(c)) return '';
+  const par = EAN_PAR[Number(c[0])];
+  let bits = '101';
+  for (let i = 1; i <= 6; i++) bits += (par[i - 1] === 'A' ? EAN_A : EAN_B)[Number(c[i])];
+  bits += '01010';
+  for (let i = 7; i <= 12; i++) bits += EAN_C[Number(c[i])];
+  return bits + '101';
+}
+// Dessine des barres dans une image, centrées, avec une largeur de barre en points ENTIERS (sinon un lecteur peut se tromper).
+function lbBarres(g, bits, cx, y, largeurMax, h) {
+  const lm = Math.max(1, Math.floor(largeurMax / (bits.length + 22)));
+  const L = bits.length * lm, x0 = Math.round(cx - L / 2);
+  g.fillStyle = '#fff'; g.fillRect(x0 - 11 * lm, y - 4, L + 22 * lm, h + 8);
+  g.fillStyle = '#000';
+  for (let i = 0; i < bits.length;) { if (bits[i] === '1') { let n = 0; while (bits[i + n] === '1') n++; g.fillRect(x0 + i * lm, y, n * lm, h); i += n; } else i++; }
+  return { x0, L, lm };
+}
+
+// ---------- 1 bis. Les messages du carnet se voient aussi quand une fenêtre est ouverte ----------
+// Une fenêtre (dialog) passe devant tout le reste de la page : le message « appuyez ENCORE pour confirmer » restait caché
+// derrière elle. Il se range maintenant DANS la fenêtre ouverte, et revient dans la page quand elle est fermée.
+const avisAvant = avertir;
+avertir = function (texte, duree) {
+  const r = avisAvant.apply(this, arguments);
+  const z = document.getElementById('avisCarnet'), ouvertes = [...document.querySelectorAll('dialog[open]')], d = ouvertes[ouvertes.length - 1];
+  if (z) { const cible = d || document.body; if (z.parentElement !== cible) cible.appendChild(z); }
+  return r;
+};
+const avisFermerAvant = fermerBoite;
+fermerBoite = function () {
+  const r = avisFermerAvant.apply(this, arguments);
+  const z = document.getElementById('avisCarnet'); if (z && z.parentElement !== document.body) document.body.appendChild(z);   // le message reste lisible
+  return r;
+};
+
+// ---------- 2. Le carton : son code, combien de cartons, le dernier carton incomplet ----------
+// Le code du carton = le code de la pièce + « -C » + le nombre de pièces dans CE carton (la règle du carnet, Voyage → Arme 18) :
+// à Conakry, un scan du carton compte ses pièces d'un coup.
+function ctnPcs(a) {
+  const qc = num(a.qte_carton); if (qc > 0) return qc;
+  const q = num(a.quantite); return num(a.cartons) === 1 && q > 0 ? q : 0;
+}
+function ctnCodeCarton(a, pcs) { const c = String(a.code_barres || '').trim(); return c && pcs > 0 ? c + '-C' + pcs : ''; }
+function ctnPlan(L) {
+  const lignes = [], sans = []; let k = 1;
+  L.forEach(x => {
+    const a = x.a || x, n = x.n || 0, pcs = ctnPcs(a), q = num(a.quantite);
+    if (!(pcs > 0) || !(q > 0)) { sans.push(a); return; }
+    const pleins = Math.floor(q / pcs), reste = q - pleins * pcs;
+    if (pleins) { lignes.push({ a, n, pcs, nb: pleins, de: k, dernier: false }); k += pleins; }
+    if (reste) { lignes.push({ a, n, pcs: reste, nb: 1, de: k, dernier: true }); k += 1; }
+  });
+  return { lignes, total: k - 1, sans };
+}
+function ctnZoneHtml(code, qc, ct, qt) {
+  const pcs = qc > 0 ? qc : (ct === 1 && qt > 0 ? qt : 0);
+  let h = '<div class="ctn-titre">📦 Le code-barres du carton</div>';
+  if (!code) return h + '<p>Il vient avec le code de la pièce : créez (ou tapez) d\'abord le code-barres ci-dessus.</p>';
+  if (!(pcs > 0)) return h + '<p>Combien de pièces dans UN carton ? Tapez « Qté / carton » plus haut' + (qt > 0 ? ', ou :' : '.') + '</p>'
+    + (qt > 0 ? '<button type="button" class="b contour" onclick="ctnUnCarton()">📦 Tout dans un seul carton (' + E(nf(qt)) + ' pièces)</button>' : '');
+  const pleins = qt > 0 ? Math.floor(qt / pcs) : Math.max(1, ct || 1), reste = qt > 0 ? qt - pleins * pcs : 0;
+  h += '<div class="ctn-svg">' + c128Svg(code + '-C' + pcs, 56, 1.6) + '</div>'
+    + '<p>À coller sur ' + (pleins > 1 ? 'chacun des <b>' + E(nf(pleins)) + ' cartons</b>' : '<b>le carton</b>') + ' de ' + E(nf(pcs)) + ' pièces. À Conakry, un scan du carton compte ses '
+    + E(nf(pcs)) + ' pièces d\'un coup.</p>';
+  if (reste > 0) h += '<p>Le dernier carton n\'a que <b>' + E(nf(reste)) + ' pièce' + (reste > 1 ? 's' : '') + '</b> : il a son propre code.</p><div class="ctn-svg">' + c128Svg(code + '-C' + reste, 56, 1.6) + '</div>';
+  return h;
+}
+function ctnMaj() {
+  const z = document.getElementById('ctn_zone'); if (!z) return;
+  const v = (id) => { const e = document.getElementById(id); return e ? e.value : ''; };
+  z.innerHTML = ctnZoneHtml(String(v('a_cb')).trim(), num(v('a_qc')), num(v('a_ct')), num(v('a_qt')));
+}
+function ctnUnCarton() {
+  const qt = document.getElementById('a_qt'), qc = document.getElementById('a_qc'), ct = document.getElementById('a_ct');
+  if (!qt || !qc || !ct || !(num(qt.value) > 0)) return;
+  qc.value = num(qt.value); ct.value = 1;
+  [qc, ct].forEach(e => e.dispatchEvent(new Event('input')));
+  ctnMaj();
+  avertir('📦 Tout dans un seul carton : ' + nf(num(qt.value)) + ' pièces. Touchez « Enregistrer ».', 4000);
+}
+// Dans quel ordre : celui du contrat (ligne 1, 2, 3…), puis ce qui n'y est pas encore (sans prix ou sans quantité).
+function ctnAchatsDe(fid) {
+  const f = fid ? mkFournisseur(fid) : null;
+  const A = (C.achats || []).filter(a => f ? a.fournisseur_id === f.id : !(a.fournisseur_id && mkFournisseur(a.fournisseur_id)));
+  const dansContrat = A.filter(a => num(a.quantite) > 0 && num(a.prix_unitaire) > 0);
+  return dansContrat.map((a, i) => ({ a, n: f ? i + 1 : 0 })).concat(A.filter(a => !dansContrat.includes(a)).map(a => ({ a, n: 0 })));
+}
+
+// ---------- 3. Les étiquettes à envoyer au fournisseur (pièces + cartons), en PDF ----------
+function ctnBoite(fid) {
+  const f = fid ? mkFournisseur(fid) : null, L = ctnAchatsDe(fid), k = f ? ctrContrat(f) : null;
+  const avecCode = L.filter(x => String(x.a.code_barres || '').trim()), sansCode = L.filter(x => !String(x.a.code_barres || '').trim());
+  const plan = ctnPlan(avecCode);
+  const nomL = (x) => (x.n ? 'Ligne ' + x.n + ' · ' : '') + (x.a.nom || 'Sans nom');
+  mkBoite(`<div class="mk-dlg ct-champs"><h3>🏷 Codes-barres — ${f ? E(mkNomFournisseur(f)) : 'achats sans fournisseur'}</h3>
+    <p class="px-aide">Un code par <b>pièce</b> (sur la boîte de chaque produit) et un code par <b>carton</b> (sur chaque gros carton : à Conakry, un seul scan compte toutes ses pièces).</p>
+    ${sansCode.length ? `<div class="ctr-attention">${E(sansCode.length)} produit(s) sans code-barres : ${E(sansCode.map(nomL).join(' ; '))}.
+      ${resteDuBloc() > 0 ? `<div style="height:8px"></div><button type="button" class="b vert" onclick="ctnCreerCodes('${fid || ''}')">🏷 Leur créer un code maintenant (${E(nf(resteDuBloc()))} restants dans le bloc)</button>`
+        : '<br>Pas de bloc de codes dans ce carnet : Voyage → « Les codes-barres du voyage ».'}</div>` : ''}
+    <div class="px-titre">Par pièce (${avecCode.length})</div>
+    ${avecCode.map(x => `<div class="ctn-l"><b>${E(nomL(x))}</b> — ${E(nf(x.a.quantite))} pièces${ean13Valide(x.a.code_barres) ? e13Grand(x.a.code_barres) : '<br><b>' + E(x.a.code_barres) + '</b>'}</div>`).join('') || '<p class="px-aide">Aucun.</p>'}
+    <div class="px-titre">Par carton (${E(nf(plan.total))} carton${plan.total > 1 ? 's' : ''})</div>
+    ${plan.lignes.map(x => `<div class="ctn-l"><b>${x.nb > 1 ? 'Cartons ' + x.de + ' à ' + (x.de + x.nb - 1) : 'Carton ' + x.de} / ${plan.total}</b> — ${E(x.a.nom || '')} · ${E(nf(x.pcs))} pièce${x.pcs > 1 ? 's' : ''}${x.dernier ? ' (dernier carton)' : ''}${c128Svg(ctnCodeCarton(x.a, x.pcs), 46, 1.4)}</div>`).join('') || '<p class="px-aide">Aucun.</p>'}
+    ${plan.sans.length ? `<div class="ctr-attention">Pièces par carton pas encore notées : ${E(plan.sans.map(a => a.nom || 'Sans nom').join(' ; '))}.
+      <div style="height:8px"></div><button type="button" class="b contour" onclick="ctnUnCartonChacun('${fid || ''}')">📦 Chacun dans un seul carton (toutes ses pièces)</button>
+      <p style="margin:6px 0 0;font-size:15px;font-weight:400">Sinon : ouvrez l'achat et tapez « Qté / carton ».</p></div>` : ''}
+    <div class="px-titre">Pour le fournisseur</div>
+    <div class="px-boutons"><button type="button" class="b" style="background:#1aad19;color:#fff" onclick="ctnEnvoyer('${fid || ''}')" ${avecCode.length ? '' : 'disabled'}>📤 Les étiquettes (PDF) → WeChat</button></div>
+    <div id="ctn_apercu" class="ctr-apercu"></div>
+    <p class="px-aide">Il imprime le code de chaque pièce sur sa boîte, et l'étiquette de chaque carton sur le carton${k ? ' (n° du contrat ' + E(k.no) + ' écrit dessus)' : ''}. Aucun prix sur les étiquettes.</p>
+    <div class="mk-boutons"><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+}
+function ctnCreerCodes(fid) {
+  let n = 0, err = '';
+  ctnAchatsDe(fid).forEach(({ a }) => {
+    if (String(a.code_barres || '').trim()) return;
+    const r = prochainCodeCarnet(a);
+    if (r.code) { a.code_barres = r.code; a.code_maison = true; a.famille = a.famille || r.famille; n++; } else if (r.erreur) err = r.erreur;
+  });
+  sauverLocal(); ctnBoite(fid);
+  avertir(n ? '🏷 ' + n + ' code(s)-barres créé(s).' : (err || 'Rien à créer.'), 5000);
+}
+function ctnUnCartonChacun(fid) {
+  let n = 0;
+  ctnAchatsDe(fid).forEach(({ a }) => { if (!(ctnPcs(a) > 0) && num(a.quantite) > 0) { a.qte_carton = num(a.quantite); a.cartons = 1; n++; } });
+  sauverLocal(); ctnBoite(fid);
+  if (n) avertir('📦 ' + n + ' produit(s) : toutes les pièces dans un seul carton.', 4000);
+}
+// Les pages A4 (150 points par pouce, comme le contrat) : d'abord les étiquettes des pièces (6 par page), puis celles des cartons (2 par page).
+async function ctnPages(fid) {
+  const f = fid ? mkFournisseur(fid) : null, k = f ? ctrContrat(f) : null;
+  const L = ctnAchatsDe(fid).filter(x => String(x.a.code_barres || '').trim()), plan = ctnPlan(L);
+  const photos = new Map();
+  for (const x of L) { if (x.a.photo && !photos.has(x.a.id)) { try { photos.set(x.a.id, await trImage(x.a.photo)); } catch (e) { /* sans photo */ } } }
+  const W = CTR_W, H = CTR_H, M = 60, pages = []; let g = null;
+  const nouvelle = (titre) => {
+    const c = document.createElement('canvas'); c.width = W; c.height = H; g = c.getContext('2d'); pages.push(c);
+    g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.textBaseline = 'alphabetic';
+    g.fillStyle = '#16233a'; g.font = 'bold 26px ' + CTR_POLICE; g.fillText(titre, M, 50);
+    g.font = '20px ' + CTR_POLICE; g.fillStyle = '#5a6b85'; g.textAlign = 'right'; g.fillText(k ? k.no : 'KYLO EURGUINE', W - M, 50); g.textAlign = 'left';
+  };
+  const texteCentre = (t, cx, y, taille, gras, l) => { g.font = (gras ? 'bold ' : '') + taille + 'px ' + CTR_POLICE; let s = String(t);
+    while (l && g.measureText(s).width > l && s.length > 4) s = s.slice(0, -2) + '…'; g.textAlign = 'center'; g.fillText(s, cx, y); g.textAlign = 'left'; };
+  const photo = (a, x, y, w, h) => { const im = photos.get(a.id); if (!im) return; const e = Math.min(w / im.width, h / im.height);
+    const pw = im.width * e, ph = im.height * e; g.drawImage(im, x + (w - pw) / 2, y + (h - ph) / 2, pw, ph); g.strokeStyle = '#9aa7ba'; g.lineWidth = 2; g.strokeRect(x + (w - pw) / 2, y + (h - ph) / 2, pw, ph); };
+  const coupe = (x, y, w, h) => { g.save(); g.setLineDash([10, 8]); g.strokeStyle = '#b9c2cf'; g.lineWidth = 2; g.strokeRect(x, y, w, h); g.restore(); };
+  // Les pièces : 2 colonnes × 3 rangées.
+  const lw = (W - 2 * M - 30) / 2, lh = 500;
+  L.forEach((x, i) => {
+    if (i % 6 === 0) nouvelle('标签 · 每件产品一个 — Étiquettes par pièce (une par produit)');
+    const col = i % 2, row = Math.floor((i % 6) / 2), x0 = M + col * (lw + 30), y0 = 80 + row * (lh + 18), cx = x0 + lw / 2, a = x.a;
+    coupe(x0, y0, lw, lh); g.fillStyle = '#16233a';
+    texteCentre('KYLO EURGUINE', cx, y0 + 42, 30, true);
+    texteCentre((x.n ? '合同第 ' + x.n + ' 项 · ' : '') + '×' + nf(a.quantite) + ' 个', cx, y0 + 80, 26, true, lw - 20);
+    texteCentre((x.n ? 'Ligne ' + x.n + ' · ' : '') + String(a.nom || '').split(' — ')[0], cx, y0 + 112, 22, false, lw - 30);
+    photo(a, x0 + (lw - 170) / 2, y0 + 126, 170, 150);
+    const bits = e13Bits(a.code_barres);
+    if (bits) { lbBarres(g, bits, cx, y0 + 296, lw - 40, 130); g.fillStyle = '#000'; texteCentre(a.code_barres, cx, y0 + 470, 34, true); }
+    else { g.fillStyle = '#000'; try { lbBarres(g, c128Bits(a.code_barres), cx, y0 + 296, lw - 40, 130); } catch (e) { /* illisible */ } texteCentre(a.code_barres, cx, y0 + 470, 30, true, lw - 20); }
+  });
+  // Les cartons : 2 par page (1 étiquette par sorte de carton ; « 箱号 __ / N » à remplir quand il y en a plusieurs pareils).
+  const ch = (H - 110 - 30) / 2;
+  plan.lignes.forEach((x, i) => {
+    if (i % 2 === 0) nouvelle('箱唛 · 外箱标签 — Étiquettes des cartons (' + plan.total + ' carton' + (plan.total > 1 ? 's' : '') + ')');
+    const y0 = 80 + (i % 2) * (ch + 30), x0 = M, w = W - 2 * M, cx = W / 2, a = x.a, code = ctnCodeCarton(a, x.pcs);
+    coupe(x0, y0, w, ch); g.fillStyle = '#000';
+    texteCentre('KYLO EURGUINE', cx, y0 + 74, 64, true);
+    texteCentre('CONAKRY – GUINÉE  几内亚 科纳克里', cx, y0 + 122, 34, true);
+    texteCentre((k ? '合同号 Contract ' + k.no : '') + (x.n ? '  第 ' + x.n + ' 项' : ''), cx, y0 + 168, 32, true, w - 40);
+    photo(a, x0 + 40, y0 + 190, 230, 230);
+    const xt = x0 + 300; g.textAlign = 'left'; g.fillStyle = '#000';
+    g.font = 'bold 44px ' + CTR_POLICE; g.fillText('每箱 ' + nf(x.pcs) + ' 个', xt, y0 + 236);
+    g.font = '28px ' + CTR_POLICE; g.fillText(nf(x.pcs) + ' pièce' + (x.pcs > 1 ? 's' : '') + ' dans ce carton' + (x.dernier ? ' (dernier carton)' : ''), xt, y0 + 280);
+    g.font = 'bold 44px ' + CTR_POLICE;
+    g.fillText(x.nb > 1 ? '箱号 C/No. ____ / ' + plan.total : '箱号 C/No. ' + x.de + ' / ' + plan.total, xt, y0 + 346);
+    g.font = '26px ' + CTR_POLICE; g.fillStyle = '#333';
+    g.fillText(x.nb > 1 ? 'Imprimer ' + x.nb + ' fois : cartons ' + x.de + ' à ' + (x.de + x.nb - 1) : String(a.nom || '').split(' — ')[0].slice(0, 40), xt, y0 + 396);
+    g.fillStyle = '#000';
+    try { lbBarres(g, c128Bits(code), cx, y0 + 440, w - 80, 170); } catch (e) { texteCentre('(code illisible : corrigez-le dans l\'achat)', cx, y0 + 540, 30, false); }
+    texteCentre(code, cx, y0 + 660, 48, true);
+  });
+  return pages;
+}
+async function ctnEnvoyer(fid) {
+  const z = document.getElementById('ctn_apercu'); if (z) z.innerHTML = '<p class="px-aide">⏳ Les étiquettes se préparent…</p>';
+  try {
+    const pages = await ctnPages(fid);
+    if (!pages.length) { if (z) z.innerHTML = ''; avertir('Aucun produit avec un code-barres.'); return; }
+    const jpegs = pages.map(c => { const u = c.toDataURL('image/jpeg', 0.95), b = atob(u.split(',')[1]), o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return { w: c.width, h: c.height, octets: o }; });
+    if (z) z.innerHTML = pages.map((c, i) => `<img src="${c.toDataURL('image/jpeg', 0.6)}" alt="Page ${i + 1}" onclick="mkApercu(this.src, 'Page ${i + 1}')">`).join('');
+    const f = fid ? mkFournisseur(fid) : null, k = f ? ctrContrat(f) : null;
+    await remettreFichier(ctrPdf(jpegs), 'Etiquettes-标签-' + (k ? k.no : 'KYLO') + '.pdf');
+  } catch (e) { if (z) z.innerHTML = '<div class="ctr-attention">Les étiquettes n\'ont pas pu être préparées : ' + E(e.message || e) + '</div>'; }
+}
+// Arme 18 (Conteneur et cartons) : le vrai code-barres du carton, plus seulement son texte.
+etiquettesCartons = function (idA) {
+  const a = trouverAchat(idA); if (!a) return;
+  const plan = ctnPlan([{ a, n: 0 }]);
+  boite(`<h3>Cartons de « ${E(a.nom || 'ce produit')} »</h3>
+    ${!String(a.code_barres || '').trim() ? '<p class="muet">Ce produit n\'a pas encore de code-barres : ouvrez l\'achat, « Créer le code-barres maintenant ».</p>'
+      : plan.lignes.length ? plan.lignes.map(x => `<div class="ctn-l"><b>${x.nb > 1 ? 'Cartons ' + x.de + ' à ' + (x.de + x.nb - 1) : 'Carton ' + x.de} / ${plan.total}</b> — ${E(nf(x.pcs))} pièce${x.pcs > 1 ? 's' : ''}${x.dernier ? ' (dernier)' : ''}${c128Svg(ctnCodeCarton(a, x.pcs), 46, 1.4)}</div>`).join('')
+      : '<p class="muet">Notez dans l\'achat combien de pièces il y a dans UN carton (« Qté / carton »).</p>'}
+    <div style="height:10px"></div>
+    ${a.fournisseur_id && mkFournisseur(a.fournisseur_id) ? `<button class="b contour" onclick="fermerBoite();ctnBoite('${a.fournisseur_id}')">🏷 Toutes les étiquettes de ce fournisseur (PDF)</button><div style="height:8px"></div>` : ''}
+    <button class="b gris" onclick="fermerBoite()">Fermer</button>`);
+};
+</script>
+<script>
+// ---------- 4. Le contrat : COMMENT on paie (Alipay, WeChat Pay, espèces, virement), et la ville du fournisseur ----------
+// Riche : « on m'a demandé de remplir avec mon numéro de carte bancaire… la plupart des paiements se font sur Alipay ou espèces,
+// rare par virement… il s'est pointé automatiquement à Guangzhou et pourtant on est à Yiwu ».
+const PAY_MODES = [
+  { k: 'alipay', cn: '支付宝', en: 'Alipay', fr: 'Alipay', ic: '🔵' },
+  { k: 'wechat', cn: '微信支付', en: 'WeChat Pay', fr: 'WeChat Pay', ic: '🟢' },
+  { k: 'especes', cn: '现金', en: 'cash', fr: 'espèces', ic: '💵' },
+  { k: 'virement', cn: '银行转账', en: 'bank transfer', fr: 'virement bancaire', ic: '🏦' }];
+const PAY_VILLES = { yiwu: ['义乌', 'Yiwu'], guangzhou: ['广州', 'Guangzhou'], canton: ['广州', 'Guangzhou'], shenzhen: ['深圳', 'Shenzhen'], ningbo: ['宁波', 'Ningbo'],
+  foshan: ['佛山', 'Foshan'], shantou: ['汕头', 'Shantou'], dongguan: ['东莞', 'Dongguan'], jieyang: ['揭阳', 'Jieyang'], zhongshan: ['中山', 'Zhongshan'],
+  hangzhou: ['杭州', 'Hangzhou'], shanghai: ['上海', 'Shanghai'], wenzhou: ['温州', 'Wenzhou'], jinhua: ['金华', 'Jinhua'], yongkang: ['永康', 'Yongkang'],
+  xiamen: ['厦门', 'Xiamen'], quanzhou: ['泉州', 'Quanzhou'], chaozhou: ['潮州', 'Chaozhou'], taizhou: ['台州', 'Taizhou'], cixi: ['慈溪', 'Cixi'] };
+function payVille(k) {
+  const t = String((k && k.ville) || '').trim() || 'Yiwu';
+  if (/[一-鿿]/.test(t)) { const e = Object.values(PAY_VILLES).find(x => t.indexOf(x[0]) >= 0); return { cn: t, en: e ? e[1] : t, fr: e ? e[1] : t }; }
+  const x = PAY_VILLES[normaliserNom(t).replace(/[^a-z]/g, '')];
+  return x ? { cn: x[0], en: x[1], fr: x[1] } : { cn: t, en: t, fr: t };
+}
+function payVilleDe(f) {
+  if (f && typeof VL_VILLES !== 'undefined' && VL_VILLES[f.ville]) return VL_VILLES[f.ville].nom;
+  return typeof vlVilleActuelle === 'function' ? vlVilleActuelle() : 'Yiwu';
+}
+function payModes(k) { return Array.isArray(k && k.paiement) ? k.paiement.filter(m => PAY_MODES.some(p => p.k === m)) : []; }
+// Un compte qui ressemble à celui de l'ACHETEUR (son nom, KYLO, une banque française ou guinéenne) ou à une carte Visa / Mastercard.
+const PAY_BANQUES_ACHETEUR = /cr[eé]dit\s*mutuel|\bcic\b|\bbnp\b|soci[eé]t[eé]\s*g[eé]n[eé]rale|\blcl\b|cr[eé]dit\s*agricole|banque\s*postale|caisse\s*d.?[eé]pargne|banque\s*populaire|boursorama|revolut|\bn26\b|hello\s*bank|fortuneo|orange\s*bank|ecobank|\buba\b|bicigui|vista\s*bank|\bsgbg\b|orabank|afriland|\bbsic\b|wise\b|paypal/i;
+function payLuhn(d) { let s = 0; for (let i = 0; i < d.length; i++) { let x = Number(d[d.length - 1 - i]); if (i % 2) { x *= 2; if (x > 9) x -= 9; } s += x; } return s % 10 === 0; }
+function payCarte(numero) {
+  const d = String(numero || '').replace(/[\s-]/g, '');
+  if (!/^\d{13,19}$/.test(d) || !payLuhn(d)) return false;
+  const p4 = Number(d.slice(0, 4));
+  return /^4/.test(d) || /^5[1-5]/.test(d) || (p4 >= 2221 && p4 <= 2720) || /^3[47]/.test(d);   // Visa, Mastercard, Amex (pas UnionPay 62 : les comptes chinois)
+}
+function payCompteAcheteur(v) {
+  const a = ctrAcheteur(), nom = normaliserNom(v.titulaire).replace(/[^a-z0-9一-鿿]/g, '');
+  const raisons = [];
+  if (nom && (nom.indexOf('kylo') >= 0 || (a.representant && nom === normaliserNom(a.representant).replace(/[^a-z0-9一-鿿]/g, '')))) raisons.push('le titulaire « ' + v.titulaire + ' » est vous (KYLO)');
+  if (PAY_BANQUES_ACHETEUR.test(String(v.banque || ''))) raisons.push('la banque « ' + v.banque + ' » est une banque de France ou de Guinée');
+  if (/^(FR|GN)\d{2}/i.test(String(v.compte || '').replace(/\s/g, ''))) raisons.push('le numéro est un IBAN de France ou de Guinée');
+  return raisons;
+}
+function payDefaut(f) {
+  const v = f.vendeur_legal;
+  if (v && String(v.compte || '').trim() && !payCompteAcheteur(v).length && !payCarte(v.compte)) return ['virement'];
+  return ['alipay', 'especes'];
+}
+const payContratAvant = ctrContrat;
+ctrContrat = function (f) {
+  const k = payContratAvant.apply(this, arguments);
+  if (!Array.isArray(k.paiement)) k.paiement = payDefaut(f);
+  if (!String(k.ville || '').trim()) k.ville = payVilleDe(f);
+  return k;
+};
+CTR_ETAPES.forEach(e => { if (e[0] === 'acompte') e[1] = '💵 Acompte payé (avec un reçu)'; });
+// La description de chaque achat entre dans la case « Produit / modèle » du contrat.
+function payCourt(t, n) { return t.length > n ? t.slice(0, n - 1).trim() + '…' : t; }
+const payAchatsDeAvant = ctrAchatsDe;
+ctrAchatsDe = function (f) {
+  return payAchatsDeAvant.apply(this, arguments).map(a => String(a.description || '').trim()
+    ? Object.assign({}, a, { reference: [a.reference, payCourt(String(a.description).trim(), 60)].filter(Boolean).join(' · ') }) : a);
+};
+const payTextesAvant = ctrTextes;
+ctrTextes = function (f, k, langue) {
+  const r = payTextesAvant.apply(this, arguments), T = r.T, v = ctrVendeur(f), vi = payVille(k), modes = payModes(k);
+  const nb = (x) => String(x || '').replace(/ /g, ' '), trou = '________';
+  // 1. Le lieu de signature : la ville du fournisseur (Yiwu = 义乌), plus « Guangzhou » écrit d'office.
+  T.entete = { cn: T.entete.cn.replace('签订地点：中国广州', '签订地点：中国' + vi.cn), en: T.entete.en.replace('Place: Guangzhou, China', 'Place: ' + vi.en + ', China'),
+    fr: T.entete.fr.replace('Lieu : Canton (Guangzhou), Chine', 'Lieu : ' + vi.fr + ', Chine') };
+  // 2. Le lieu de livraison : l'entrepôt du transitaire DANS CETTE VILLE ; une adresse écrite en français est expliquée en chinois.
+  const art4 = T.articles[3], p4 = art4 && art4.p[0], lieu = String(k.lieu || '').trim();
+  if (p4 && !lieu) {
+    p4.cn = p4.cn.replace('买方指定的广州货代仓库（地址由买方提供）', '买方指定的' + vi.cn + '货代仓库（地址由买方提供）');
+    p4.en = p4.en.replace('the Buyer\'s forwarder warehouse in Guangzhou (address given by the Buyer)', 'the Buyer\'s forwarder warehouse in ' + vi.en + ' (address given by the Buyer)');
+    p4.fr = p4.fr.replace('l\'entrepôt du transitaire de l\'acheteur à Canton (adresse donnée par l\'acheteur)', 'l\'entrepôt du transitaire de l\'acheteur à ' + vi.fr + ' (adresse donnée par l\'acheteur)');
+  } else if (p4 && lieu && !/[一-鿿]/.test(lieu)) {
+    p4.cn = p4.cn.replace('交货地点：' + lieu + '。', '交货地点：买方指定的' + vi.cn + '货代仓库（' + lieu + '）。');
+  }
+  // 3. Le paiement : les moyens choisis ; les comptes DU VENDEUR seulement ; un reçu pour les espèces.
+  const art5 = T.articles[4];
+  if (art5 && art5.p.length >= 2) {
+    const M = PAY_MODES.filter(m => modes.indexOf(m.k) >= 0), pl = M.length > 1;
+    const p = [art5.p[0], art5.p[1]];
+    p.push(M.length ? { cn: '付款方式：' + M.map(m => m.cn).join('、') + '。', en: 'Payment method' + (pl ? 's' : '') + ': ' + M.map(m => m.en).join(', ') + '.',
+      fr: 'Moyen' + (pl ? 's' : '') + ' de paiement : ' + M.map(m => m.fr).join(', ') + '.' }
+      : { cn: '付款方式：' + trou + '。', en: 'Payment method: ' + trou + '.', fr: 'Moyen de paiement : ' + trou + '.' });
+    if (modes.indexOf('alipay') >= 0) p.push({ cn: '卖方支付宝收款账户：' + nb(v.alipay || trou) + '　实名：' + (v.alipay_nom || trou),
+      en: 'Seller\'s Alipay account: ' + nb(v.alipay || trou) + ' — Real name: ' + (v.alipay_nom || trou), fr: 'Compte Alipay du vendeur : ' + nb(v.alipay || trou) + ' — Nom réel : ' + (v.alipay_nom || trou), gras: true });
+    if (modes.indexOf('wechat') >= 0) p.push({ cn: '卖方微信支付收款：' + nb(v.wxpay || trou) + '　实名：' + (v.wxpay_nom || trou),
+      en: 'Seller\'s WeChat Pay: ' + nb(v.wxpay || trou) + ' — Real name: ' + (v.wxpay_nom || trou), fr: 'WeChat Pay du vendeur : ' + nb(v.wxpay || trou) + ' — Nom réel : ' + (v.wxpay_nom || trou), gras: true });
+    if (modes.indexOf('virement') >= 0) p.push({ cn: '卖方公司银行账户：开户名：' + (v.titulaire || trou) + '　开户行：' + (v.banque || trou) + '　账号：' + nb(v.compte || trou) + (v.swift ? '　SWIFT：' + v.swift : ''),
+      en: 'Seller\'s company bank account: Account name: ' + (v.titulaire || trou) + ' — Bank: ' + (v.banque || trou) + ' — Account No.: ' + nb(v.compte || trou) + (v.swift ? ' — SWIFT: ' + v.swift : ''),
+      fr: 'Compte bancaire de la société du vendeur : titulaire ' + (v.titulaire || trou) + ' — banque ' + (v.banque || trou) + ' — n° ' + nb(v.compte || trou) + (v.swift ? ' — SWIFT ' + v.swift : ''), gras: true });
+    const comptes = M.some(m => m.k !== 'especes'), cash = modes.indexOf('especes') >= 0;
+    if (cash) p.push({ cn: '现金付款时，卖方须当场出具签字并盖章的收据，注明金额和本合同编号。',
+      en: 'For each cash payment, the Seller hands over on the spot a receipt, signed and sealed, stating the amount and this contract No.',
+      fr: 'À chaque paiement en espèces, le vendeur remet sur-le-champ un reçu signé et tamponné, avec le montant et le numéro du contrat.' });
+    p.push(comptes || !M.length ? { cn: '款项只付到本合同所列的卖方收款账户' + (cash ? '，或以现金当面付给卖方' : '') + '。收款账户如有变更，须由卖方书面通知并经视频电话确认；付到其他账户的要求一律无效。',
+      en: 'Payments are made only to the Seller\'s accounts stated in this contract' + (cash ? ', or in cash to the Seller in person' : '') + '. Any change of account must be notified in writing by the Seller and confirmed by video call; any request to pay another account is void.',
+      fr: 'On paie seulement sur les comptes du vendeur écrits dans ce contrat' + (cash ? ', ou en espèces au vendeur en personne' : '') + '. Tout changement de compte doit être écrit par le vendeur et confirmé par appel vidéo ; une demande de payer ailleurs est nulle.' }
+      : { cn: '款项以现金当面付给卖方，凭收据为准；任何要求付到账户的请求，须经买方书面同意。', en: 'Payments are made in cash to the Seller in person, against a receipt; any request to pay into an account requires the Buyer\'s written consent.',
+        fr: 'On paie en espèces au vendeur en personne, contre un reçu ; toute demande de payer sur un compte demande l\'accord écrit de l\'acheteur.' });
+    art5.p = p;
+  }
+  return r;
+};
+// Les alertes : le compte bancaire ne compte que si l'on paie par virement ; on crie si c'est le sien ou une carte.
+const payAlertesAvant = ctrAlertes;
+ctrAlertes = function (f) {
+  const modes = payModes(ctrContrat(f)), v = ctrVendeur(f), vir = modes.indexOf('virement') >= 0;
+  let al = payAlertesAvant.apply(this, arguments);
+  if (!vir) al = al.filter(x => !/^(⚠ Le compte bancaire|Compte bancaire de la société)/.test(x));
+  const plus = [];
+  if (!modes.length) plus.push('Choisissez comment vous payez (section 3) : Alipay, WeChat Pay, espèces ou virement.');
+  if (vir) {
+    const r = payCompteAcheteur(v);
+    if (r.length) plus.push('⛔ Le compte bancaire écrit est le VÔTRE (' + r.join(' ; ') + '). Ici, c\'est le compte DU VENDEUR, celui où vous envoyez l\'argent. Effacez-le et demandez-lui le sien.');
+    if (payCarte(v.compte)) plus.push('⛔ Ce numéro ressemble à un numéro de carte bancaire (Visa / Mastercard). Si c\'est LA VÔTRE, effacez-la : on ne donne jamais son numéro de carte. Si c\'est la carte de dépôt chinoise DU VENDEUR, vérifiez que le titulaire est bien lui ou sa société.');
+  }
+  if (modes.indexOf('alipay') >= 0 && !String(v.alipay || '').trim()) plus.push('Alipay : notez son compte Alipay (téléphone ou e-mail) et le nom réel qui s\'affiche quand vous scannez son code : ce doit être lui ou sa société.');
+  if (modes.indexOf('wechat') >= 0 && !String(v.wxpay || '').trim()) plus.push('WeChat Pay : notez son WeChat de paiement et le nom réel qui s\'affiche : ce doit être lui ou sa société.');
+  ['alipay_nom', 'wxpay_nom'].forEach(c => { const n = normaliserNom(v[c]).replace(/[^a-z0-9一-鿿]/g, ''); if (n && n.indexOf('kylo') >= 0) plus.push('⛔ Le nom du compte de paiement est le vôtre (KYLO) : il faut celui du vendeur.'); });
+  return plus.concat(al);
+};
+function payToutVa() { const z = document.getElementById('ctr_alertes'); if (z) z.querySelectorAll('.ctr-ok').forEach(e => { e.textContent = '✓ Tout est rempli.'; }); }
+function payChoixHtml(f) {
+  const k = ctrContrat(f), v = ctrVendeur(f), m = payModes(k), on = (x) => m.indexOf(x) >= 0;
+  const ancien = !on('virement') && String(v.compte || '').trim() && (payCompteAcheteur(v).length || payCarte(v.compte));
+  return `<div class="pay-modes">${PAY_MODES.map(x => `<label class="${on(x.k) ? 'on' : ''}" for="pay_${x.k}"><input type="checkbox" id="pay_${x.k}" ${on(x.k) ? 'checked' : ''} onchange="payChanger()"><span>${x.ic} ${E(x.fr.charAt(0).toUpperCase() + x.fr.slice(1))}<small>${E(x.cn)}</small></span></label>`).join('')}</div>
+    <p class="px-aide">Cochez <b>comment vous payez ce fournisseur</b> (plusieurs possibles). Le contrat écrit les comptes <b>DU VENDEUR</b> — jamais les vôtres, jamais un numéro de carte.</p>
+    <div class="pay-z" id="pay_alipay_z" ${on('alipay') ? '' : 'hidden'}><div class="ctr-g">${ctrChamp('pay_ali', '🔵 Son compte Alipay (téléphone ou e-mail)', v.alipay, { ph: '138…' })}${ctrChamp('pay_ali_nom', 'Nom réel affiché (实名)', v.alipay_nom, { ph: '张三' })}</div>
+      <p class="px-aide">Quand vous scannez son code Alipay, le téléphone montre le nom réel du compte : c'est ce nom-là, et ce doit être le sien ou celui de sa société.</p></div>
+    <div class="pay-z" id="pay_wechat_z" ${on('wechat') ? '' : 'hidden'}><div class="ctr-g">${ctrChamp('pay_wx', '🟢 Son WeChat pour payer', v.wxpay)}${ctrChamp('pay_wx_nom', 'Nom réel affiché (实名)', v.wxpay_nom)}</div></div>
+    <div class="pay-z" id="pay_especes_z" ${on('especes') ? '' : 'hidden'}><p class="px-aide">💵 Espèces : à chaque paiement, demandez un <b>reçu (收据) signé et tamponné</b>, avec le montant et le n° du contrat. Le contrat le prévoit.</p></div>
+    <div class="pay-z" id="pay_virement_z" ${on('virement') ? '' : 'hidden'}><p class="px-aide">🏦 <b>Le compte bancaire DU VENDEUR</b>, au nom de sa société (celui où vous envoyez l'argent).</p></div>
+    ${ancien ? `<div class="ctr-attention" id="pay_ancien">Un compte bancaire est noté chez lui (« ${E(v.titulaire || '')}${v.banque ? ' — ' + E(v.banque) : ''} »)${payCompteAcheteur(v).length ? ' mais il ressemble au VÔTRE' + (payCarte(v.compte) ? ', avec un numéro de carte' : '') : ' avec un numéro qui ressemble à une carte bancaire'}. Il n'est pas écrit dans le contrat (vous ne payez pas par virement).
+      ${payCompteAcheteur(v).length ? '<div style="height:8px"></div><button type="button" class="b rouge" onclick="payEffacerCompte()">🗑 L\'effacer du carnet</button>' : ''}</div>` : ''}`;
+}
+function payChanger() {
+  const f = mkFournisseur(ctrFid); if (!f) return;
+  const k = ctrContrat(f);
+  k.paiement = PAY_MODES.map(x => x.k).filter(x => { const e = document.getElementById('pay_' + x); return e && e.checked; });
+  PAY_MODES.forEach(x => { const e = document.getElementById('pay_' + x.k), z = document.getElementById('pay_' + x.k + '_z');
+    if (e && e.parentElement) e.parentElement.classList.toggle('on', e.checked); if (z) z.hidden = !(e && e.checked); });
+  const g = document.getElementById('pay_banque'); if (g) g.hidden = k.paiement.indexOf('virement') < 0;
+  ctrGarderChamps();
+}
+function payEffacerCompte() {
+  const f = mkFournisseur(ctrFid); if (!f) return;
+  if (!confirmerEnDeuxTemps('pay-efface-' + f.id, 'Effacer ce compte bancaire du carnet ?')) return;
+  const v = ctrVendeur(f); v.titulaire = ''; v.banque = ''; v.compte = ''; v.swift = '';
+  sauverLocal(); ctrDessiner(); avertir('🗑 Compte bancaire effacé.', 3500);
+}
+const payDessinerAvant = ctrDessiner;
+ctrDessiner = function () {
+  payDessinerAvant.apply(this, arguments);
+  const f = mkFournisseur(ctrFid), d = document.getElementById('contenuBoite'); if (!f || !d) return;
+  const k = ctrContrat(f), vi = payVille(k);
+  const t3 = [...d.querySelectorAll('.px-titre')].find(x => /^3\./.test(x.textContent.trim()));
+  if (t3 && !d.querySelector('.pay-modes')) {
+    const banque = t3.nextElementSibling;
+    t3.textContent = '3. Comment vous le payez';
+    t3.insertAdjacentHTML('afterend', payChoixHtml(f));
+    const z = document.getElementById('pay_virement_z');
+    if (z && banque && banque.classList.contains('ctr-g')) { banque.id = 'pay_banque'; z.appendChild(banque);
+      const tit = banque.querySelector('label[for="ctr_v_tit"]'); if (tit) tit.textContent = 'Titulaire (le nom de SA société)'; }
+  }
+  const liv = document.getElementById('ctr_k_liv');
+  if (liv && !document.getElementById('ctr_k_ville')) liv.parentElement.insertAdjacentHTML('afterend', ctrChamp('ctr_k_ville', 'Ville où vous signez', k.ville, { ph: 'ex : Yiwu' }));
+  const lieu = document.getElementById('ctr_k_lieu'); if (lieu) lieu.placeholder = 'vide = « l\'entrepôt de mon transitaire à ' + vi.fr + ' »';
+  d.querySelectorAll('.ctr-explique li').forEach(li => { if (/acompte/.test(li.textContent)) li.innerHTML = '<b>' + E(nf(num(k.acompte) || 30)) + ' % d\'acompte</b> après signature, <b>le reste après un contrôle conforme</b>, avant l\'expédition — par '
+    + E(PAY_MODES.filter(m => payModes(k).indexOf(m.k) >= 0).map(m => m.fr).join(', ') || '(moyen à choisir)') + ', <b>seulement au vendeur</b> (ses comptes écrits dans le contrat, ou en main propre contre un reçu).'; });
+  payToutVa();
+};
+const payGarderAvant = ctrGarderChamps;
+ctrGarderChamps = function () {
+  const f = mkFournisseur(ctrFid);
+  if (f) {
+    const v = ctrVendeur(f), k = ctrContrat(f);
+    const val = (id) => { const e = document.getElementById(id); return e ? String(e.value || '').trim() : undefined; };
+    [['alipay', 'pay_ali'], ['alipay_nom', 'pay_ali_nom'], ['wxpay', 'pay_wx'], ['wxpay_nom', 'pay_wx_nom']].forEach(([c, id]) => { const x = val(id); if (x !== undefined) v[c] = x; });
+    const vi = val('ctr_k_ville'); if (vi !== undefined) k.ville = vi || payVilleDe(f);
+  }
+  payGarderAvant.apply(this, arguments);
+  payToutVa();
+};
+// Avant d'envoyer au fournisseur : s'il y a encore votre compte ou une carte dans le contrat, deux appuis pour confirmer.
+const payEnvoyerAvant = ctrEnvoyer;
+ctrEnvoyer = async function (langue) {
+  const f = mkFournisseur(ctrFid);
+  if (f && langue !== 'fr') {
+    ctrGarderChamps();
+    const k = ctrContrat(f), v = ctrVendeur(f);
+    if (payModes(k).indexOf('virement') >= 0 && (payCompteAcheteur(v).length || payCarte(v.compte))
+      && !confirmerEnDeuxTemps('pay-envoi-' + f.id, '⛔ Le contrat contient un compte qui ressemble au VÔTRE (ou une carte bancaire) : le vendeur le verra.')) return;
+  }
+  return payEnvoyerAvant.apply(this, arguments);
+};
+</script>
+<script>
+// ---------- 5. « 🛒 Ajouter un achat » commence par le fournisseur ----------
+// Riche : « quand tu rentres dans achat, il doit te demander le fournisseur… une fois que tu as le fournisseur, tous les produits
+// que tu as sélectionnés là-bas avec leur prix… tu peux sélectionner ce que tu as sélectionné et le reste peut partir… ajouter
+// un autre produit de son magasin, même s'il n'était pas enregistré ».
+let haEtat = null;
+const haNouvelAchatAvant = nouvelAchat;
+nouvelAchat = function () { haChoisir(); };
+function haAchatLibre() { fermerBoite(); haNouvelAchatAvant(); }
+function haChoisir() {
+  haEtat = null;
+  mkBoite(`<div class="mk-dlg"><h3>🛒 Nouvel achat</h3>
+    <p class="px-aide">D'abord : <b>chez quel fournisseur ?</b> Ses informations et les produits notés chez lui viennent tout seuls.</p>
+    <input id="ha_cherche" type="search" placeholder="🔎 Son code (Y09), son nom, WeChat, un produit…" oninput="haFiltrer(this.value)" style="font-size:17px;width:100%;box-sizing:border-box">
+    <div id="ha_liste">${haListeHtml('')}</div>
+    <div class="mk-boutons"><button class="b contour" onclick="haNouveauFournisseur()">➕ Un fournisseur pas encore dans le carnet</button>
+      <button class="b gris" onclick="haAchatLibre()">Sans fournisseur (achat libre)</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+}
+function haListeHtml(q) {
+  const n = normaliserNom(q), nbA = {};
+  (C.achats || []).forEach(a => { if (a.fournisseur_id) nbA[a.fournisseur_id] = (nbA[a.fournisseur_id] || 0) + 1; });
+  let L = mkFournisseursRecents();
+  if (n) L = L.filter(f => normaliserNom([f.code, f.nom, f.societe, f.societe_cn, f.contact, f.wechat, f.tel, f.mobile, f.allee, f.marche,
+    mkOffresDe(f).map(x => x.c.article).join(' ')].join(' ')).includes(n));
+  const total = L.length; L = L.slice(0, n ? 60 : 30);
+  if (!L.length) return '<p class="px-aide">Aucun fournisseur ne correspond. « ➕ Un fournisseur pas encore dans le carnet », plus bas.</p>';
+  return L.map(f => {
+    const no = mkOffresDe(f).length, np = ctProduits(f).length;
+    const det = [f.contact, [f.marche, f.batiment, f.allee].filter(Boolean).join(' '), no ? no + ' produit' + (no > 1 ? 's' : '') + ' noté' + (no > 1 ? 's' : '') : '',
+      np ? np + ' au catalogue' : '', nbA[f.id] ? '🛒 ' + nbA[f.id] + ' achat' + (nbA[f.id] > 1 ? 's' : '') : ''].filter(Boolean).join(' · ');
+    return `<button type="button" class="ha-four" onclick="haProduits('${f.id}')"><span class="ha-code">${E(f.code || '—')}</span><span><b>${E(String(f.nom || f.societe || '(sans nom)').trim())}</b>${det ? '<br><small>' + E(det) + '</small>' : ''}</span></button>`;
+  }).join('') + (total > L.length ? `<p class="px-aide">… et ${E(total - L.length)} autres : tapez son code ou son nom.</p>` : '');
+}
+function haFiltrer(v) { const z = document.getElementById('ha_liste'); if (z) z.innerHTML = haListeHtml(v); }
+function haNouveauFournisseur() {
+  const nom = String((document.getElementById('ha_cherche') || {}).value || '').trim();
+  const f = { id: idUnique('f'), code: mkProchainCode(), nom, marche: '', batiment: '', allee: '', wechat: '', tel: '', qualite: '', remarque: '',
+    le: mkMaintenant().slice(0, 10), vu_le: mkMaintenant(), source: 'achat', decision: 'contacter', docs: [], produits: [] };
+  if (typeof vlVilleActuelle === 'function') { f.ville = vlVilleActuelle(); if (typeof vlAccorderLieu === 'function') vlAccorderLieu(f); }
+  fournisseursListe().unshift(f); sauverLocal();
+  haProduits(f.id);
+  avertir('➕ Nouveau fournisseur ' + f.code + (nom ? ' : ' + nom : '') + '. Son WeChat, sa carte : dans sa fiche (📂), quand vous voulez.', 5000);
+}
+// Ses produits : ceux notés au stand (et demandés), puis les modèles de son catalogue qui vous intéressent ou qui ont un prix.
+function haLignes(f) {
+  const L = pxLignesDe(f), vus = L.filter(l => l.o), cat = L.filter(l => l.p);
+  const utiles = cat.filter(l => l.p.interesse || num(l.p.prix) > 0 || (haEtat && haEtat.choix[l.cle]));
+  return { vus, utiles, reste: cat.filter(l => utiles.indexOf(l) < 0) };
+}
+function haPrixLigne(l, qte) {
+  if (l.o) { const r = pxPrixPour(l.o, l.o.niveau, num(qte) || 0); if (r && r.prix > 0) return { prix: r.prix, devise: r.devise || l.o.devise || 'CNY' };
+    return { prix: num(l.o.prix), devise: l.o.devise || 'CNY' }; }
+  return { prix: num(l.p && l.p.prix), devise: (l.p && l.p.devise) || 'CNY' };
+}
+function haNonRelies(f) {
+  const lies = new Set(); (C.comparaisons || []).forEach(c => (c.offres || []).forEach(o => { if (o.achat_id) lies.add(o.achat_id); }));
+  return (C.achats || []).filter(a => a.fournisseur_id === f.id && !lies.has(a.id));
+}
+// Un achat fait avant (fiche libre, Comparer…) chez CE fournisseur : relié à son produit noté s'il pointe déjà dessus, ou s'il porte
+// exactement le même nom et que ce produit n'a pas d'achat. Sinon il reste tel quel, montré à part.
+function haRelier(f) {
+  let n = 0; const L = pxLignesDe(f);
+  haNonRelies(f).forEach(a => {
+    let l = a.px && a.px.oid ? L.find(x => x.o && x.o.id === a.px.oid && !pxAchatDe(x.o)) : null;
+    if (!l) { const nom = normaliserNom(a.nom); l = nom ? L.find(x => x.o && !pxAchatDe(x.o) && normaliserNom(x.nom) === nom) : null; }
+    if (l) { l.o.achat_id = a.id; a.px = Object.assign({}, a.px, { cid: l.c.id, oid: l.o.id }); n++; }
+  });
+  if (n) sauverLocal();
+  return n;
+}
+function haIdDom(cle) { return 'hal_' + String(cle).replace(/[^a-z0-9]/gi, '_'); }
+function haProduits(fid, opts) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const rempl = (opts && opts.remplacer) || '';
+  if (!(opts && opts.garder && haEtat && haEtat.fid === fid)) {
+    haRelier(f);
+    haEtat = { fid, remplacer: rempl, choix: {}, cherche: '' };
+    if (!rempl) pxLignesDe(f).forEach(l => { const a = l.o ? pxAchatDe(l.o) : null; if (a) haEtat.choix[l.cle] = { qte: num(a.quantite), prix: num(a.prix_unitaire), devise: deviseDe(a) }; });
+  }
+  haDessiner();
+}
+function haLigneHtml(l) {
+  const ch = haEtat.choix[l.cle], on = !!ch, rempl = haEtat.remplacer;
+  const pr = haPrixLigne(l, ch ? ch.qte : 0), a = l.o ? pxAchatDe(l.o) : null;
+  const photo = l.photo ? `<img src="${l.photo}" alt="">` : l.doc ? `<img class="ct-mini" data-doc="${E(l.doc)}" alt="">` : '<div class="ha-vide" aria-hidden="true">📦</div>';
+  const qc = l.o ? num(l.o.qte_carton) : num(l.p && l.p.colisage);
+  const infos = [pr.prix > 0 ? nf(pr.prix, 2) + ' ' + mkSym(pr.devise) : 'prix pas encore noté', l.o && num(l.o.moq) ? 'min. ' + nf(l.o.moq) + ' pcs' : '',
+    qc > 0 ? nf(qc) + ' par carton' : '', a && a.id !== rempl ? '🛒 dans mes achats : ' + nf(a.quantite) + ' pcs' : ''].filter(Boolean).join(' · ');
+  const desc = l.o ? String(l.o.note || '').trim() : String((l.p && l.p.caracteristiques) || '').trim();
+  const corps = `<div><div class="ha-n">${E(l.nom)}</div><div class="ha-p">${E(infos)}${desc ? '<br>' + E(desc.slice(0, 110)) : ''}</div>
+    ${on && !rempl ? `<div class="ha-champs"><div><label for="${haIdDom(l.cle)}_q">Pièces</label><input id="${haIdDom(l.cle)}_q" inputmode="numeric" value="${E(ch.qte || '')}" placeholder="combien ?" oninput="haSaisir('${l.cle}','qte',this.value)"></div>
+      <div><label for="${haIdDom(l.cle)}_p">Prix / pièce (${E(mkSym((ch.devise && num(ch.prix) > 0) ? ch.devise : pr.devise))})</label><input id="${haIdDom(l.cle)}_p" inputmode="decimal" value="${E(ch.prix || '')}" placeholder="${pr.prix > 0 ? E(nf(pr.prix, 2)) : 'prix obtenu'}" oninput="haSaisir('${l.cle}','prix',this.value)"></div></div>` : ''}
+    ${rempl ? (a && a.id !== rempl ? '<div class="ha-p">Déjà dans vos achats : il ne peut pas remplacer celui-ci.</div>'
+      : `<button type="button" class="b vert" style="margin-top:8px;min-height:48px;font-size:16px" onclick="haRemplacerPar('${l.cle}')">🔄 Choisir celui-ci</button>`) : ''}
+    ${l.o ? `<button type="button" class="mk-lien" onclick="haModifierProduit('${l.c.id}','${l.o.id}')">✏️ Photo, nom, description</button>` : ''}</div>`;
+  if (rempl) return `<div class="ha-ligne rempl" id="${haIdDom(l.cle)}">${photo}${corps}</div>`;
+  return `<div class="ha-ligne${on ? ' on' : ''}" id="${haIdDom(l.cle)}"><input type="checkbox" ${on ? 'checked' : ''} aria-label="J'achète ${E(l.nom)}" onchange="haCocher('${l.cle}', this.checked)">${photo}${corps}</div>`;
+}
+function haDessiner() {
+  const f = mkFournisseur(haEtat.fid); if (!f) return;
+  const { vus, utiles, reste } = haLignes(f), rempl = haEtat.remplacer, ar = rempl ? trouverAchat(rempl) : null;
+  const infos = [f.contact, f.mobile || f.tel, f.wechat ? 'WeChat ' + f.wechat : '', [f.marche, f.batiment, f.allee].filter(Boolean).join(' ')].filter(Boolean);
+  mkBoite(`<div class="mk-dlg ha-dlg">
+    <h3>${rempl ? '🔄 Remplacer « ' + E(ar ? ar.nom : '') + ' »' : '🛒 Acheter chez ' + E(mkNomFournisseur(f))}</h3>
+    <div class="ha-info">🏪 <b>${E(mkNomFournisseur(f))}</b>${infos.length ? '<br>' + E(infos.join(' · ')) : ''}<br><button type="button" class="mk-lien" onclick="fermerBoite();ctOuvrirDossier('${f.id}')">📂 Sa fiche</button></div>
+    <p class="px-aide">${rempl ? 'Touchez « 🔄 Choisir celui-ci » sur le produit qui le remplace (ou ajoutez-en un nouveau, plus bas). Le code-barres de l\'achat reste le même.'
+      : 'Cochez ce que vous achetez, puis le nombre de pièces et le prix obtenu. Ce qui n\'est pas coché reste dans sa fiche, pas dans vos achats.'}</p>
+    ${!rempl && haNonRelies(f).length ? `<div class="px-titre">Déjà dans mes achats chez lui (sans produit noté)</div>
+      ${haNonRelies(f).map(a => `<div class="ha-ligne rempl">${a.photo ? `<img src="${E(a.photo)}" alt="">` : '<div class="ha-vide" aria-hidden="true">📦</div>'}<div><div class="ha-n">${E(a.nom || 'Sans nom')}</div>
+        <div class="ha-p">${E(nf(a.quantite))} × ${E(dev(a.prix_unitaire, deviseDe(a)))} — il reste tel quel. Ne le recochez pas plus bas : il serait en double.</div>
+        <button type="button" class="mk-lien" onclick="fermerBoite();modifierAchat('${a.id}')">✏️ Ouvrir cet achat</button></div></div>`).join('')}` : ''}
+    ${vus.length ? `<div class="px-titre">Notés chez lui (${vus.length})</div>${vus.map(haLigneHtml).join('')}` : '<p class="px-aide">Aucun produit noté chez lui pour l\'instant : ajoutez-en un plus bas.</p>'}
+    ${utiles.length ? `<div class="px-titre">De son catalogue (${utiles.length})</div>${utiles.map(haLigneHtml).join('')}` : ''}
+    ${reste.length ? `<div class="px-titre">Chercher dans son catalogue (${reste.length} autres modèles)</div>
+      <input type="search" placeholder="🔎 Référence, mot…" oninput="haChercherCatalogue(this.value)" style="font-size:17px;width:100%;box-sizing:border-box"><div id="ha_cat"></div>` : ''}
+    <div id="ha_nouveau"></div>
+    <button type="button" class="b contour" id="ha_bouton_nouveau" onclick="haFormNouveau()">➕ Un autre produit de sa boutique (pas encore noté)</button>
+    <div id="ha_total" class="ha-total" role="status"></div>
+    <div class="mk-boutons">
+      ${rempl ? '' : '<button class="b vert" id="ha_valider" onclick="haValider()">🛒 Mettre dans mes achats</button>'}
+      <button class="b gris" onclick="${rempl ? `fermerBoite();modifierAchat('${rempl}')` : 'haChoisir()'}">← ${rempl ? 'Revenir à l\'achat' : 'Un autre fournisseur'}</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+  haMajTotal(); ctRemplirMinis();
+}
+function haChercherCatalogue(q) {
+  const f = mkFournisseur(haEtat.fid), z = document.getElementById('ha_cat'); if (!f || !z) return;
+  const n = normaliserNom(q); if (!n) { z.innerHTML = ''; return; }
+  const R = haLignes(f).reste.filter(l => normaliserNom([l.nom, l.p.ref, l.p.categorie, l.p.caracteristiques].join(' ')).includes(n));
+  z.innerHTML = R.slice(0, 30).map(haLigneHtml).join('') + (R.length > 30 ? '<p class="px-aide">… ' + E(R.length - 30) + ' autres : précisez.</p>' : (R.length ? '' : '<p class="px-aide">Rien trouvé.</p>'));
+  ctRemplirMinis();
+}
+function haTrouver(cle) { const f = mkFournisseur(haEtat.fid); return f ? (pxLignesDe(f).find(l => l.cle === cle) || pxTrouverLigne(f, cle)) : null; }
+function haCocher(cle, oui) {
+  const l = haTrouver(cle); if (!l) return;
+  if (oui) {
+    const a = l.o ? pxAchatDe(l.o) : null;
+    const qte = a ? num(a.quantite) : (l.o ? num(l.o.moq) : num(l.p && l.p.moq)) || '';
+    haEtat.choix[cle] = a ? { qte, prix: num(a.prix_unitaire), devise: deviseDe(a) } : { qte, prix: haPrixLigne(l, qte).prix || '' };
+  } else delete haEtat.choix[cle];
+  const el = document.getElementById(haIdDom(cle));
+  if (el && oui && el.closest('#ha_cat')) {
+    haDessiner(); const e2 = document.getElementById(haIdDom(cle)); if (e2) e2.scrollIntoView({ block: 'center' });
+    const q2 = document.getElementById(haIdDom(cle) + '_q'); if (q2 && !q2.value) q2.focus(); return;
+  }
+  if (el) { el.outerHTML = haLigneHtml(l); ctRemplirMinis(); }
+  if (oui) { const q = document.getElementById(haIdDom(cle) + '_q'); if (q && !q.value) q.focus(); }
+  haMajTotal();
+}
+function haSaisir(cle, champ, v) { const ch = haEtat.choix[cle]; if (!ch) return; ch[champ] = pxNombre(v); haMajTotal(); }
+function haMajTotal() {
+  const z = document.getElementById('ha_total'), f = mkFournisseur(haEtat.fid); if (!z || !f || haEtat.remplacer) { if (z) z.innerHTML = ''; return; }
+  const cles = Object.keys(haEtat.choix), parDev = {}; let manque = 0;
+  const nonRelies = haNonRelies(f).map(a => normaliserNom(a.nom)), doubles = [];
+  cles.forEach(c => { const l = haTrouver(c), ch = haEtat.choix[c]; if (!l) return; const pr = haPrixLigne(l, ch.qte), prix = num(ch.prix) > 0 ? num(ch.prix) : pr.prix;
+    const d = num(ch.prix) > 0 ? (ch.devise || pr.devise) : pr.devise;
+    if (!(l.o && pxAchatDe(l.o)) && nonRelies.indexOf(normaliserNom(l.nom)) >= 0) doubles.push(l.nom);
+    if (!(num(ch.qte) > 0) || !(prix > 0)) { manque++; return; } parDev[d] = (parDev[d] || 0) + num(ch.qte) * prix; });
+  const retires = pxLignesDe(f).filter(l => l.o && pxAchatDe(l.o) && !haEtat.choix[l.cle]);
+  const g = Object.keys(parDev).reduce((s, d) => s + enGnf(parDev[d], d), 0);
+  z.innerHTML = cles.length ? `🛒 ${cles.length} produit${cles.length > 1 ? 's' : ''} coché${cles.length > 1 ? 's' : ''}${Object.keys(parDev).length ? ' = ' + Object.keys(parDev).map(d => E(nf(parDev[d], 2) + ' ' + mkSym(d))).join(' + ') + ' = ' + E(gnfStrict(g)) : ''}
+    ${manque ? `<div class="att">⚠ ${manque} sans nombre de pièces ou sans prix : complétez (sinon le contrat ne le prend pas).</div>` : ''}` : 'Cochez les produits que vous achetez.';
+  if (doubles.length) z.innerHTML += `<div class="att">⚠ Déjà dans vos achats (sans produit noté) : ${E(doubles.join(', '))}. Le recocher le mettrait en double.</div>`;
+  if (retires.length) z.innerHTML += `<div class="att">${retires.length} produit${retires.length > 1 ? 's' : ''} décoché${retires.length > 1 ? 's' : ''} sortira${retires.length > 1 ? 'ont' : ''} de vos achats : ${E(retires.map(l => l.nom).join(', '))}.</div>`;
+  const b = document.getElementById('ha_valider');
+  if (b) { b.disabled = !cles.length && !retires.length; b.textContent = cles.length ? '🛒 Mettre ' + cles.length + ' produit' + (cles.length > 1 ? 's' : '') + ' dans mes achats' : (retires.length ? '🗑 Les retirer de mes achats' : '🛒 Mettre dans mes achats'); }
+}
+async function haPhotoDe(o, l) {
+  if (o.photo) return o.photo;
+  const d = o.photo_doc || (l && l.doc); if (!d) return '';
+  try { return ctMiniCache[d] || (await ctLire(d + '~m')) || ''; } catch (e) { return ''; }
+}
+let haOccupe = false;
+async function haValider() {
+  if (haOccupe || !haEtat) return;
+  const f = mkFournisseur(haEtat.fid); if (!f) return;
+  const L = pxLignesDe(f);
+  const retires = L.filter(l => l.o && pxAchatDe(l.o) && !haEtat.choix[l.cle]);
+  const et = (f.contrat && f.contrat.etapes) || {}, contrat = et.signe ? 'signé' : et.envoye ? 'envoyé' : '';
+  if (retires.length && !confirmerEnDeuxTemps('ha-retire-' + f.id, '🗑 ' + retires.length + ' produit(s) décoché(s) vont sortir de vos achats : ' + retires.map(l => l.nom).join(', ') + '.'
+    + (contrat ? '\n⚠ Son contrat est déjà ' + contrat + ' : prévenez-le par écrit sur WeChat.' : ''))) return;
+  haOccupe = true; const bouton = document.getElementById('ha_valider'); if (bouton) { bouton.disabled = true; bouton.textContent = '⏳ Un instant…'; }
+  try { await haValiderSuite(f, L, retires); } finally { haOccupe = false; }
+}
+async function haValiderSuite(f, L, retires) {
+  let n = 0, codes = 0, manque = 0, erreurCode = ''; const parDev = {};
+  for (const cle of Object.keys(haEtat.choix)) {
+    const ch = haEtat.choix[cle], l = haTrouver(cle); if (!l) continue;
+    const { c, o } = pxOffrePour(f, l);
+    let a = pxAchatDe(o); const neuf = !a;
+    if (!a) { a = { id: idUnique('a'), categorie: '', famille: '', code_barres: '', marge: 0.75, prix_grossiste_gnf: 0, conformite: { requise: false, verifie: false, note: '' } }; C.achats.push(a); o.achat_id = a.id; }
+    const pr = haPrixLigne(l, ch.qte), prix = num(ch.prix) > 0 ? num(ch.prix) : pr.prix, qte = num(ch.qte), devise = num(ch.prix) > 0 ? (ch.devise || pr.devise) : pr.devise;
+    const nom = c.article + (o.modele && normaliserNom(c.article).indexOf(normaliserNom(o.modele)) < 0 ? ' ' + o.modele : '');
+    const qc = num(a.qte_carton) || num(o.qte_carton) || (l.p ? num(l.p.colisage) : 0);
+    if (neuf) {
+      a.nom = nom; a.reference = o.modele || ''; a.photo = await haPhotoDe(o, l); a.description = String(o.note || '').trim();
+      a.famille = proposerFamille(nom).code; a.categorie = libelleFamille(a.famille);
+      a.dim_l = num(o.dim_l) || ''; a.dim_la = num(o.dim_la) || ''; a.dim_h = num(o.dim_h) || '';
+      a.prix_detail_gnf = num(c.prix_vente_vise_gnf) || 0; a.note = 'Acheté chez ' + mkNomFournisseur(f) + ' le ' + mkJour(mkMaintenant());
+    } else if (!a.photo) a.photo = await haPhotoDe(o, l);
+    Object.assign(a, { fournisseur: mkNomFournisseur(f), fournisseur_id: f.id, quantite: qte, prix_unitaire: prix, devise: devise || o.devise || 'CNY',
+      qte_carton: qc, cartons: qc > 0 && qte > 0 ? Math.ceil(qte / qc) : num(a.cartons),
+      px: Object.assign({}, a.px, { cid: c.id, oid: o.id, niveau: o.niveau || '', prix_main: num(ch.prix) > 0 && num(ch.prix) !== pr.prix, le: mkMaintenant() }) });
+    o.achat_id = a.id; if (prix > 0) o.prix = pxQualites(o).length ? o.prix : prix;
+    c.choisi = o.id; c.decision = 'acheter'; c.decide_le = mkMaintenant().slice(0, 10); c.transforme = true; if (qte > 0) c.quantite = qte;
+    if (!String(a.code_barres || '').trim()) {
+      const r = prochainCodeCarnet(a);
+      if (r.code) { a.code_barres = r.code; a.code_maison = true; a.famille = a.famille || r.famille; codes++; } else if (r.erreur) erreurCode = r.erreur;
+    }
+    if (qte > 0 && prix > 0) parDev[a.devise] = (parDev[a.devise] || 0) + qte * prix; else manque++;
+    n++;
+  }
+  retires.forEach(l => {
+    const a = pxAchatDe(l.o); if (!a) return;
+    C.achats = C.achats.filter(x => x !== a); delete l.o.achat_id;
+    C.frais = (C.frais || []).map(fr => (fr.produit_id === a.id ? Object.assign({}, fr, { repartition: 'valeur', produit_id: '' }) : fr));   // comme « Supprimer »
+    if (l.c && l.c.choisi === l.o.id) { delete l.c.decision; delete l.c.decide_le; l.c.transforme = false; }
+    if (typeof oublierVideosDe === 'function') try { oublierVideosDe(a); } catch (e) {}
+  });
+  haEtat = null;
+  sauverLocal(); fermerBoite(); allerA('achats');
+  const g = Object.keys(parDev).reduce((s, d) => s + enGnf(parDev[d], d), 0);
+  avertir((n ? '🛒 ' + n + ' produit(s) chez ' + mkNomFournisseur(f) + ' dans mes achats' + (g ? ' : ' + Object.keys(parDev).map(d => nf(parDev[d], 2) + ' ' + mkSym(d)).join(' + ') + ' = ' + gnfStrict(g) : '') + '.' : '')
+    + (retires.length ? '\n🗑 ' + retires.length + ' retiré(s) de mes achats.' : '')
+    + (codes ? '\n🏷 ' + codes + ' code(s)-barres créé(s).' : '') + (erreurCode ? '\n⚠ ' + erreurCode : '')
+    + (manque ? '\n⚠ ' + manque + ' sans pièces ou sans prix : à compléter.' : '') + '\nTotal de mes achats : ' + gnfStrict(totalAchatsGnf()), 8000);
+}
+// Un produit de sa boutique pas encore noté : photo, nom, description, prix, pièces — il entre dans sa fiche ET dans la liste (coché).
+function haFormNouveau() {
+  const z = document.getElementById('ha_nouveau'); if (!z) return;
+  haEtat.photoNouveau = '';
+  z.innerHTML = `<div class="ha-nouveau"><div class="px-titre" style="margin-top:0">➕ Nouveau produit chez lui</div>
+    <div class="champ-photo"><div class="vignette" id="han_ph">📦</div><div style="flex:1"><label class="b contour" for="han_file" style="display:block;text-align:center;cursor:pointer">📷 Photo du produit</label>
+      <input type="file" id="han_file" accept="image/*" class="champ-cache" onchange="haPhotoNouveau(this)"></div></div>
+    <label for="han_nom">Nom du produit</label><input id="han_nom" placeholder="ex : Gonfleur de pneus portable">
+    <label for="han_desc">Description (modèle, couleur, ce qui le distingue)</label><textarea id="han_desc" rows="2"></textarea>
+    <div class="duo"><div><label for="han_prix">Prix / pièce (${E(mkSym(mkDevise()))})</label><input id="han_prix" inputmode="decimal"></div>
+      <div><label for="han_qte">Pièces</label><input id="han_qte" inputmode="numeric"></div></div>
+    <div style="height:8px"></div><button type="button" class="b vert" onclick="haAjouterNouveau()">✅ ${haEtat.remplacer ? 'Remplacer par celui-ci' : 'Ajouter à la liste (coché)'}</button></div>`;
+  const b = document.getElementById('ha_bouton_nouveau'); if (b) b.hidden = true;
+  const n = document.getElementById('han_nom'); if (n) { n.scrollIntoView({ block: 'center' }); }
+}
+function haReduirePhoto(input) {
+  return new Promise((ok) => {
+    const fi = input.files && input.files[0]; if (!fi) { ok(''); return; }
+    const lec = new FileReader();
+    lec.onload = () => { const img = new Image(); img.onload = () => { const max = 700, e = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.round(img.width * e); c.height = Math.round(img.height * e); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); ok(c.toDataURL('image/jpeg', 0.62)); };
+      img.onerror = () => ok(''); img.src = lec.result; };
+    lec.onerror = () => ok(''); lec.readAsDataURL(fi);
+  });
+}
+async function haPhotoNouveau(input) {
+  const d = await haReduirePhoto(input); if (!d) { avertir('Photo illisible : réessayez.'); return; }
+  haEtat.photoNouveau = d; const z = document.getElementById('han_ph'); if (z) z.innerHTML = '<img src="' + d + '" alt="">';
+}
+function haAjouterNouveau() {
+  const f = mkFournisseur(haEtat.fid); if (!f) return;
+  const val = (id) => String((document.getElementById(id) || {}).value || '').trim();
+  const nomTape = val('han_nom'), desc = val('han_desc'), prix = pxNombre(val('han_prix')), qte = Math.round(pxNombre(val('han_qte')));
+  if (!nomTape && !haEtat.photoNouveau) { avertir('Prenez sa photo ou tapez son nom.'); return; }
+  const maintenant = mkMaintenant(), nom = nomTape || ('Produit vu à ' + mkHeure(maintenant) + ' chez ' + (f.code || ''));
+  const c = pxComparaison(nom, 'stand');
+  const o = { id: idUnique('o'), fournisseur: mkNomFournisseur(f), fournisseur_id: f.id, prix, devise: mkDevise(), moq: 0, delai: 0, qualite: 0, note: desc,
+    photo: haEtat.photoNouveau || '', vu_le: maintenant };
+  c.offres.push(o); c.maj = maintenant; f.vu_le = maintenant; delete f.ct_neuf;
+  sauverLocal();
+  if (haEtat.remplacer) { haRemplacerPar('o:' + o.id); return; }
+  haEtat.choix['o:' + o.id] = { qte: qte || '', prix: prix || '' };
+  haEtat.photoNouveau = '';
+  haDessiner();
+  avertir('✅ « ' + nom + ' » ajouté chez ' + mkNomFournisseur(f) + ' et coché.', 3500);
+}
+// Remplacer un achat par un autre produit (Riche changeait d'avis devant le vendeur).
+async function haRemplacerPar(cle) {
+  if (haOccupe || !haEtat) return;
+  const a = trouverAchat(haEtat.remplacer), f = mkFournisseur(haEtat.fid); if (!a || !f) return;
+  const l = haTrouver(cle); if (!l) return;
+  const deja = l.o ? pxAchatDe(l.o) : null;
+  if (deja && deja !== a) { avertir('Ce produit est déjà dans vos achats (' + nf(deja.quantite) + ' pièces) : choisissez-en un autre, ou ouvrez cet achat-là.', 6000); return; }
+  haOccupe = true;
+  try { await haRemplacerSuite(a, f, l); } finally { haOccupe = false; }
+}
+async function haRemplacerSuite(a, f, l) {
+  const { c, o } = pxOffrePour(f, l);
+  const avant = a.px && a.px.oid ? (C.comparaisons || []).map(x => ({ c: x, o: (x.offres || []).find(y => y.id === a.px.oid) })).find(x => x.o) : null;
+  if (avant && avant.o !== o && avant.o.achat_id === a.id) { delete avant.o.achat_id; if (avant.c.choisi === avant.o.id) { delete avant.c.decision; delete avant.c.decide_le; avant.c.transforme = false; } }
+  o.achat_id = a.id;
+  const pr = haPrixLigne(l, a.quantite);
+  const px = pr.prix > 0 ? { p: pr.prix, d: pr.devise } : num(o.prix) > 0 ? { p: num(o.prix), d: o.devise || 'CNY' } : { p: num(a.prix_unitaire), d: deviseDe(a) };
+  const nom = c.article + (o.modele && normaliserNom(c.article).indexOf(normaliserNom(o.modele)) < 0 ? ' ' + o.modele : '');
+  delete a.commande;
+  Object.assign(a, { nom, reference: o.modele || '', photo: await haPhotoDe(o, l), description: String(o.note || '').trim(), fournisseur: mkNomFournisseur(f), fournisseur_id: f.id,
+    prix_unitaire: px.p, devise: px.d,
+    qte_carton: num(o.qte_carton) || num(a.qte_carton), px: Object.assign({}, a.px, { cid: c.id, oid: o.id, le: mkMaintenant() }) });
+  if (num(a.qte_carton) > 0 && num(a.quantite) > 0) a.cartons = Math.ceil(num(a.quantite) / num(a.qte_carton));
+  o.achat_id = a.id; c.choisi = o.id; c.decision = 'acheter'; c.decide_le = mkMaintenant().slice(0, 10); c.transforme = true;
+  haEtat = null; sauverLocal(); fermerBoite(); modifierAchat(a.id);
+  avertir('🔄 Remplacé par « ' + nom + ' ».' + (a.code_barres ? '\nLe code-barres reste ' + a.code_barres + ' : si le fournisseur l\'a déjà imprimé pour l\'ancien produit, prévenez-le.' : ''), 7000);
+}
+
+// ---------- 6. Changer la photo, le nom, la description d'un produit noté (au stand, dans sa fiche, dans l'achat) ----------
+let haMod = null;
+function haModifierProduit(cid, oid) {
+  const c = trouverComparaison(cid), o = c && (c.offres || []).find(x => x.id === oid); if (!o) return;
+  const d = document.getElementById('boite');
+  haMod = { cid, oid, photo: '', sans: false, retour: d && d.open && haEtat && document.getElementById('ha_total') ? 'ha' : '' };
+  const a = pxAchatDe(o), qs = pxQualites(o).length;
+  mkBoite(`<div class="mk-dlg ct-champs"><h3>✏️ Ce produit${o.fournisseur ? ' — ' + E(o.fournisseur) : ''}</h3>
+    <div class="champ-photo"><div class="vignette" id="ham_ph">${o.photo ? `<img src="${o.photo}" alt="">` : o.photo_doc ? `<img class="ct-mini" data-doc="${E(o.photo_doc)}" alt="">` : '📦'}</div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:6px"><label class="b contour" for="ham_file" style="display:block;text-align:center;cursor:pointer">📷 ${o.photo || o.photo_doc ? 'Changer la photo' : 'Prendre / choisir la photo'}</label>
+        <input type="file" id="ham_file" accept="image/*" class="champ-cache" onchange="haModPhoto(this)">
+        <button type="button" class="b gris" onclick="haModSansPhoto()">🗑 Enlever la photo</button></div></div>
+    <label for="ham_nom">Nom du produit</label><input id="ham_nom" value="${E(c.article)}">
+    <label for="ham_ref">Modèle / référence</label><input id="ham_ref" value="${E(o.modele || '')}">
+    <label for="ham_desc">Description (couleur, taille, ce qui le distingue)</label><textarea id="ham_desc" rows="3">${E(o.note || '')}</textarea>
+    ${qs ? '<p class="px-aide">Ses prix par qualité se corrigent dans sa fiche : « ✏️ Corriger ses prix ».</p>'
+      : `<div class="duo"><div><label for="ham_prix">Prix / pièce</label><input id="ham_prix" inputmode="decimal" value="${num(o.prix) > 0 ? E(o.prix) : ''}"></div>
+        <div><label for="ham_dev">Devise</label><select id="ham_dev">${codesDevises().map(x => `<option value="${x}"${(o.devise || 'CNY') === x ? ' selected' : ''}>${x}</option>`).join('')}</select></div></div>`}
+    <div class="duo"><div><label for="ham_moq">Minimum (pièces)</label><input id="ham_moq" inputmode="numeric" value="${num(o.moq) || ''}"></div>
+      <div><label for="ham_qc">Pièces par carton</label><input id="ham_qc" inputmode="numeric" value="${num(o.qte_carton) || ''}"></div></div>
+    ${a ? '<p class="px-aide">🛒 Il est dans vos achats : son nom, sa photo et sa description y changent aussi.</p>' : ''}
+    <div class="mk-boutons"><button class="b vert" onclick="haModGarder()">✅ Garder</button><button class="b gris" onclick="haModRetour()">Annuler</button></div></div>`);
+  ctRemplirMinis();
+}
+async function haModPhoto(input) {
+  const d = await haReduirePhoto(input); if (!d) { avertir('Photo illisible : réessayez.'); return; }
+  haMod.photo = d; haMod.sans = false; const z = document.getElementById('ham_ph'); if (z) z.innerHTML = '<img src="' + d + '" alt="">';
+}
+function haModSansPhoto() { haMod.photo = ''; haMod.sans = true; const z = document.getElementById('ham_ph'); if (z) z.innerHTML = '📦'; }
+function haModGarder() {
+  let c = trouverComparaison(haMod.cid); const o = c && (c.offres || []).find(x => x.id === haMod.oid); if (!o) { haModRetour(); return; }
+  const val = (id) => { const e = document.getElementById(id); return e ? String(e.value || '').trim() : null; };
+  const nom = val('ham_nom') || c.article;
+  if (normaliserNom(nom) !== normaliserNom(c.article)) {
+    if ((c.offres || []).length <= 1) c.article = nom;
+    else {                                   // d'autres fournisseurs ont ce produit : celui-ci part sous son nouveau nom, les autres ne changent pas
+      const etaitChoisi = c.choisi === o.id;
+      c.offres = c.offres.filter(x => x !== o);
+      if (etaitChoisi) { c.choisi = null; delete c.decision; delete c.decide_le; c.transforme = false; }
+      const c2 = pxComparaison(nom, c.source || 'stand'), neuve = !c2.offres.length;
+      if (neuve) ['prix_vente_vise_gnf', 'quantite', 'marche'].forEach(k => { if (c[k] !== undefined) c2[k] = JSON.parse(JSON.stringify(c[k])); });
+      c2.offres.push(o);
+      if ((etaitChoisi || o.achat_id) && (!c2.choisi || c2.choisi === o.id)) { c2.choisi = o.id; c2.decision = 'acheter'; c2.decide_le = mkMaintenant().slice(0, 10); c2.transforme = true; }
+      (typeof negociations === 'function' ? negociations() : []).forEach(x => { if (x.px && x.px.oid === o.id) x.px.cid = c2.id; });
+      c = c2;
+    }
+  }
+  o.modele = val('ham_ref') || ''; o.note = val('ham_desc') || '';
+  if (val('ham_prix') !== null) { o.prix = pxNombre(val('ham_prix')); o.devise = val('ham_dev') || o.devise || 'CNY'; }
+  o.moq = Math.round(pxNombre(val('ham_moq'))); o.qte_carton = Math.round(pxNombre(val('ham_qc')));
+  if (haMod.photo) o.photo = haMod.photo;
+  if (haMod.sans) { o.photo = ''; o.photo_doc = ''; }
+  c.maj = mkMaintenant();
+  const a = pxAchatDe(o);
+  if (a) {
+    a.nom = c.article + (o.modele && normaliserNom(c.article).indexOf(normaliserNom(o.modele)) < 0 ? ' ' + o.modele : '');
+    a.reference = o.modele; a.description = o.note;
+    if (haMod.photo) a.photo = haMod.photo; if (haMod.sans) a.photo = '';
+    if (!num(a.qte_carton) && o.qte_carton) { a.qte_carton = o.qte_carton; if (num(a.quantite) > 0) a.cartons = Math.ceil(num(a.quantite) / o.qte_carton); }
+    a.px = Object.assign({}, a.px, { cid: c.id, oid: o.id });
+  }
+  sauverLocal(); avertir('✅ Gardé : ' + c.article + '.', 3000);
+  haModRetour();
+}
+function haModRetour() {
+  const r = haMod && haMod.retour; haMod = null;
+  if (r === 'ha' && haEtat) { haDessiner(); return; }
+  fermerBoite();
+  if (ongletActif === 'stand' && typeof asMajProduits === 'function') { asMajProduits(); if (typeof asMajQui === 'function') asMajQui(); } else dessiner();
+}
+// Le bouton ✏️ partout où un produit noté se montre : sa fiche (🛒 Ses produits et ses prix) et le stand (Notés chez lui).
+const haOffreHtmlAvant = pxOffreHtml;
+pxOffreHtml = function (c, o) {
+  const h = haOffreHtmlAvant.apply(this, arguments);
+  const neg = `<button type="button" class="b contour" onclick="pxNegocier('${c.id}','${o.id}')">🤝 Négocier</button>`;
+  return h.replace(neg, neg + `\n      <button type="button" class="b contour" onclick="haModifierProduit('${c.id}','${o.id}')">✏️ Photo, nom, description</button>`);
+};
+const haStandProduitsAvant = asProduitsHtml;
+asProduitsHtml = function (f) {
+  return haStandProduitsAvant.apply(this, arguments).replace(/<button type="button" class="suppr" aria-label="Retirer ce prix" onclick="asRetirerProduit\('([^']+)','([^']+)'\)">/g,
+    (m, cid, oid) => `<button type="button" class="modif" aria-label="Changer la photo, le nom, la description" onclick="haModifierProduit('${cid}','${oid}')">✏️</button>` + m);
+};
+
+// ---------- 7. L'achat : enlever / changer la photo, une description, remplacer par un autre produit, le code du carton ----------
+const haModifierAchatAvant = modifierAchat;
+modifierAchat = function (idA) {
+  haModifierAchatAvant.apply(this, arguments);
+  const a = trouverAchat(idA), d = document.getElementById('contenuBoite'); if (!a || !d) return;
+  const lab = d.querySelector('label[for="photoInput"]');
+  if (lab && !d.querySelector('#ha_ph_btns')) {
+    lab.textContent = a.photo ? '📷 Changer la photo' : '📷 Prendre / choisir la photo';
+    const f = a.fournisseur_id ? mkFournisseur(a.fournisseur_id) : null;
+    lab.insertAdjacentHTML('afterend', `<div id="ha_ph_btns" style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+      <button type="button" class="b gris" onclick="haEnleverPhoto('${a.id}')">🗑 Enlever la photo</button>
+      ${f ? `<button type="button" class="b contour" onclick="haProduits('${f.id}', { remplacer: '${a.id}' })">🔄 Remplacer par un autre produit</button>` : ''}</div>`);
+  }
+  if (a.code_barres && ean13Valide(a.code_barres)) d.querySelectorAll('svg[aria-label="Code-barres ' + String(a.code_barres).replace(/\D/g, '') + '"]').forEach(sv => { sv.outerHTML = e13Grand(a.code_barres); });
+  const nom = d.querySelector('#a_nom');
+  if (nom && !d.querySelector('#a_desc')) nom.insertAdjacentHTML('afterend', `<label for="a_desc">Description (modèle, couleur, ce qui le distingue)</label>
+    <textarea id="a_desc" rows="2" placeholder="ex : blanc, 3 vitesses, batterie 4 000 mAh">${E(a.description || '')}</textarea>`);
+  const marge = d.querySelector('#a_marge'), labMarge = marge && marge.previousElementSibling;
+  if (labMarge && !d.querySelector('#ctn_zone')) {
+    labMarge.insertAdjacentHTML('beforebegin', '<div id="ctn_zone" class="ctn-zone"></div>');
+    ['a_cb', 'a_qc', 'a_ct', 'a_qt'].forEach(id => { const e = document.getElementById(id); if (e) e.addEventListener('input', ctnMaj); });
+    ctnMaj();
+  }
+};
+function haEnleverPhoto(idA) {
+  const a = trouverAchat(idA); if (!a) return;
+  a.photo = ''; sauverLocal();
+  const ap = document.getElementById('apercuPhoto'); if (ap) ap.innerHTML = '📦';
+  const lab = document.querySelector('label[for="photoInput"]'); if (lab) lab.textContent = '📷 Prendre / choisir la photo';
+  const inp = document.getElementById('photoInput'); if (inp) inp.value = '';
+  avertir('🗑 Photo enlevée. « 📷 Prendre / choisir la photo » pour en mettre une autre.', 3500);
+}
+const haEnregistrerAvant = enregistrerAchat;
+enregistrerAchat = function (idA) {
+  const a = trouverAchat(idA), d = document.getElementById('a_desc');
+  if (a && d) a.description = String(d.value || '').trim();
+  return haEnregistrerAvant.apply(this, arguments);
+};
+const haCreerCodeAvant = creerCodeMaintenant;
+creerCodeMaintenant = function (idA) {
+  const r = haCreerCodeAvant.apply(this, arguments), a = trouverAchat(idA), z = document.getElementById('zoneCodeCree'), sv = z && z.querySelector('svg');
+  if (sv && a && ean13Valide(a.code_barres)) sv.outerHTML = e13Grand(a.code_barres);
+  ctnMaj(); return r;
+};
+// La fiche « Consignes pour le fournisseur » (Voyage) : chaque carton a SON code — plus « ce code sur chaque carton ».
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof ficheFournisseur !== 'function' || typeof ouvrirImprimable !== 'function') return;
+  const avant = ficheFournisseur;
+  ficheFournisseur = function () {
+    const oi = ouvrirImprimable;
+    ouvrirImprimable = function (h) {
+      let t = String(h).split('Imprimer ce code sur chaque unité vendue, et sur chaque carton.<br>')        // toutes les fiches, pas seulement la 1re
+        .join('Imprimer ce code sur chaque unité vendue. Chaque carton a son propre code (ce code + « -C » + le nombre de pièces dans le carton) : voir les étiquettes des cartons.<br>')
+        .split('<i>Print this barcode on every sales unit and on every carton.</i>').join('<i>Print this barcode on every sales unit. Each carton has its own barcode (this code + "-C" + pieces in the carton): see the carton labels.</i>');
+      (C.achats || []).forEach(a => { const pcs = ctnPcs(a); if (!a.code_barres || !(pcs > 0)) return;
+        t = t.replace('<td class="code">' + E(a.code_barres) + '</td></tr>', '<td class="code">' + E(a.code_barres) + '</td></tr>\n      <tr><th>Code du carton / <i>Carton barcode</i></th><td class="code">' + E(ctnCodeCarton(a, pcs)) + ' (Code 128)</td></tr>'); });
+      return oi.apply(this, [t].concat([].slice.call(arguments, 1)));
+    };
+    try { return avant.apply(this, arguments); } finally { ouvrirImprimable = oi; }
+  };
+});
+
+// ---------- 8. L'onglet Achats : rangé par fournisseur ----------
+function haLigneAchatHtml(a) {
+  const conforme = a.conformite && a.conformite.verifie, pcs = ctnPcs(a), q = num(a.quantite);
+  return `<div class="article" onclick="modifierAchat('${a.id}')">
+      <div class="vignette">${a.photo ? `<img src="${E(a.photo)}" alt="">` : '📦'}</div>
+      <div class="corps">
+        <div class="nom">${E(a.nom || 'Sans nom')}</div>
+        ${String(a.description || '').trim() ? `<div class="det">${E(String(a.description).slice(0, 90))}</div>` : ''}
+        <div class="det">${nf(a.quantite)} articles · ${dev(a.prix_unitaire, deviseDe(a))} l'unité</div>
+        <div class="det">${a.code_barres ? '<span class="pastille p-ok">' + E(a.code_barres) + '</span>' + (a.code_maison ? ' code du magasin' : ' code du fabricant') : '<span class="pastille p-non">sans code-barres</span>'}
+          ${a.famille ? ' · ' + E(libelleFamille(a.famille)) : ''}</div>
+        ${a.code_barres ? `<div class="det ha-carton">📦 ${pcs > 0 ? 'carton : ' + E(ctnCodeCarton(a, pcs)) + (q > pcs ? ' · ' + E(nf(Math.ceil(q / pcs))) + ' cartons' : '') : 'pièces par carton à noter'}</div>` : ''}
+        <div class="det">Coût rendu : <b>${gnf(coutRenduGnf(a))}</b>${pastilleVideos(a)}
+          ${conforme ? '<span class="pastille p-ok">conformité vérifiée</span>' : (a.conformite && a.conformite.requise ? '<span class="pastille p-non">conformité à faire</span>' : '')}</div>
+      </div>
+      <div class="val">${dev(coutAchat(a), deviseDe(a))}<div class="det" style="font-weight:400">${gnf(coutAchatGnf(a))}</div></div>
+    </div>`;
+}
+function haGroupes() {
+  const G = new Map();
+  (C.achats || []).forEach(a => {
+    const f = a.fournisseur_id ? mkFournisseur(a.fournisseur_id) : null;
+    const cle = f ? f.id : (String(a.fournisseur || '').trim() ? 'nom:' + normaliserNom(a.fournisseur) : '');
+    if (!G.has(cle)) G.set(cle, { f, nom: f ? mkNomFournisseur(f) : String(a.fournisseur || '').trim(), A: [] });
+    G.get(cle).A.push(a);
+  });
+  return [...G.values()];
+}
+function haGroupesHtml() {
+  return haGroupes().map(g => {
+    const parDev = {}; g.A.forEach(a => { const d = deviseDe(a); parDev[d] = (parDev[d] || 0) + coutAchat(a); });
+    const tot = g.A.reduce((s, a) => s + coutAchatGnf(a), 0), fid = g.f ? g.f.id : '';
+    return `<div class="carte ha-groupe"><div class="ha-g-tete"><b>${g.nom ? '🏪 ' + E(g.nom) : '📦 Sans fournisseur'}</b><br>
+        <small>${g.A.length} produit${g.A.length > 1 ? 's' : ''} · ${Object.keys(parDev).map(d => E(dev(parDev[d], d))).join(' + ')} · ${E(gnfStrict(tot))}</small></div>
+      ${g.A.map(haLigneAchatHtml).join('')}
+      <div class="ha-g-btns">${g.f ? `<button class="b vert" onclick="haProduits('${fid}')">🛒 Ajouter / enlever des produits chez lui</button>
+        <button class="b contour" onclick="ctrBoite('${fid}')">📝 Son contrat</button>` : ''}
+        <button class="b contour" onclick="ctnBoite('${fid}')">🏷 Codes-barres : pièces et cartons</button></div></div>`;
+  }).join('');
+}
+const haEcranAchatsAvant = ecranAchats;
+ecranAchats = function () {
+  const h = haEcranAchatsAvant.apply(this, arguments);
+  const bouton = '<button class="b vert" onclick="nouvelAchat()">+ Ajouter un achat</button>', neuf = '<button class="b vert" onclick="nouvelAchat()">🛒 Ajouter un achat — choisir le fournisseur</button>';
+  if (!C.achats.length) return h.replace(bouton, neuf);
+  const debut = h.indexOf('<div class="carte"><h2>Produits achetés ('), fin = debut >= 0 ? h.indexOf(bouton, debut) : -1;
+  if (debut < 0 || fin < 0) return h.replace(bouton, neuf);
+  return h.slice(0, debut) + neuf + '<div style="height:10px"></div>' + haGroupesHtml() + neuf + h.slice(fin + bouton.length);
+};
+</script>
+
 
 <script>
 

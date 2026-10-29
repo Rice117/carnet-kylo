@@ -269,6 +269,33 @@ Fichiers `suivi-1.15.0.html`, `construire-1.15.0.py` (part de la 1.14.0). Test r
 compare chaque écran et les dates à la 1.14.0, et mesure les deux). Rien de retiré.
 ⚠ Même remarque pour `KYLO-Achats.html`.
 
+Version 1.16.0 — 30/10/2026 : **Achats reliés au fournisseur ; le code-barres du carton ; un contrat sans numéro de carte, dans la ville du fournisseur**.
+« 🛒 Ajouter un achat » commence par le fournisseur (recherche par code, nom, WeChat, produit ; les 30 plus récents en tête), puis montre
+ses produits (vus au stand, demandés, puis les modèles de son catalogue qui intéressent ou ont un prix) avec photo et prix : on coche, on
+tape pièces et prix obtenu, total en direct ; « ➕ Un autre produit de sa boutique » (photo, nom, description, prix, pièces) entre dans sa
+fiche et dans la liste ; « Mettre N produits dans mes achats » relie chaque achat à son produit et à son fournisseur et lui donne son
+code-barres de pièce (bloc du carnet) ; décocher un produit déjà acheté le sort des achats (deux appuis), il reste dans la fiche. L'achat
+libre reste possible. L'onglet Achats est rangé par fournisseur (🛒 ajouter / enlever chez lui, 📝 son contrat, 🏷 codes-barres).
+Code du carton : code de la pièce + « -C » + pièces dans ce carton, en Code 128 (encodeur dans le carnet, vérifié contre la table
+standard et relu par le lecteur du carnet) ; dernier carton incomplet = son propre code ; « 📦 Tout dans un seul carton » ; un PDF
+d'étiquettes pour le fournisseur (une par produit : ligne du contrat, photo, EAN-13 ; une par carton : KYLO EURGUINE, Conakry en
+chinois, n° du contrat, 每箱 N 个, 箱号 k/T, Code 128 ; aucun prix) ; Arme 18 montre le vrai code. Contrat : section 3 « Comment vous
+le payez » (Alipay, WeChat Pay, espèces, virement ; comptes DU VENDEUR avec le nom réel ; reçu signé et tamponné pour les espèces ;
+les cases bancaires ne servent qu'au virement) ; alerte si le compte est celui de l'acheteur (KYLO, banque de France ou de Guinée) ou
+ressemble à une carte Visa / Mastercard (pas UnionPay 62…), envoi en deux appuis, « 🗑 L'effacer » ; lieu de signature et entrepôt du
+transitaire = la ville du fournisseur (义乌 / Yiwu), case « Ville où vous signez », adresse en français expliquée en chinois.
+Changer la photo, le nom, la description : d'un achat (🗑 enlever, 📷 changer, description, 🔄 remplacer par un autre produit du même
+fournisseur — le code-barres reste) et d'un produit noté (✏️ au stand et dans la fiche ; l'achat suit ; le même produit chez un autre
+fournisseur ne change pas). Chiffres sous les codes-barres : jamais sous 14 px. Fichiers `suivi-1.16.0.html`, `suivi-1.16.0-contrat.html`,
+`suivi-1.16.0-achats.html`, `construire-1.16.0.py` (part de la 1.15.0). Tests : `tests/test-carnet-1160.js` (94 contrôles, gros carnet),
+`test-maj-1160.js`, `test-reserve-1160.js`. Rien de retiré.
+⚠ Même remarque pour `KYLO-Achats.html`.
+Relecture indépendante avant mise en ligne : achats faits avant chez le même fournisseur reliés (même nom) ou montrés à part ; double
+appui sans doublon ; les messages « appuyez encore » passent par-dessus les fenêtres ouvertes (`avertir` range son message dans la
+fenêtre ouverte, `fermerBoite` le rend à la page) ; remplacer par un produit déjà acheté refusé ; retrait = frais remis au prorata ;
+carte chinoise du vendeur pas confondue avec celle de l'acheteur ; IBAN FR/GN reconnus ; « Consignes pour le fournisseur » : un code
+par carton. `tests/test-carnet-1160.js` : 112 contrôles.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

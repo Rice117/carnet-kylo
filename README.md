@@ -248,6 +248,27 @@ Fichiers `suivi-1.14.0-a-journee.js` + `suivi-1.14.0.css`, `construire-1.14.0.py
 `tests/test-carnet-1140.py` (31 contrôles), et les 51 + 57 contrôles de la 1.13.0 rejoués sur la 1.14.0. Rien de retiré.
 ⚠ Même remarque pour `KYLO-Achats.html`.
 
+Version 1.15.0 — 29/10/2026 : **Le carnet ne chauffe plus le téléphone ; « ✅ À contacter » en haut ; le bloc de codes-barres ne se perd plus**.
+Mesuré d'abord (carnet de test aussi gros que le vrai : 132 fournisseurs, 3 760 modèles, 413 photos, 68 produits vus avec photo ;
+processeur ralenti ×4) : chaque geste coûtait cher — toucher « ✅ À contacter » 5 fois : 18,7 s de calcul ; taper 20 lettres : 6,4 s ;
+l'écran 🏭 Fournisseurs pesait 18 à 28 Mo parce que chaque photo y était recopiée en texte à chaque dessin. Désormais : 0,6 s ; 1,5 s ;
+écran de 1,8 Mo ; au repos 0,5 %. Comment : les photos de l'écran principal passent par une adresse courte (`blob:`, gardée une fois)
+et ne se chargent qu'en arrivant à l'écran (`loading="lazy"`) — les petits QR et les fenêtres ne changent pas (appui long →
+« Enregistrer dans Photos ») ; les petites photos et les images du carnet sont lues en une seule fois dans la réserve ; un
+enregistrement par geste (au plus tard 2,5 s après, et tout de suite en quittant l'application : `pagehide`, `visibilitychange`,
+`freeze`) ; « ✅ À contacter » ne redessine que la fiche touchée ; les règles d'écriture des dates sont gardées ; l'appareil photo du
+carnet s'éteint 12 s après (au lieu de 45 s). Rien ne change dans les données.
+« ✅ À contacter » : une carte tout en haut de 🏭 Fournisseurs (WeChat, 📞, « ✔ Contacté » → « Déjà contactés », `contacte_le`) ;
+le filtre « ✅ À contacter » marche aussi en vue « 📂 Par catégorie » (il était ignoré).
+Codes-barres : la ligne du magasin est comprise même abîmée (point de l'iPhone, tiret long, espace insécable, minuscules, O pour 0,
+milliers séparés, les deux colonnes copiées, plusieurs lignes d'un coup) ; plusieurs blocs (`C.blocs_suivants`, le suivant prend le
+relais, `C.blocs_finis`) ; une copie à part (`localStorage kylo_blocs_v1`, numéro suivant qui ne recule jamais) remet les blocs si le
+carnet est remplacé par un fichier ou effacé ; un fichier de Claude peut apporter `blocs` (📥) ; 📋 Coller ; l'astuce « Texte en
+direct » de l'appareil photo. Ouvrir un fichier carnet demande confirmation dès qu'il y a des fournisseurs (avant : seulement des achats).
+Fichiers `suivi-1.15.0.html`, `construire-1.15.0.py` (part de la 1.14.0). Test rejouable : `tests/test-carnet-1150.js` (85 contrôles,
+compare chaque écran et les dates à la 1.14.0, et mesure les deux). Rien de retiré.
+⚠ Même remarque pour `KYLO-Achats.html`.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

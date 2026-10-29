@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.14.0';
+window.KYLO_APPLICATION = '1.15.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -3453,25 +3453,7 @@ function ecranVoyage() {
     <button class="b contour" onclick="chargerExemple()">Charger un voyage d'exemple</button>
   </div>` : ''}
   ${carteReferenceCodes()}
-  <div class="carte"><h2>Les codes-barres du voyage</h2>
-    ${(() => { const b = blocDuCarnet(); return b
-      ? `<p>Le magasin a confié à ce carnet <b>${b.fin - b.debut + 1} codes-barres</b>.
-          Il en reste <b>${resteDuBloc()}</b>.</p>
-         <p class="muet">Chaque achat que vous confirmez reçoit son code tout de suite, ici, sans Internet.
-         Au retour, les étiquettes s'impriment avant même que le conteneur arrive, et l'entrée en stock
-         se fait à la douchette.</p>
-         <p class="muet">Bloc ${E(b.jeton || '')} · préfixe ${E(b.prefixe)} · du ${E(b.debut)} au ${E(b.fin)}</p>`
-      : `<p>Ce carnet n'a pas de bloc de codes.</p>
-         <p class="muet">Sans bloc, les achats partent sans code-barres et le magasin leur en donnera un
-         au retour — vous ne pourrez pas imprimer les étiquettes à l'avance.</p>
-         <p class="muet"><b>Pour en obtenir un :</b> au magasin, ouvrez <i>Administration → Codes-barres</i>,
-         bouton « Préparer un voyage ». Recopiez la ligne affichée ci-dessous, ou ouvrez simplement ce
-         carnet depuis le magasin : le bloc arrive tout seul.</p>
-         <div class="ligne" style="gap:8px">
-           <input id="v_bloc" placeholder="BLOC-A1B2C3 20 1250 1749" style="flex:1">
-           <button class="b contour" style="width:auto" onclick="definirBloc(document.getElementById('v_bloc').value)">Enregistrer le bloc</button>
-         </div>`; })()}
-  </div>
+  ${blCarteHtml()}
   <div class="carte"><h2>Comment ça marche</h2>
     <p class="muet">1. Vous saisissez chaque achat sur place, avec sa photo.<br>
     2. Vous ajoutez les frais du voyage (transport, douane, taxi, hôtel) : ils sont répartis sur les
@@ -18744,6 +18726,522 @@ ecranRencontres = function () {
   return i < 0 ? b + h : h.slice(0, i) + b + h.slice(i);
 };
 </script>
+<style>
+/* ===================== 1.15.0 — 29/10/2026 ===================== */
+/* A. La liste « À contacter », en haut de 🏭 Fournisseurs */
+.ac-carte{border:2px solid var(--vert);background:var(--carte)}
+.ac-carte>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:19px;font-weight:900;color:var(--noir);min-height:48px}
+.ac-carte>summary::-webkit-details-marker{display:none}
+.ac-carte>summary .ac-n{margin-left:auto;background:var(--vert);color:#fff;border-radius:999px;padding:4px 14px;font-size:17px}
+.ac-vide{font-size:16px;line-height:1.5;color:var(--texte-note);margin:8px 0 2px}
+.ac-l{border-top:1px solid var(--lisiere);padding:12px 0;display:grid;gap:8px}
+.ac-l:first-of-type{border-top:0}
+.ac-qui{font-size:17px;line-height:1.35;color:var(--noir);cursor:pointer}
+.ac-qui small{display:block;font-size:15px;color:var(--texte-note);font-weight:500;margin-top:2px}
+.ac-bt{display:flex;flex-wrap:wrap;gap:8px}
+.ac-bt .b{width:auto;flex:1 1 auto;min-height:48px;font-size:16px;padding:0 14px;margin:0}
+.ac-fait{margin-top:10px}
+.ac-fait>summary{font-size:16px;font-weight:800;color:var(--texte-note);cursor:pointer;min-height:44px;display:flex;align-items:center}
+.ac-fait .ac-l{opacity:.75}
+.ac-date{font-size:15px;color:var(--vert);font-weight:800}
+/* B. Les codes-barres du voyage */
+.bl-carte textarea{width:100%;min-height:96px;font-size:18px;font-family:ui-monospace,Menlo,Consolas,monospace;text-transform:uppercase;line-height:1.4}
+.bl-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.bl-actions .b{width:auto;flex:1 1 auto;min-height:52px;font-size:17px;margin:0}
+.bl-msg{margin-top:10px;font-size:16px;line-height:1.5}
+.bl-ligne{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:16px;font-weight:800}
+.bl-liste{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:6px}
+.bl-liste li{background:var(--cv);border-radius:10px;padding:10px 12px;font-size:16px;line-height:1.45}
+.bl-liste li.actif{background:var(--vert-pale);border:1.5px solid var(--vert)}
+.bl-astuce{font-size:15px;line-height:1.5;color:var(--texte-note);margin-top:10px}
+</style>
+<script>
+'use strict';
+// =====================================================================================================
+//  CARNET 1.15.0 — 29/10/2026 (matin, Yiwu)
+//  Riche, 8 h 40, photo de l'écran « Préparer un voyage » du magasin (3 blocs) :
+//   « quand je le mets manuellement, il prend pas… il faut que je passe par Claude cinq fois… et encore le carnet de voyage
+//     il fait chauffer mon téléphone beaucoup beaucoup et il consomme énormément de batterie. Fais en sorte que ça s'arrête. »
+//  8 h 43 : « je ne vois pas la liste où est écrit À contacter quand je coche à contacter… sauf si je rentre dans
+//     Fournisseurs, et là il y a beaucoup de fournisseurs. »
+//
+//  MESURÉ avant de toucher (carnet de test aussi gros que le sien : 132 fournisseurs, 3 760 modèles, 413 photos,
+//  68 produits vus avec photo ; téléphone simulé, processeur ×4 plus lent qu'un ordinateur) :
+//   - toucher « ✅ À contacter » sur 5 fiches : 21 secondes de calcul (≈ 4 s à chaque toucher) ;
+//   - taper 20 lettres dans une case : 6,8 s ; ouvrir 🏭 Fournisseurs : 4 s ; l'écran fabriqué pesait 18 à 28 Mo,
+//     parce que chaque photo y était recopiée en entier, en texte, à chaque fois que l'écran se redessinait, puis relue
+//     par le téléphone (et chaque morceau du carnet la recopiait encore pour y ajouter ses boutons) ;
+//   - au repos : presque rien (1,9 %). Ce n'est donc pas une boucle cachée : c'est CHAQUE geste qui coûtait cher.
+//  Ce qui change (rien n'est effacé, rien ne change dans ce que Riche voit, sauf les deux cartes A et B) :
+//   1. Les photos ne sont plus recopiées dans l'écran : l'écran reçoit une petite adresse (« blob: ») vers la même image,
+//      gardée une fois pour toutes. Les photos hors de l'écran ne se chargent qu'au moment où on y arrive.
+//   2. Les petites photos (cartes, pages) sont lues en UNE fois dans la réserve, au lieu d'ouvrir la réserve photo par photo.
+//   3. L'enregistrement attend la fin du geste : taper 20 lettres = 1 enregistrement, pas 20. Il se fait au plus tard
+//      2,5 s après, et TOUT DE SUITE quand on quitte l'application (WeChat, écran éteint, fermeture).
+//   4. « ✅ À contacter » ne redessine plus les 132 fiches : seule la fiche touchée change.
+//   5. Les dates (« vu le 27/10 à 14:18 ») ne refabriquent plus leur règle d'écriture à chaque fiche.
+//   6. L'appareil photo du carnet s'éteint 12 s après avoir été refermé (au lieu de 45 s : la caméra en 4K chauffe).
+//  A. La liste « ✅ À contacter » en haut de 🏭 Fournisseurs, avec WeChat, appel et « ✔ Contacté ».
+//     Et le filtre « ✅ À contacter » marche aussi dans la vue « 📂 Par catégorie » (il était ignoré).
+//  B. Le bloc de codes-barres : la ligne du magasin est comprise même avec un point, un tiret long, un espace en trop,
+//     des milliers séparés, ou les 3 lignes collées d'un coup ; on peut garder PLUSIEURS blocs (le suivant prend le relais
+//     quand l'un est fini) ; une copie est gardée à part, et revient toute seule si le carnet est remplacé par un fichier
+//     (c'est ce qui le faisait « disparaître ») ; un fichier de Claude peut l'apporter (📥, comme les catalogues).
+// =====================================================================================================
+window.KYLO_LEGER = '1.15.0';
+
+// ---------- 1. Les photos ne sont plus recopiées dans l'écran ----------
+const VG_URL = new Map();                 // image (data:…) → adresse courte (blob:…)
+const VG_SEUIL = 20000;                   // les petits QR restent tels quels (appui long → « Enregistrer dans Photos »)
+function vgBlobUrl(d) {
+  if (typeof d !== 'string' || d.length < VG_SEUIL || !d.startsWith('data:image')) return d;
+  let u = VG_URL.get(d); if (u) return u;
+  try {
+    const i = d.indexOf(','), tete = d.slice(5, i);
+    if (!/;base64$/i.test(tete)) return d;
+    const bin = atob(d.slice(i + 1)), o = new Uint8Array(bin.length);
+    for (let k = 0; k < bin.length; k++) o[k] = bin.charCodeAt(k);
+    u = URL.createObjectURL(new Blob([o], { type: tete.split(';')[0] || 'image/jpeg' }));
+  } catch (e) { return d; }
+  VG_URL.set(d, u);
+  return u;
+}
+const VG_RE_SRC = /src="(data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+)"/gi;
+function vgAlleger(h, paresseux) {
+  if (typeof h !== 'string' || h.indexOf('<img') < 0) return h;
+  if (h.indexOf('data:image') >= 0) h = h.replace(VG_RE_SRC, (m, d) => d.length < VG_SEUIL ? m : 'src="' + vgBlobUrl(d) + '"');
+  // Une photo hors de l'écran ne se charge qu'au moment où l'on y arrive (le téléphone ne décode plus 400 photos d'un coup).
+  if (paresseux) h = h.replace(/<img(?![^>]*\bloading=)/g, '<img loading="lazy" decoding="async"');
+  return h;
+}
+// Toute page posée dans l'écran principal passe par ici (les fenêtres : rien ne change, l'appui long sur un QR reste possible).
+(function vgInstaller() {
+  const P = Element.prototype, dIn = Object.getOwnPropertyDescriptor(P, 'innerHTML'), dOut = Object.getOwnPropertyDescriptor(P, 'outerHTML');
+  const dansEcran = (el) => { const e = document.getElementById('ecran'); return !!(e && el && (el === e || e.contains(el))); };
+  if (dIn && dIn.set) Object.defineProperty(P, 'innerHTML', { configurable: true, enumerable: dIn.enumerable, get: dIn.get,
+    set(v) { dIn.set.call(this, dansEcran(this) ? vgAlleger(String(v), true) : v); } });
+  if (dOut && dOut.set) Object.defineProperty(P, 'outerHTML', { configurable: true, enumerable: dOut.enumerable, get: dOut.get,
+    set(v) { dOut.set.call(this, dansEcran(this) ? vgAlleger(String(v), true) : v); } });
+  const ins = P.insertAdjacentHTML;
+  P.insertAdjacentHTML = function (pos, v) { return ins.call(this, pos, dansEcran(this) ? vgAlleger(String(v), true) : v); };
+})();
+// La fiche d'un fournisseur dans la liste : allégée tout de suite (sinon chaque morceau du carnet recopiait 18 Mo).
+const vgFicheAvant = mkCarteFournisseurHtml;
+mkCarteFournisseurHtml = function () { return vgAlleger(vgFicheAvant.apply(this, arguments), true); };
+
+// ---------- 2. Les petites photos : lues en une fois ----------
+ctRemplirMinis = function () {
+  const manque = new Map();
+  document.querySelectorAll('img.ct-mini[data-doc]').forEach(img => {
+    const id = img.getAttribute('data-doc'), c = ctMiniCache[id];
+    if (c) { const u = vgBlobUrl(c); if (img.getAttribute('src') !== u) img.src = u; return; }
+    if (!manque.has(id)) manque.set(id, []);
+    manque.get(id).push(img);
+  });
+  if (!manque.size) return;
+  ctOuvrir().then(db => {
+    let tx;
+    try { tx = db.transaction(CT_TABLE, 'readonly'); } catch (e) { try { db.close(); } catch (e2) {} return; }
+    const st = tx.objectStore(CT_TABLE);
+    manque.forEach((imgs, id) => {
+      const r = st.get(id + '~m');
+      r.onsuccess = () => {
+        const src = r.result;
+        if (src) { ctMiniCache[id] = src; const u = vgBlobUrl(src); imgs.forEach(i => { i.src = u; }); }
+        else imgs.forEach(i => { i.alt = 'photo restée sur un autre appareil'; });
+      };
+    });
+    tx.oncomplete = () => db.close();
+    tx.onerror = tx.onabort = () => { try { db.close(); } catch (e) {} };
+  }).catch(() => {});
+};
+// Au démarrage : les images du carnet reviennent de la réserve en UNE lecture (au lieu d'une ouverture par image).
+clRestaurerImages = function () {
+  if (clRestauration && clDernierC === C) return clRestauration;
+  clDernierC = C;
+  const refs = clRefsDe(C, []);
+  if (!refs.length) { clRestauration = Promise.resolve(0); return clRestauration; }
+  clRestauration = (async () => {
+    const aLire = [...new Set(refs.map(r => r[2]).filter(id => !CL_IMG.get(id)))];
+    if (aLire.length) {
+      try {
+        const db = await ctOuvrir();
+        await new Promise((ok) => {
+          let tx; try { tx = db.transaction(CT_TABLE, 'readonly'); } catch (e) { ok(); return; }
+          const st = tx.objectStore(CT_TABLE);
+          aLire.forEach(id => { const r = st.get(id); r.onsuccess = () => { if (r.result) CL_IMG.set(id, r.result); }; });
+          tx.oncomplete = tx.onerror = tx.onabort = () => ok();
+        });
+        try { db.close(); } catch (e) {}
+      } catch (e) { /* la réserve ne répond pas : les images restent à leur place dans la réserve */ }
+    }
+    let n = 0;
+    for (const [o, k, id] of refs) {
+      const src = CL_IMG.get(id);
+      if (src) { o[k] = src; CL_REF.set(src, { id, ok: true }); n++; }
+    }
+    if (n) { try { dessiner(); } catch (e) {} }
+    return n;
+  })();
+  return clRestauration;
+};
+
+// ---------- 3. Un enregistrement par geste, pas un par lettre ----------
+// Avant : chaque lettre tapée, chaque case cochée réécrivait TOUT le carnet (des Mo) dans la mémoire du téléphone.
+let svMinuterie = null, svDebut = 0, svEnAttente = false;
+const svAvant = sauverLocal;
+sauverLocal = function () {
+  try { C.maj_le = new Date().toISOString(); } catch (e) {}
+  modifieDepuisEnregistrement = true;
+  svEnAttente = true;
+  const t = Date.now(); if (!svDebut) svDebut = t;
+  clearTimeout(svMinuterie);
+  svMinuterie = setTimeout(svMaintenant, Math.max(0, Math.min(700, 2500 - (t - svDebut))));
+  try { majEtat(); } catch (e) {}
+};
+// Écrit tout de suite ce qui attend. Appelée aussi quand on quitte l'application (WeChat, écran éteint, fermeture).
+function svMaintenant() {
+  clearTimeout(svMinuterie); svMinuterie = null; svDebut = 0;
+  if (!svEnAttente) return false;
+  svEnAttente = false;
+  const m = modifieDepuisEnregistrement;           // un fichier « Enregistrer » fait entre-temps reste compté comme fait
+  try { svAvant.apply(window, []); } finally { modifieDepuisEnregistrement = m; try { majEtat(); } catch (e) {} }
+  return true;
+}
+function svAttend() { return svEnAttente; }
+window.addEventListener('pagehide', svMaintenant);
+window.addEventListener('beforeunload', svMaintenant);
+document.addEventListener('freeze', svMaintenant);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') svMaintenant(); });
+// Une nouvelle version qui rouvre le carnet : ce qui attend s'écrit d'abord.
+const svPeutRechargerAvant = kyloPeutRecharger;
+kyloPeutRecharger = function () { svMaintenant(); return svPeutRechargerAvant.apply(this, arguments); };
+
+// ---------- 5. Les dates : la règle d'écriture est fabriquée une fois ----------
+(function dtCache() {
+  const cache = new Map();
+  const DATE = ['weekday', 'year', 'month', 'day'], HEURE = ['dayPeriod', 'hour', 'minute', 'second', 'fractionalSecondDigits'];
+  const regle = (requis, loc, opt) => {
+    const k = requis + '|' + String(loc) + '|' + JSON.stringify(opt || {});
+    let f = cache.get(k);
+    if (!f) {
+      const o = Object.assign({}, opt || {});
+      let manque = !o.dateStyle && !o.timeStyle;
+      (requis === 'date' ? DATE : HEURE).forEach(x => { if (o[x] !== undefined) manque = false; });
+      if (manque) (requis === 'date' ? ['year', 'month', 'day'] : ['hour', 'minute', 'second']).forEach(x => { o[x] = 'numeric'; });
+      f = new Intl.DateTimeFormat(loc, o);
+      cache.set(k, f);
+    }
+    return f;
+  };
+  const jour = Date.prototype.toLocaleDateString, heure = Date.prototype.toLocaleTimeString;
+  Date.prototype.toLocaleDateString = function (loc, opt) {
+    if (isNaN(this.getTime()) || (loc !== undefined && typeof loc !== 'string')) return jour.call(this, loc, opt);
+    try { return regle('date', loc, opt).format(this); } catch (e) { return jour.call(this, loc, opt); }
+  };
+  Date.prototype.toLocaleTimeString = function (loc, opt) {
+    if (isNaN(this.getTime()) || (loc !== undefined && typeof loc !== 'string')) return heure.call(this, loc, opt);
+    try { return regle('heure', loc, opt).format(this); } catch (e) { return heure.call(this, loc, opt); }
+  };
+})();
+
+// ---------- 6. L'appareil photo s'éteint plus vite ----------
+const caRelacherAvant = asFluxRelacher;
+asFluxRelacher = function (delai) { return caRelacherAvant.call(this, delai == null ? 12000 : Math.min(Number(delai) || 0, 12000)); };
+
+// ---------- A. La liste « ✅ À contacter » ----------
+function acListe() { return mkFournisseurs().filter(f => f.decision === 'contacter'); }
+function acLigneHtml(f) {
+  const tel = fsTel(f), aWx = f.wechat || f.wechat_lien || f.qr_photo;
+  const lieu = [f.ville, f.allee || f.marche].filter(Boolean).join(' · ');
+  return `<div class="ac-l" id="acl-${f.id}">
+    <div class="ac-qui" onclick="ctOuvrirDossier('${f.id}')"><span class="mk-code">${E(f.code || '—')}</span> <b>${E(asNomTete(f))}</b>
+      ${f.contacte_le ? `<span class="ac-date"> · ✔ contacté le ${E(mkJour(f.contacte_le))}</span>` : ''}
+      <small>${E([f.nom && f.societe ? f.societe : '', lieu].filter(Boolean).join(' — ') || 'touchez pour ouvrir sa fiche')}</small></div>
+    <div class="ac-bt">
+      ${aWx ? `<button type="button" class="b wechat" onclick="mkContact('${f.id}')">💬 WeChat</button>` : ''}
+      ${tel ? `<button type="button" class="b contour" onclick="location.href='tel:${E(tel.replace(/[^\d+]/g, ''))}'">📞 Appeler</button>` : ''}
+      ${f.contacte_le
+        ? `<button type="button" class="b gris" onclick="acContacte('${f.id}', false)">↩︎ Pas encore</button>`
+        : `<button type="button" class="b vert" onclick="acContacte('${f.id}', true)">✔ Contacté</button>`}
+    </div></div>`;
+}
+function acCarteHtml() {
+  const L = acListe(), aFaire = L.filter(f => !f.contacte_le), faits = L.filter(f => f.contacte_le);
+  let ouvert = true; try { ouvert = localStorage.getItem('kylo_ac_ferme') !== '1'; } catch (e) {}
+  return `<details class="carte ac-carte" id="ac_carte"${ouvert ? ' open' : ''} ontoggle="acPlier(this.open)">
+    <summary>✅ À contacter <span class="ac-n">${aFaire.length}</span></summary>
+    ${L.length ? '' : `<p class="ac-vide">Personne pour l'instant. Sur la fiche d'un fournisseur, touchez <b>✅ À contacter</b> : il apparaît ici, en haut, avec son WeChat et son téléphone.</p>`}
+    ${aFaire.map(acLigneHtml).join('')}
+    ${L.length && !aFaire.length ? `<p class="ac-vide">✔ Tous ceux de la liste sont contactés.</p>` : ''}
+    ${faits.length ? `<details class="ac-fait"><summary>✔ Déjà contactés (${faits.length})</summary>${faits.map(acLigneHtml).join('')}</details>` : ''}
+  </details>`;
+}
+function acPlier(ouvert) { try { localStorage.setItem('kylo_ac_ferme', ouvert ? '0' : '1'); } catch (e) {} }
+function acMaj() { const z = document.getElementById('ac_carte'); if (z) z.outerHTML = acCarteHtml(); }
+function acContacte(fid, oui) {
+  const f = mkFournisseur(fid); if (!f) return;
+  if (oui) f.contacte_le = mkMaintenant(); else delete f.contacte_le;
+  sauverLocal(); acMaj();
+  if (oui) avertir('✔ ' + mkNomFournisseur(f) + ' : contacté. Il reste dans « Déjà contactés ».', 3000);
+}
+// En haut de 🏭 Fournisseurs, avant tout le reste.
+const acRencontresAvant = ecranRencontres;
+ecranRencontres = function () { return acCarteHtml() + acRencontresAvant.apply(this, arguments); };
+// Les puces du filtre, remises à jour sans tout redessiner.
+function acMajPuces() {
+  const z = document.querySelector('#ecran .mk-filtres:not(.vl-filtres)'); if (!z) return;
+  const n = mkCompterDecisions();
+  const filtres = [['tous', 'Tous'], ['contacter', '✅ À contacter'], ['voir', '🤔 Peut-être'], ['non', '❌ Non'], ['rien', '❔ Pas décidé']];
+  z.innerHTML = filtres.map(([k, t]) => `<button type="button" class="mk-puce${mkFiltre === k ? ' on' : ''}" onclick="mkFiltrer('${k}')">${t} (${n[k]})</button>`).join('');
+}
+// « ✅ À contacter » sur une fiche : seule cette fiche change (avant : les 132 fiches redessinées à chaque toucher).
+const acDeciderAvant = mkDecider;
+mkDecider = function (fid, d) {
+  const el = document.getElementById('mkf-' + fid), f = mkFournisseur(fid);
+  if (!f || ongletActif !== 'rencontres' || !el) {
+    const r = acDeciderAvant.apply(this, arguments);
+    if (f && f.decision === 'contacter') avertir('✅ ' + mkNomFournisseur(f) + ' ajouté à la liste « À contacter » (en haut de 🏭 Fournisseurs).', 3500);
+    return r;
+  }
+  f.decision = f.decision === d ? '' : d;
+  if (f.decision === 'contacter') f.a_contacter_le = mkMaintenant();
+  sauverLocal();
+  const sort = mkFiltre !== 'tous' && (mkFiltre === 'rien' ? !!f.decision : f.decision !== mkFiltre);
+  if (sort) el.remove();
+  else { el.outerHTML = mkCarteFournisseurHtml(f); ctRemplirMinis(); }
+  acMajPuces(); acMaj();
+  if (f.decision === 'contacter') avertir('✅ ' + mkNomFournisseur(f) + ' est dans « À contacter », tout en haut (' + acListe().filter(x => !x.contacte_le).length + ').', 3500);
+};
+// Le filtre « ✅ À contacter » marche aussi dans la vue « 📂 Par catégorie » (avant : il montrait tout le monde).
+const acCategorieAvant = clListeParCategorie;
+clListeParCategorie = function () {
+  if (mkFiltre === 'tous') return acCategorieAvant.apply(this, arguments);
+  const tous = mkFournisseursRecents;
+  mkFournisseursRecents = function () { return tous.apply(this, arguments).filter(f => mkFiltre === 'rien' ? !f.decision : f.decision === mkFiltre); };
+  try {
+    const h = acCategorieAvant.apply(this, arguments);
+    return mkFournisseursRecents().length ? h : '<div class="carte"><p class="mk-aide" style="font-size:16px">Aucun fournisseur dans ce choix.</p></div>';
+  } finally { mkFournisseursRecents = tous; }
+};
+
+// ---------- B. Les blocs de codes-barres du magasin ----------
+// Une ligne du magasin : « BLOC-A1B2C3D4E5F6 20 1250 1749 » (le nom du bloc, la base 20, le premier et le dernier numéro).
+const BL_COTE = 'kylo_blocs_v1';
+function blCle(b) { return b.prefixe + ':' + b.debut + '-' + b.fin; }
+// Comprend la ligne même abîmée : point ajouté par l'iPhone (deux espaces), tiret long, espace insécable, minuscules,
+// lettre O à la place du zéro dans les nombres, milliers séparés (« 1 027 »), plusieurs lignes collées d'un coup.
+function blLire(texte) {
+  const t = String(texte || '').toUpperCase().normalize('NFKC')
+    .replace(/[‐-―−﹘﹣－]/g, '-').replace(/[  -​ 　]/g, ' ');
+  const morceaux = t.split(/\n|(?=BLOC)/).map(s => s.trim()).filter(Boolean);
+  const blocs = [], erreurs = [];
+  const rates = [];
+  morceaux.forEach(m => {
+    const r = blLireUne(m);
+    if (r.bloc) blocs.push(r.bloc); else if (r.erreur) rates.push(r);
+  });
+  // Les deux colonnes copiées ensemble (« BLOC-… » puis « BLOC-… 20 1027 1526 ») : le nom seul n'est pas une erreur.
+  rates.forEach(r => { if (!(r.jeton && blocs.some(b => b.jeton === r.jeton))) erreurs.push(r.erreur); });
+  return { blocs, erreurs };
+}
+function blLireUne(m) {
+  let jeton = '', reste = m;
+  const j = /^BLOC\s*[-_.:]?\s*([A-Z0-9]{4,20})\b/.exec(m);
+  if (j) { jeton = 'BLOC-' + j[1]; reste = m.slice(j[0].length); }
+  else {
+    const k = /^([A-Z0-9]*[A-Z][A-Z0-9]*)\b/.exec(m);        // le nom sans « BLOC- » devant
+    if (k && k[1].length >= 6) { jeton = 'BLOC-' + k[1]; reste = m.slice(k[0].length); }
+  }
+  // Dans les nombres seulement : la lettre O pour un zéro, I ou L pour un 1 (clavier, ou ligne lue sur une photo).
+  const nombres = reste.split(/[^A-Z0-9]+/).filter(x => /^[0-9OIL]+$/.test(x) && /[0-9]/.test(x)).map(x => x.replace(/O/g, '0').replace(/[IL]/g, '1'));
+  if (!nombres.length) return { jeton, erreur: jeton ? 'Il manque les nombres après ' + jeton + ' (la base 20, le premier et le dernier numéro).' : '' };
+  const pre = nombres[0], R = nombres.slice(1);
+  if (!/^(02|2\d)$/.test(pre)) return { erreur: '« ' + m.slice(0, 60) + ' » : la base doit être 20 à 29 (ou 02), j\'ai lu ' + pre + '.' };
+  let deb = null, fin = null;
+  if (R.length === 2) { deb = Number(R[0]); fin = Number(R[1]); }
+  else if (R.length > 2) {                                        // des milliers séparés : « 1 027 1 526 »
+    const groupe = (L) => L.length && L[0].length <= 3 && L.slice(1).every(x => x.length === 3) ? Number(L.join('')) : null;
+    for (let i = 1; i < R.length; i++) {
+      const a = groupe(R.slice(0, i)), b = groupe(R.slice(i));
+      if (a !== null && b !== null && a <= b) { deb = a; fin = b; break; }
+    }
+  }
+  if (deb === null || fin === null) return { erreur: '« ' + m.slice(0, 60) + ' » : il faut le premier ET le dernier numéro du bloc (ex. 1027 1526).' };
+  if (!(deb >= 1) || !(fin >= deb) || fin - deb + 1 > 100000 || fin > 99999999) return { erreur: '« ' + m.slice(0, 60) + ' » : du ' + deb + ' au ' + fin + ', ce n\'est pas un bloc possible.' };
+  return { bloc: { jeton: jeton || 'BLOC-' + pre + '-' + deb, prefixe: pre, debut: deb, fin, suivant: deb } };
+}
+// Tous les blocs connus : celui en cours (C.bloc) et ceux qui attendent (C.blocs_suivants).
+function blTous() {
+  if (!Array.isArray(C.blocs_suivants)) C.blocs_suivants = [];
+  return (C.bloc ? [C.bloc] : []).concat(C.blocs_suivants);
+}
+function blReste(b) { return b ? Math.max(0, b.fin - b.suivant + 1) : 0; }
+// La copie à part : elle revient si le carnet est remplacé (fichier ouvert, carnet effacé). Le numéro suivant ne recule jamais.
+function blLireCote() { try { const x = JSON.parse(localStorage.getItem(BL_COTE) || 'null'); return x && Array.isArray(x.blocs) ? x : null; } catch (e) { return null; } }
+function blGarderCote() {
+  try {
+    const avant = blLireCote(), vus = new Map((avant ? avant.blocs : []).map(b => [blCle(b), b]));
+    blTous().forEach(b => { const v = vus.get(blCle(b)); vus.set(blCle(b), Object.assign({}, b, { suivant: Math.max(b.suivant, v ? v.suivant : 0) })); });
+    localStorage.setItem(BL_COTE, JSON.stringify({ actif: C.bloc ? blCle(C.bloc) : '', blocs: [...vus.values()], le: new Date().toISOString() }));
+  } catch (e) {}
+}
+// Remet les blocs à leur place : ceux de la copie à part qui manquent, le numéro suivant le plus avancé, et un bloc fini
+// laisse la main au suivant.
+function blAssurer() {
+  if (!C) return;
+  if (!Array.isArray(C.blocs_suivants)) C.blocs_suivants = [];
+  let change = false;
+  const cote = blLireCote();
+  if (cote) {
+    const ici = new Map(blTous().map(b => [blCle(b), b]));
+    cote.blocs.forEach(x => {
+      const b = ici.get(blCle(x));
+      if (b) { if (x.suivant > b.suivant) { b.suivant = x.suivant; change = true; } }
+      else if (blReste(x) > 0) {
+        const n = { jeton: x.jeton, prefixe: x.prefixe, debut: x.debut, fin: x.fin, suivant: x.suivant };
+        if (!C.bloc && cote.actif === blCle(x)) C.bloc = n; else C.blocs_suivants.push(n);
+        change = true;
+      }
+    });
+  }
+  if ((!C.bloc || blReste(C.bloc) <= 0) && C.blocs_suivants.some(b => blReste(b) > 0)) {
+    const i = C.blocs_suivants.findIndex(b => blReste(b) > 0);
+    const fini = C.bloc;
+    C.bloc = C.blocs_suivants.splice(i, 1)[0];
+    if (fini) { C.blocs_finis = (C.blocs_finis || []).concat([fini]); }
+    change = true;
+  }
+  if (change) { blGarderCote(); try { sauverLocal(); } catch (e) {} }
+}
+// Ajoute des blocs (lus dans une ligne, ou venus d'un fichier de Claude). Rend le compte de ce qui a été fait.
+function blAjouter(blocs) {
+  blAssurer();
+  const r = { ajoutes: [], deja: [], chevauche: [] };
+  const tous = () => blTous().concat(C.blocs_finis || []);
+  blocs.forEach(b => {
+    if (tous().some(x => blCle(x) === blCle(b))) { r.deja.push(b); return; }
+    if (tous().some(x => x.prefixe === b.prefixe && b.debut <= x.fin && x.debut <= b.fin)) { r.chevauche.push(b); return; }
+    if (!C.bloc) C.bloc = b; else C.blocs_suivants.push(b);
+    r.ajoutes.push(b);
+  });
+  blAssurer(); blGarderCote(); sauverLocal(); svMaintenant();
+  return r;
+}
+function blTexteBilan(r) {
+  const nb = (L) => L.reduce((s, b) => s + b.fin - b.debut + 1, 0);
+  return [r.ajoutes.length ? '✅ ' + r.ajoutes.length + ' bloc' + (r.ajoutes.length > 1 ? 's' : '') + ' gardé' + (r.ajoutes.length > 1 ? 's' : '') + ' : ' + nf(nb(r.ajoutes)) + ' codes-barres.' : '',
+    r.deja.length ? 'ℹ️ Déjà dans le carnet : ' + r.deja.map(b => b.jeton).join(', ') + '.' : '',
+    r.chevauche.length ? '⚠ Pas gardé (ses numéros sont déjà dans un autre bloc) : ' + r.chevauche.map(b => b.jeton).join(', ') + '.' : ''].filter(Boolean).join('\n');
+}
+// Les anciennes fonctions passent par ici.
+const blDuCarnetAvant = blocDuCarnet;
+blocDuCarnet = function () { blAssurer(); return blDuCarnetAvant.apply(this, arguments); };
+resteDuBloc = function () { blAssurer(); return blTous().reduce((s, b) => s + blReste(b), 0); };
+const blProchainAvant = prochainCodeCarnet;
+prochainCodeCarnet = function () {
+  blAssurer();
+  const r = blProchainAvant.apply(this, arguments);
+  if (r && !r.erreur) { blGarderCote(); blAssurer(); }
+  return r;
+};
+definirBloc = function (texte) {
+  const z = document.getElementById('bl_msg');
+  const { blocs, erreurs } = blLire(texte);
+  if (!blocs.length) {
+    const m = (erreurs[0] || 'Je ne trouve pas de bloc dans ce texte.') + '\nRecopiez la ligne de droite du magasin, par exemple : BLOC-A1B2C3D4E5F6 20 1250 1749';
+    if (z) z.innerHTML = `<div class="alerte a-rouge" style="font-size:16px">${E(m).replace(/\n/g, '<br>')}</div>`; else avertir(m, 8000);
+    return false;
+  }
+  const r = blAjouter(blocs), t = blTexteBilan(r) + (erreurs.length ? '\n⚠ ' + erreurs.join('\n⚠ ') : '');
+  dessiner();
+  const z2 = document.getElementById('bl_msg');
+  if (z2) { z2.innerHTML = `<div class="alerte ${r.ajoutes.length ? 'a-vert' : 'a-ambre'}" style="font-size:16px">${E(t).replace(/\n/g, '<br>')}</div>`; z2.scrollIntoView({ block: 'center' }); }
+  avertir(t, 6000);
+  return r.ajoutes.length > 0;
+};
+function blColler() {
+  const ch = document.getElementById('v_bloc');
+  if (navigator.clipboard && navigator.clipboard.readText) {
+    navigator.clipboard.readText().then(t => { if (ch) { ch.value = t; } definirBloc(t); },
+      () => { if (ch) ch.focus(); avertir('Appuyez longuement dans la case, puis « Coller ».'); });
+  } else { if (ch) ch.focus(); avertir('Appuyez longuement dans la case, puis « Coller ».'); }
+}
+// La carte « Les codes-barres du voyage » (onglet Voyage).
+function blCarteHtml() {
+  blAssurer();
+  const L = blTous(), reste = L.reduce((s, b) => s + blReste(b), 0);
+  const ligne = (b, actif) => `<li class="${actif ? 'actif' : ''}">${actif ? '▶ <b>En cours</b> · ' : 'Ensuite · '}<span class="bl-ligne">${E(b.jeton)}</span><br>
+    base ${E(b.prefixe)} · du ${E(nf(b.debut))} au ${E(nf(b.fin))} · <b>${E(nf(blReste(b)))}</b> codes libres sur ${E(nf(b.fin - b.debut + 1))}</li>`;
+  return `<div class="carte bl-carte" id="bl_carte"><h2>Les codes-barres du voyage</h2>
+    ${L.length ? `<p style="font-size:17px">Ce carnet a <b>${E(nf(reste))} codes-barres</b> libres, confiés par le magasin.</p>
+      <ul class="bl-liste">${L.map((b, i) => ligne(b, i === 0 && b === C.bloc)).join('')}</ul>
+      <p class="muet">Chaque achat confirmé reçoit son code tout de suite, ici, sans Internet. Quand un bloc est fini, le suivant prend le relais tout seul.</p>`
+    : `<p style="font-size:17px">Ce carnet n'a <b>pas encore de bloc</b> de codes-barres.</p>
+      <p class="muet">Sans bloc, les achats partent sans code-barres et le magasin leur en donne un au retour.</p>`}
+    <label for="v_bloc" style="font-size:16px;margin-top:12px">${L.length ? 'Ajouter un autre bloc' : 'Ajouter le bloc'} : la ligne de droite du magasin (« À recopier dans le carnet »). Vous pouvez en mettre plusieurs, une par ligne.</label>
+    <textarea id="v_bloc" rows="3" autocapitalize="characters" autocorrect="off" autocomplete="off" spellcheck="false" enterkeyhint="done"
+      placeholder="BLOC-A1B2C3D4E5F6 20 1250 1749"></textarea>
+    <div class="bl-actions">
+      <button type="button" class="b" onclick="definirBloc(document.getElementById('v_bloc').value)">✅ Enregistrer le bloc</button>
+      <button type="button" class="b contour" onclick="blColler()">📋 Coller</button>
+    </div>
+    <div class="bl-msg" id="bl_msg"></div>
+    <p class="bl-astuce"><b>Sans rien taper :</b> visez la ligne sur l'écran du magasin avec l'<b>appareil photo de l'iPhone</b>, touchez le petit
+      symbole « texte » qui apparaît en bas, puis <b>Copier</b>. Revenez ici et touchez <b>📋 Coller</b>.<br>
+      Ou envoyez la photo de l'écran à Claude : il vous renvoie un fichier à ajouter avec <b>📥 Ajouter un fichier de Claude</b>.</p>
+    <p class="bl-astuce">« Ouvrir le carnet depuis le magasin » ne vaut que pour le carnet du magasin, pas pour cette application installée
+      depuis Internet : ici, le bloc passe par la ligne, ou par un fichier de Claude.</p>
+  </div>`;
+}
+// Un carnet remplacé (fichier ouvert, carnet effacé, copie de la réserve) : les blocs reviennent de la copie à part.
+const blCompleterAvant = completerCarnet;
+completerCarnet = function () {
+  const c = blCompleterAvant.apply(this, arguments);
+  try { const avant = C; C = c; blAssurer(); C = avant; } catch (e) {}
+  return c;
+};
+// Un fichier de Claude peut apporter des blocs : { "format": "kylo-import", "fournisseurs": [], "blocs": ["BLOC-… 20 1027 1526", …] }
+function blDuFichier(imp) {
+  const L = Array.isArray(imp && imp.blocs) ? imp.blocs : (imp && imp.bloc ? [imp.bloc] : []);
+  const blocs = [];
+  L.forEach(x => {
+    if (typeof x === 'string') blocs.push(...blLire(x).blocs);
+    else if (x && typeof x === 'object' && x.debut != null && x.fin != null) {
+      const r = blLireUne([x.jeton || '', x.prefixe || '20', x.debut, x.fin].join(' '));
+      if (r.bloc) blocs.push(r.bloc);
+    }
+  });
+  return blocs;
+}
+const blApercuAvant = ctApercuImport;
+ctApercuImport = async function () {
+  await blApercuAvant.apply(this, arguments);
+  const imp = ctImportEnCours, z = document.getElementById('ct_apercu_import');
+  const blocs = blDuFichier(imp);
+  if (imp && z && blocs.length) {
+    z.insertAdjacentHTML('afterbegin', `<div class="alerte a-vert" style="font-size:16px">🏷️ <b>${blocs.length} bloc${blocs.length > 1 ? 's' : ''} de codes-barres</b> (${nf(blocs.reduce((s, b) => s + b.fin - b.debut + 1, 0))} codes) pour l'onglet Voyage :<br>
+      ${blocs.map(b => `<span class="bl-ligne">${E(b.jeton)} ${E(b.prefixe)} ${E(b.debut)} ${E(b.fin)}</span>`).join('<br>')}</div>`);
+    const bouton = document.getElementById('ct_bouton_import'); if (bouton) bouton.disabled = false;
+  }
+};
+const blAppliquerAvant = ctAppliquerImport;
+ctAppliquerImport = async function () {
+  const imp = ctImportEnCours, blocs = blDuFichier(imp);
+  if (!blocs.length) return blAppliquerAvant.apply(this, arguments);
+  const r = blAjouter(blocs);
+  const rien = !(imp.fournisseurs || []).length && !imp.commande && !imp.etude && !(imp.offres || []).length && !imp.marche;
+  if (rien) {
+    ctImportEnCours = null; fermerBoite(); allerA('voyage');
+    setTimeout(() => { const z = document.getElementById('bl_carte'); if (z) z.scrollIntoView({ block: 'start' }); const m = document.getElementById('bl_msg'); if (m) m.innerHTML = `<div class="alerte a-vert" style="font-size:16px">${E(blTexteBilan(r)).replace(/\n/g, '<br>')}</div>`; }, 250);
+    avertir(blTexteBilan(r), 7000);
+    return;
+  }
+  await blAppliquerAvant.apply(this, arguments);
+  setTimeout(() => avertir(blTexteBilan(r), 7000), 7200);
+};
+</script>
+
 <script>
 
 // ---------- 6. Objectif de chiffre d'affaires ----------
@@ -19536,7 +20034,7 @@ document.getElementById('fichierCarnet').addEventListener('change', function () 
         c.voyage.taux = Object.fromEntries(DEVISES_BASE.map(d => [d[0], d[2]]));
         if (c.voyage.devise && c.voyage.taux_gnf) c.voyage.taux[c.voyage.devise] = c.voyage.taux_gnf;
       }
-      if (C.achats.length && !confirmerEnDeuxTemps('ouvrir-fichier', 'Remplacer le carnet ouvert par celui-ci ? Rechoisissez le fichier pour confirmer.')) return;
+      if ((C.achats.length || fournisseursListe().length || (C.comparaisons || []).length) && !confirmerEnDeuxTemps('ouvrir-fichier', 'Remplacer le carnet ouvert par celui-ci ? Rechoisissez le fichier pour confirmer.')) return;
       C = completerCarnet(c);
       sauverLocal(); modifieDepuisEnregistrement = false; allerA('achats');
     } catch (err) { avertir('Fichier illisible : ' + err.message); }

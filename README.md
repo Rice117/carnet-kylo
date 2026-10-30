@@ -318,6 +318,25 @@ Tests : `tests/test-carnet-1170.js` (99 contrôles), la suite 1.16.0 rejouée (1
 Relecture indépendante avant mise en ligne, toutes ses remarques corrigées et rejouées dans le test. Rien de retiré.
 ⚠ Même remarque pour `KYLO-Achats.html`.
 
+Version 1.18.0 — 30/10/2026 : **Le contrôle complet de A à Z**. Cinq contrôles « comme l'utilisateur » (le voyage depuis un carnet
+vide ; argent et planification ; fournisseurs et stand ; comparer, négocier, acheter, envoyer ; contrat → réception), chaque écran et
+chaque bouton, les calculs refaits à la main, la cohérence entre écrans : 150 défauts (20 graves). Corrigés en six chantiers + un
+morceau commun + un morceau d'assemblage, chacun avec un test qui échoue sur la 1.17.0 et passe sur la 1.18.0. Règles désormais :
+**un seul coût de revient** partout (frais = le plus grand entre l'estimation du voyage et les frais notés ; pénalité de retard
+retirée) ; **marge = (vente − coût) ÷ vente** partout (anciennes marges converties sans changer les prix) ; **le prix de vente se
+décide** (plus de marge mise d'office ; un produit sans prix est « à fixer », pas « prêt ») ; **chaque prix garde sa devise**
+(devise du marché proposée : ¥ en Chine ; contrat et facture en yuans justes, nombres avec un point en chinois) ; **rien ne se
+perd** (deux appuis, « Fermer » demande, fournisseur avec achats jamais supprimé, import de Claude qui ne mélange plus deux
+fournisseurs, « Voir un exemple » qui n'efface plus rien, cartes de visite dans le fichier « Enregistrer », « 📸 Copie complète »
+avec toutes les photos) ; **jamais retaper** (prix négocié → achat, pièces par carton au stand → achat → cartons → conteneur,
+date du contrat → conteneur, un seul budget, une seule liste de frais, un seul registre d'acomptes) ; contrat signé puis modifié :
+alerte et avenant ; le bloc ne redonne jamais un code déjà porté ; livraison incomplète acceptée ; envoi au magasin avec la quantité
+reçue ; « Préparer mon voyage » avec date de retour ; nombres « 1 400 » / « 100 pièces » lus justes ; rien sous 14 px, contrastes.
+Fichiers `suivi-1.18.0-commun.html`, `suivi-1.18.0-F1…F6-*.html`, `suivi-1.18.0-Z-assemblage.html`, `construire-1.18.0.py`
+(part de la 1.17.0). Tests : `test-commun-1180.js`, `test-F1…F6-*-1180.js`, `test-assemblage-1180.js`, plus les suites 1.17.0 et
+1.16.0 rejouées, `test-maj-1180.js`, `test-reserve-1180.js`. Rien de retiré.
+⚠ Même remarque pour `KYLO-Achats.html`.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

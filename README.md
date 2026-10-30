@@ -337,6 +337,26 @@ Fichiers `suivi-1.18.0-commun.html`, `suivi-1.18.0-F1…F6-*.html`, `suivi-1.18.
 1.16.0 rejouées, `test-maj-1180.js`, `test-reserve-1180.js`. Rien de retiré.
 ⚠ Même remarque pour `KYLO-Achats.html`.
 
+Version 1.19.0 — 30/10/2026 : **Les caisses de l'argent**. Chaque frais va dans une caisse, et chaque caisse se partage entre
+les produits avec sa propre clé : 🛍 marchandise (le prix de chaque produit) ; 🤝 achat sur place (accompagnateur, interprète,
+commission de l'agent, échantillons, téléphone, banque) selon la valeur ; ✈️ voyage (billet, hôtel, repas, taxi, visa) selon la
+valeur ; 🚢 transport (transitaire en Chine, bateau au volume des cartons, avion au poids) ; 🛃 douane = % de (achat + transport),
+transitaire et port à l'arrivée selon la valeur ; 🏠 hors coût (« Ne pas répartir » : achats personnels, cadeaux) dans l'argent
+sorti, jamais dans le coût des produits. Une caisse compte l'estimation tant que les frais notés ne la dépassent pas, ou jusqu'à
+« ✅ Tout est noté » ; le surplus d'estimation se partage selon l'estimation de chaque produit. C'est la formule de l'étude
+« Achats Chine KYLO » : arrivé = (achat + bateau) × (1 + douane) + achat × (transitaire + voyage). Réglages dans l'onglet Frais
+(🧺 → ⚙ Régler mes caisses), proposés depuis l'étude quand il y en a une ; rien ne compte avant « ✅ Garder » : jusque-là, le
+calcul de la 1.18.0 est inchangé. Le % du voyage est celui qui est tapé (jamais « tous les frais ÷ budget »). « Voyage à part » :
+aucun produit ne le porte, il reste dans l'argent investi.
+Nouveau : la fenêtre d'un frais propose sa caisse ; 7 types de frais ; « 🧮 Son coût » (le coût d'un produit, caisse par caisse)
+dans Achats ; « L'argent à prévoir, caisse par caisse » (compté, quand payer, payé, reste) et « À la fin » dans Argent ; 🧭 demande
+les réglages qui manquent et signale les cartons pas mesurés (ou sans poids, en avion). Un prix vu dans Comparer est estimé de la
+même façon. Corrigé : le fichier envoyé au magasin portait la version « 1.18.0 » écrite en dur ; il donne, pour
+chaque produit, frais notés + estimés = sa part des caisses. Relu par un second contrôle indépendant (9 défauts corrigés).
+Fichiers `suivi-1.19.0-caisses.html`, `construire-1.19.0.py` (part de la 1.18.0). Tests : `test-caisses-1190.js` (38 contrôles,
+chaque coût refait à la main), plus les suites 1.18.0, 1.17.0 et 1.16.0 rejouées, `test-maj-1190.js`, réserve. Rien de retiré.
+⚠ Même remarque pour `KYLO-Achats.html`.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

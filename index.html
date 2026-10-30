@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.18.0';
+window.KYLO_APPLICATION = '1.19.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -24210,7 +24210,7 @@ function f3CarnetPourMagasin(avant) { return function () {
       a_fixer: !choisi, prix_detail_gnf: choisi ? x.prix_detail_gnf : 0, incomplet: f3Raisons(a).map(r => F3_RAISON[r]) });
   });
   copie.calculs = (copie.calculs || []).filter(x => garder.has(x.id)).map(x => { const a = trouverAchat(x.id); if (a && !f3PrixChoisi(a)) Object.assign(x, { prix_detail_gnf: 0, prix_grossiste_gnf: 0, a_fixer: true }); return x; });
-  copie.envoi = { le: mkMaintenant(), carnet: '1.18.0', produits: copie.achats.length, incomplets_envoyes: copie.achats.filter(x => x.incomplet.length).length };
+  copie.envoi = { le: mkMaintenant(), carnet: window.KYLO_APPLICATION || '1.19.0', produits: copie.achats.length, incomplets_envoyes: copie.achats.filter(x => x.incomplet.length).length };
   return copie;
 }; }
 F3_TARD.push(() => { carnetPourMagasin = f3CarnetPourMagasin(carnetPourMagasin); });
@@ -27074,6 +27074,566 @@ function zInstaller() {
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', zInstaller); else zInstaller();
 </script>
+<style>
+/* ===================== Carnet 1.19.0 — les caisses de l'argent (Riche, 30/10/2026 à 16 h 37 puis « Ok vas-y ») ===================== */
+.ca-carte h2{margin-bottom:6px}
+.ca-c{border:2px solid var(--lisiere);border-radius:14px;padding:10px 12px;margin:8px 0;background:var(--carte)}
+.ca-c.ferme{border-color:var(--vert)}
+.ca-c .t{display:flex;justify-content:space-between;gap:8px;align-items:baseline;font-size:17px;font-weight:900}
+.ca-c .l{font-size:15px;line-height:1.45;margin-top:4px}
+.ca-c .l b{white-space:nowrap}
+.ca-c .cle{font-size:14px;color:var(--anthracite);margin-top:2px}
+.ca-c button{margin-top:8px;min-height:44px;font-size:15px}
+.ca-tab{width:100%;border-collapse:collapse;font-size:15px;margin:8px 0}
+.ca-tab td{padding:7px 4px;border-bottom:1px solid var(--lisiere);vertical-align:top}
+.ca-tab td:last-child{text-align:right;white-space:nowrap;font-weight:800}
+.ca-tab tr.tot td{border-top:2px solid var(--anthracite);border-bottom:0;font-size:17px;font-weight:900}
+.ca-tab .s{display:block;font-size:14px;font-weight:600;color:var(--anthracite)}
+.ca-pastille{display:inline-block;font-size:14px;font-weight:800;border-radius:999px;padding:1px 8px;background:var(--gris-clair);color:var(--anthracite);margin-left:4px}
+.ca-pastille.est{background:#fff3cd;color:#6b4e00}
+.ca-pastille.reel{background:#e3f4ea;color:#155c35}
+html[data-theme="sombre"] .ca-pastille.est{background:#3d3000;color:#ffe08a}
+html[data-theme="sombre"] .ca-pastille.reel{background:#11331f;color:#a8e6bf}
+.ca-cout{width:auto!important;min-height:44px;font-size:15px;margin:6px 0 2px}
+/* L'argent à prévoir : une caisse par bloc (le tableau débordait à droite sur le téléphone) */
+.ca-ar{padding:9px 2px;border-bottom:1px solid var(--lisiere)}
+.ca-ar .t{display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-size:16px;font-weight:800}
+.ca-ar .t b{white-space:nowrap}
+.ca-ar .s{font-size:14px;font-weight:600;color:var(--anthracite);line-height:1.4}
+.ca-ar .s b{white-space:nowrap;color:var(--noir)}
+.ca-ar.tot{border-top:2px solid var(--anthracite);border-bottom:0;margin-top:2px}
+.ca-ar.tot .t{font-size:17px;font-weight:900}
+</style>
+<script>
+// =====================================================================================================
+// Carnet 1.19.0 — LES CAISSES DE L'ARGENT
+// Riche (30/10, 16 h 37) : « fais la différence entre l'argent investi dans le produit, les frais du voyage, le dédouanement, ce qu'on paie
+// à celui qui nous accompagne et au cargo ; catégorise pour calculer à la fin le coût du produit et combien il me reste ; trouve la belle
+// manière de faire ». Puis : « Ok, vas-y ».
+//
+// La belle manière (la même formule que son étude « Achats Chine KYLO ») :
+//   coût rendu magasin d'un produit = achat + voyage (% de la valeur) + accompagnateur (selon la valeur)
+//                                     + bateau (au VOLUME de ses cartons) ou avion (au POIDS)
+//                                     + douane (% de achat + bateau) + transitaire de Conakry (% de la valeur)
+// Chaque frais va dans SA caisse, chaque caisse se partage avec SA clé. Dans chaque caisse : l'estimation (ses réglages) tant que les vrais
+// frais notés ne la dépassent pas, ou tant que Riche n'a pas dit « ✅ tout est noté » ; ensuite les vrais.
+// Réglages dans C.voyage.caisses (et le prix du bateau dans C.voyage.px_fret_m3_usd, déjà lu par Comparer). Rien n'est retiré : tant que
+// ni la douane, ni le bateau, ni l'accompagnateur ne sont réglés, le carnet compte comme en 1.18.0.
+// =====================================================================================================
+window.KYLO_CAISSES = '1.19.0';
+const CA_NOMS = { achat: '🤝 Achat sur place', voyage: '✈️ Voyage', transport: '🚢 Transport', arrivee: '🛃 Douane et arrivée', hors: '🏠 Hors coût des produits' };
+const CA_ORDRE = ['achat', 'voyage', 'transport', 'arrivee'];
+const CA_QUAND = { marchandise: 'acompte maintenant, solde à la réception', achat: 'pendant le voyage', voyage: 'pendant le voyage', transport: 'au départ du cargo, en Chine', arrivee: 'à l\'arrivée à Conakry' };
+// Les nouveaux types de frais (avant « Autre »).
+(function () {
+  const nouveaux = ['Accompagnateur / interprète', 'Commission de l\'agent', 'Échantillons', 'Téléphone / internet', 'Transitaire en Chine (groupage)',
+    'Transitaire à Conakry', 'Achats personnels / cadeaux'];
+  if (typeof TYPES_FRAIS === 'undefined' || !Array.isArray(TYPES_FRAIS)) return;
+  const i = TYPES_FRAIS.indexOf('Autre');
+  nouveaux.filter(t => TYPES_FRAIS.indexOf(t) < 0).forEach((t, k) => TYPES_FRAIS.splice(i >= 0 ? i + k : TYPES_FRAIS.length, 0, t));
+})();
+// Le type d'un frais dit sa caisse (Riche peut la changer dans la fenêtre du frais).
+// « port » en mot entier : « transport » et « passeport » ne sont pas le port de Conakry.
+function caCaisseDuType(lib) {
+  const s = String(lib || '').toLowerCase();
+  if (/accompagn|interpr|commission de l|agent|échantillon|echantillon|frais bancaire|transfert|change|téléphone|telephone|internet/.test(s)) return 'achat';
+  if (/maritime|bateau|conteneur|aérien|aerien|fret|cargo|groupage|transitaire en chine|^assurance$/.test(s)) return 'transport';
+  if (/douane|dédouan|dedouan|transitaire|\bport\b|déchargement|dechargement|manutention|stockage|magasinage/.test(s)) return 'arrivee';
+  if (/personnel|cadeau/.test(s)) return 'hors';
+  return 'voyage';
+}
+// Hors coût ⇔ « Ne pas répartir » (repartition 'aucune') : une seule vérité, la même que le Rapport et la 1.18.0.
+// Le type ne sert qu'à proposer la caisse dans la fenêtre du frais (« Achats personnels / cadeaux » y coche « Ne pas répartir »).
+function caCaisseDe(f) { if (!f) return 'voyage'; if (f.repartition === 'aucune') return 'hors';
+  const k = CA_NOMS[f.caisse] && f.caisse !== 'hors' ? f.caisse : caCaisseDuType(f.libelle); return k === 'hors' ? 'voyage' : k; }
+function caEstDouane(f) { return /douane|dédouan|dedouan|droits/i.test(String(f && f.libelle || '')); }
+
+// ---------- Les réglages (une fois pour le voyage) ----------
+function caReg() {
+  const v = C.voyage || (C.voyage = {});
+  if (!v.caisses || typeof v.caisses !== 'object') v.caisses = caSemer();
+  const r = v.caisses;
+  if (!r.fermees || typeof r.fermees !== 'object') r.fermees = {};
+  if (!r.acc || typeof r.acc !== 'object') r.acc = { mode: '' };
+  return r;
+}
+// Les chiffres de son étude (« Achats Chine KYLO ») sont seulement PROPOSÉS dans « ⚙ Régler mes caisses » : rien ne compte,
+// rien n'est écrit dans le carnet, tant que Riche n'a pas appuyé sur « ✅ Garder ».
+function caSemer() {
+  return { source: 'vide', le: new Date().toISOString(), douane_pct: '', transit_pct: '', transport: 'bateau', fret_kg_usd: '', inclure_voyage: true, acc: { mode: '' }, fermees: {} };
+}
+function caPropose() {
+  const p = {};
+  try {
+    const e = typeof etActuelle === 'function' && Array.isArray(C.etudes) && C.etudes.length ? etActuelle() : null;
+    if (e && typeof etReg === 'function') { const g = etReg(e); p.douane = num(g.douane); p.transit = num(g.transit); p.fret = num(g.fret); p.etude = true; }
+  } catch (x) {}
+  return p;
+}
+// Les caisses comptent seulement après « ✅ Garder » dans ⚙ Régler mes caisses, et s'il y a quelque chose à compter
+// (douane, bateau, avion ou accompagnateur). Avant : exactement le calcul de la 1.18.0. Le prix du bateau tapé dans Comparer
+// (« 🚢 Le prix du bateau ») ne les allume pas.
+function caActif() {
+  const r = caReg();
+  return !!r.regle_le && (num(r.douane_pct) > 0 || num(C.voyage.px_fret_m3_usd) > 0 || num(r.fret_kg_usd) > 0 || !!(r.acc && r.acc.mode));
+}
+// Le % du voyage (billet, hôtel, repas…) : celui que Riche a tapé. Jamais « tous mes frais ÷ budget » (cela recompterait le bateau et la douane).
+function caPctVoyage() { const v = num(C.voyage.frais_pourcent); return v > 0 ? v : 0; }
+function caFretM3Gnf() { const u = num(C.voyage.px_fret_m3_usd); return u > 0 ? u * (tauxDe('USD') || 0) : 0; }
+function caFretKgGnf() { const r = caReg(), u = num(r.fret_kg_usd); return u > 0 ? u * (tauxDe(r.fret_kg_devise || 'USD') || 0) : 0; }
+// L'accompagnateur (ou l'interprète) : par jour, au forfait, ou en % des achats — estimation pour TOUT le voyage, en francs.
+function caAccEstimeGnf(M) {
+  const a = caReg().acc || {};
+  if (a.mode === 'jour') return num(a.montant) * Math.max(0, num(a.jours)) * (tauxDe(a.devise || deviseDuMarche()) || 0);
+  if (a.mode === 'forfait') return num(a.montant) * (tauxDe(a.devise || deviseDuMarche()) || 0);
+  if (a.mode === 'pct') return M * num(a.pct) / 100;
+  return 0;
+}
+
+// ---------- Le calcul (remplace le calcul unique de la 1.18.0 quand les caisses sont réglées) ----------
+const caCalculerAvant = f1Calculer;
+f1Calculer = function () {
+  if (!caActif()) { const e = caCalculerAvant.apply(this, arguments); e.ca = null; return e; }
+  const A = (C.achats || []).filter(a => a && typeof a === 'object');
+  // a. La pénalité de retard (comme la 1.18.0) : elle baisse le prix d'achat des lignes du contrat, une fois acquise.
+  const remise = {}, remiseDev = {}, vus = new Set();
+  A.forEach(a => {
+    const fid = a.fournisseur_id; if (!fid || vus.has(fid)) return; vus.add(fid);
+    const f = typeof mkFournisseur === 'function' ? mkFournisseur(fid) : null; if (!f || !f.contrat || typeof rgEtat !== 'function') return;
+    let s; try { s = rgEtat(f); } catch (x) { return; }
+    if (!(s && s.penalite > 0 && s.total > 0)) return;
+    const k = s.k || {}, et = k.etapes || {};
+    if (!((k.reception && k.reception.le) || et.solde || (Array.isArray(k.paiements) && k.paiements.some(p => p && p.quoi === 'solde')))) return;
+    rgLignes(f).forEach(x => { remise[x.id] = (remise[x.id] || 0) + s.penalite * rgEnCny(num(x.quantite) * num(x.prix_unitaire), deviseDe(x)) / s.total; });
+  });
+  A.forEach(a => { const r = remise[a.id]; if (!r) return; const d = deviseDe(a); remiseDev[a.id] = d === 'CNY' ? r : (tauxDe(d) > 0 ? r * tauxDe('CNY') / tauxDe(d) : 0); });
+  // b. 🛍 La marchandise, en francs.
+  const val = {}; let M = 0, Q = 0;
+  A.forEach(a => { const v = Math.max(0, enGnf(num(a.quantite) * num(a.prix_unitaire) - (remiseDev[a.id] || 0), deviseDe(a))); val[a.id] = v; M += v; Q += num(a.quantite); });
+  const { parOffre, lien } = f1Liens(A), R = caReg(), P = caPctVoyage();
+  // c. Le volume et le poids de chaque produit : ses cartons mesurés ; sinon la taille habituelle (étude) ; sinon la moyenne de ses produits mesurés.
+  const vol = {}, src = {}, poids = {}, douPct = {}; let Vk = 0, valK = 0;
+  A.forEach(a => {
+    let v = 0, s = '';
+    try { v = typeof volumeAchatM3 === 'function' ? num(volumeAchatM3(a)) : 0; } catch (x) { v = 0; }
+    if (v > 0) s = 'carton';
+    const l = f1Offre(lien[a.id]);
+    if (!(v > 0) && l && typeof pxVolumePiece === 'function') { const vp = pxVolumePiece(l.c, l.o); if (vp && vp.m3 > 0) { v = vp.m3 * num(a.quantite); s = vp.source === 'carton' ? 'carton' : 'typique'; } }
+    vol[a.id] = v; src[a.id] = s; if (v > 0 && val[a.id] > 0) { Vk += v; valK += val[a.id]; }
+    const nc = typeof f5NbCartons === 'function' ? num(f5NbCartons(a)) : num(a.cartons), pc = typeof clPoids === 'function' ? num(clPoids(a)) : num(a.poids_carton_kg);
+    poids[a.id] = nc > 0 && pc > 0 ? nc * pc : 0;
+    const m = l && typeof pxMarcheDe === 'function' ? pxMarcheDe(l.c) : null;
+    douPct[a.id] = m && num(m.douane_pct) > 0 ? num(m.douane_pct) : num(R.douane_pct);
+  });
+  const densite = valK > 0 ? Vk / valK : 0, inconnus = [];
+  A.forEach(a => { if (!(vol[a.id] > 0) && val[a.id] > 0) { if (densite > 0) { vol[a.id] = val[a.id] * densite; src[a.id] = 'moyenne'; } else src[a.id] = 'inconnu'; inconnus.push(a.id); } });
+  const fretM3 = caFretM3Gnf(), fretKg = caFretKgGnf(), avion = R.transport === 'avion' && fretKg > 0;
+  // d. Les estimations, caisse par caisse et produit par produit.
+  const accTot = caAccEstimeGnf(M);
+  const est = { achat: {}, voyage: {}, transport: {}, douane: {}, transit: {} };
+  A.forEach(a => {
+    const v = val[a.id];
+    est.achat[a.id] = M > 0 ? accTot * v / M : 0;
+    est.voyage[a.id] = v * P / 100;
+    est.transport[a.id] = avion && poids[a.id] > 0 ? poids[a.id] * fretKg : vol[a.id] * fretM3;
+    est.transit[a.id] = v * num(R.transit_pct) / 100;
+  });
+  const somme = (o) => A.reduce((s, a) => s + (o[a.id] || 0), 0);
+  // e. Les frais notés, rangés dans leur caisse.
+  const N = { achat: 0, voyage: 0, transport: 0, douane: 0, transit: 0 }, direct = { achat: {}, voyage: {}, transport: {}, douane: {}, transit: {} };
+  const pool = { achat: 0, voyage: 0, transport: 0, douane: 0, transit: 0 }; let H = 0;
+  (C.frais || []).forEach(f => {
+    if (f.f2_brouillon) return;
+    const m = fraisGnf(f), c0 = caCaisseDe(f);
+    if (c0 === 'hors') { H += m; return; }
+    const c = c0 === 'arrivee' ? (caEstDouane(f) ? 'douane' : 'transit') : c0;
+    N[c] += m;
+    if (f.repartition === 'produit') { if (f.produit_id && val[f.produit_id] !== undefined) direct[c][f.produit_id] = (direct[c][f.produit_id] || 0) + m; else pool[c] += m; }
+    else if (f.repartition === 'quantite') A.forEach(a => { if (Q > 0) direct[c][a.id] = (direct[c][a.id] || 0) + m * num(a.quantite) / Q; });
+    else pool[c] += m;
+  });
+  const ferme = (c) => !!R.fermees[c === 'douane' || c === 'transit' ? 'arrivee' : c];
+  const part = { achat: {}, voyage: {}, transport: {}, douane: {}, transit: {} }, sur = { achat: {}, voyage: {}, transport: {}, douane: {}, transit: {} }, compte = {}, S = {};
+  // Une caisse : le noté (direct + par sa clé) + le reste de l'estimation (au prorata de l'estimation de chaque produit).
+  const repartir = (c, cle, E) => {
+    const totCle = somme(cle), totE = E;
+    const Nc = N[c], cpt = ferme(c) ? Nc : Math.max(totE, Nc), reste = Math.max(0, cpt - Nc);
+    compte[c] = cpt; S[c] = reste;
+    A.forEach(a => {
+      let p = direct[c][a.id] || 0;
+      p += totCle > 0 ? pool[c] * (cle[a.id] || 0) / totCle : (M > 0 ? pool[c] * val[a.id] / M : 0);
+      const s2 = reste > 0 ? (totE > 0 ? reste * (est[c] ? est[c][a.id] || 0 : 0) / totE : (M > 0 ? reste * val[a.id] / M : 0)) : 0;
+      sur[c][a.id] = s2; part[c][a.id] = p + s2;
+    });
+  };
+  repartir('achat', val, somme(est.achat));
+  repartir('voyage', val, somme(est.voyage));
+  // Avion : des kilos pour les uns, des m³ (au prix du bateau) pour ceux qui n'ont pas de poids : on partage selon l'estimation en francs,
+  // jamais en additionnant des kilos et des m³.
+  const cleT = {}; A.forEach(a => { cleT[a.id] = avion ? (est.transport[a.id] || 0) : vol[a.id]; });
+  if (avion && !(somme(cleT) > 0)) A.forEach(a => { cleT[a.id] = vol[a.id]; });
+  const sansPoids = avion ? A.filter(a => !(poids[a.id] > 0) && val[a.id] > 0).map(a => a.id) : [];
+  repartir('transport', cleT, somme(est.transport));
+  // La douane se compte sur (achat + bateau), avec SON pourcentage (douane connue par Claude pour ce genre de produit, sinon le réglage).
+  const baseD = {}; A.forEach(a => { baseD[a.id] = douPct[a.id] / 100 * (val[a.id] + (part.transport[a.id] || 0)); est.douane[a.id] = baseD[a.id]; });
+  repartir('douane', baseD, somme(est.douane));
+  repartir('transit', val, somme(est.transit));
+  // « Voyage dans le coût des produits ? Non, à part » : la caisse du voyage reste comptée (estimation ou vrais frais) dans l'argent
+  // investi, mais aucun produit n'en porte une part : elle passe dans 🏠 hors coût.
+  let Hv = 0;
+  if (R.inclure_voyage === false) { Hv = compte.voyage; H += Hv; A.forEach(a => { part.voyage[a.id] = 0; sur.voyage[a.id] = 0; }); }
+  // f. Ce que chaque produit porte, et les totaux que lisent tous les écrans.
+  const partTot = {}, estTot = {}, note = {}; let Etot = 0, Ntot = 0, Nd = 0;
+  const cs = ['achat', 'voyage', 'transport', 'douane', 'transit'];
+  A.forEach(a => {
+    partTot[a.id] = cs.reduce((s, c) => s + (part[c][a.id] || 0), 0);
+    estTot[a.id] = cs.reduce((s, c) => s + (est[c][a.id] || 0), 0);
+  });
+  cs.forEach(c => { if (c === 'voyage' && R.inclure_voyage === false) return; Etot += compte[c]; Ntot += N[c]; });
+  A.forEach(a => { note[a.id] = Math.max(0, partTot[a.id] - cs.reduce((s, c) => s + (sur[c][a.id] || 0), 0)); Nd += note[a.id]; });
+  const Rr = Math.max(0, Etot - Ntot);
+  const mode = !(M > 0) ? 'vide' : (Rr > 0.5 ? 'estime' : (Ntot > 0 ? 'reel' : 'aucun'));
+  const estimes = {}; cs.forEach(c => { estimes[c] = somme(est[c]); });
+  const Vtot = somme(vol);
+  // Les taux réels du voyage, pour estimer un prix vu au stand ou dans Comparer de la même façon qu'un produit acheté.
+  const eff = {
+    rv: R.inclure_voyage === false ? 0 : (M > 0 ? compte.voyage / M : P / 100),
+    ra: M > 0 ? compte.achat / M : (R.acc && R.acc.mode === 'pct' ? num(R.acc.pct) / 100 : 0),
+    parM3: Vtot > 0 ? compte.transport / Vtot : fretM3,
+    fD: estimes.douane > 0 ? compte.douane / estimes.douane : 1,
+    fT: estimes.transit > 0 ? compte.transit / estimes.transit : 1,
+    densite: densite > 0 ? densite : 0,
+    // Des vrais frais notés dans une caisse SANS estimation (douane ou transitaire pas réglés, aucun carton mesuré) : un prix vu
+    // les porte quand même, selon sa valeur.
+    dV: !(estimes.douane > 0) && M > 0 ? compte.douane / M : 0,
+    tV: !(estimes.transit > 0) && M > 0 ? compte.transit / M : 0,
+    trV: !(Vtot > 0) && M > 0 ? compte.transport / M : 0
+  };
+  // Pour les écrans de la 1.18.0 : « frais estimés P % » = toutes les estimations des caisses ÷ la marchandise (pas seulement le voyage),
+  // et la part encore estimée de chaque produit = R × est ÷ E (même formule qu'avant) = sa part des surplus d'estimation.
+  const Pest = M > 0 ? cs.reduce((t, c) => t + (c === 'voyage' && R.inclure_voyage === false ? 0 : estimes[c]), 0) / M * 100 : P;
+  const surTot = {}; A.forEach(a => { surTot[a.id] = cs.reduce((t, c) => t + (sur[c][a.id] || 0), 0); });
+  const estOut = {}; A.forEach(a => { estOut[a.id] = Rr > 0 ? surTot[a.id] * Etot / Rr : 0; });
+  const ca = { R, P, M, H, Hv, N, compte, S, estimes, part, vol, src, poids, douPct, inconnus, sansPoids, eff, avion, fretM3, fretKg, accTot, Vtot };
+  return { M, N: Ntot, Nd, Nn: Math.max(0, Ntot - Nd), E: Etot, R: Rr, P: Math.round(Pest * 10) / 10, H, mode, pctReel: M > 0 ? Ntot / M * 100 : 0, pctEff: M > 0 ? Etot / M * 100 : 0,
+    val, part: partTot, est: estOut, estCaisses: estTot, note, remise, remiseDev, lien, parOffre, ca };
+};
+// Les produits sans carton mesuré qui ne portent AUCUN bateau (ni moyenne, ni vrai bateau partagé selon la valeur).
+function caSansBateau(c) { return c ? c.inconnus.filter(id => !(c.part.transport[id] > 0)).length : 0; }
+function caEtat() { const e = f1Etat(); return e && e.ca ? e : null; }
+
+// ---------- Un prix vu (stand, Comparer, Négocier) : la même formule, avec les taux réels du voyage ----------
+const caPxModeleAvant = pxModele;
+pxModele = function (c, o) {
+  if (f1.calc || !caActif()) return caPxModeleAvant.apply(this, arguments);
+  const e = caEtat(); if (!e) return caPxModeleAvant.apply(this, arguments);
+  const x = e.ca.eff, R = e.ca.R, m = c && typeof pxMarcheDe === 'function' ? pxMarcheDe(c) : null;
+  const d = (m && num(m.douane_pct) > 0 ? num(m.douane_pct) : num(R.douane_pct)) / 100 * x.fD;
+  const v = typeof pxVolumePiece === 'function' ? pxVolumePiece(c, o) : null;
+  let local = x.rv + x.ra + num(R.transit_pct) / 100 * x.fT + (x.dV || 0) + (x.tV || 0), F = 0, vsrc = 'inconnu', m3 = 0;
+  if (v && v.m3 > 0 && x.parM3 > 0) { F = v.m3 * x.parM3; vsrc = v.source; m3 = v.m3; }
+  else if (x.densite > 0 && x.parM3 > 0) { local += x.densite * x.parM3 * (1 + d); vsrc = 'moyenne'; }
+  else if (x.trV > 0) { local += x.trV * (1 + d); vsrc = 'valeur'; }
+  return { type: 'volume', d, F, m3, vsrc, local, fretUsd: x.parM3 / (tauxDe('USD') || 1), ca: true };
+};
+const caPxTexteAvant = typeof pxTexteFrais === 'function' ? pxTexteFrais : null;
+if (caPxTexteAvant) pxTexteFrais = function (pl) {
+  if (!(pl && pl.md && pl.md.ca)) return caPxTexteAvant.apply(this, arguments);
+  const md = pl.md, t = tauxDe('CNY'), x = (caEtat() || {}).ca;
+  const b = md.F > 0 ? 'bateau ≈ ' + (t > 0 ? nf(md.F / t, 2) + ' ¥' : gnfStrict(md.F)) + ' la pièce (' + nf(md.m3, 4) + ' m³' + (md.vsrc === 'carton' ? ', son carton' : ', taille habituelle') + ')'
+    : md.vsrc === 'moyenne' ? 'bateau à la moyenne de vos produits mesurés' : md.vsrc === 'valeur' ? 'bateau noté, partagé selon la valeur (aucun carton mesuré)' : 'bateau pas compté (carton pas mesuré)';
+  return 'caisses du voyage : ' + b + ', douane ≈ ' + nf(md.d * 100, 1) + ' % (achat + bateau), voyage + accompagnateur + transitaire ≈ ' + nf(md.local * 100, 1) + ' %';
+};
+// Négocier et Comparer lisent un pourcentage : celui que coûtent vraiment les frais, en moyenne, sur les achats du voyage.
+const caFraisPourcentAvant = fraisPourcent;
+fraisPourcent = function () {
+  if (f1.calc || !caActif()) return caFraisPourcentAvant.apply(this, arguments);
+  const e = caEtat(); if (!e) return caFraisPourcentAvant.apply(this, arguments);
+  if (e.M > 0) return Math.round(e.pctEff * 10) / 10;
+  const x = e.ca.eff, d = num(e.ca.R.douane_pct) / 100;
+  return Math.round((x.rv + x.ra + num(e.ca.R.transit_pct) / 100 + d) * 1000) / 10;
+};
+
+// ---------- L'en-tête : de quoi sont faits les frais ----------
+const caBandeauAvant = majBandeau;
+majBandeau = function () {
+  const r = caBandeauAvant.apply(this, arguments);
+  try {
+    const e = caEtat(), z = document.getElementById('bandeauBanque'); if (!e || !z) return r;
+    const n = z.querySelector('.f1-bq'), c = e.ca, inc = c.inconnus.length;
+    const txt = 'Frais comptés : ' + CA_ORDRE.map(k => k === 'arrivee' ? '🛃 ' + gnf(c.compte.douane + c.compte.transit) : CA_NOMS[k].split(' ')[0] + ' ' + gnf(c.compte[k])).join(' · ')
+      + (e.R > 0.5 ? ' (dont ' + gnf(e.R) + ' encore estimés)' : '') + (caSansBateau(c) && c.fretM3 > 0 ? ' — ⚠ bateau pas compté pour ' + caSansBateau(c) + ' produit(s) sans carton mesuré' : '');
+    if (n) n.textContent = txt; else z.insertAdjacentHTML('beforeend', '<div class="bq-note f1-bq">' + E(txt) + '</div>');
+  } catch (x) {}
+  return r;
+};
+
+// ---------- Onglet Frais : les caisses en haut ----------
+function caMontant(x) { return E(gnf(x)); }
+function caCarteHtml() {
+  const actif = caActif(), R = caReg();
+  if (!actif) return `<div class="carte ca-carte" id="ca-caisses"><h2>🧺 Les caisses de votre argent</h2>
+    <p>Pour que chaque produit porte sa vraie part du <b>bateau</b> (au volume de ses cartons), de la <b>douane</b> et de <b>l'accompagnateur</b>,
+      réglez-les une fois. Le carnet range ensuite chaque frais dans sa caisse et calcule le coût rendu magasin de chaque produit.</p>
+    <button type="button" class="b vert" onclick="caRegler()">⚙ Régler mes caisses (douane, bateau, accompagnateur)</button></div>`;
+  const e = caEtat(); if (!e) return '';
+  // Une sous-caisse : estimé · noté, et ce qui reste estimé. « noté » (pas « réel ») : un frais prévu, pas encore payé, compte aussi.
+  const etat = (est, n, fe) => `Estimé ${caMontant(est)} · noté ${caMontant(n)}${n > 0 ? ' <span class="ca-pastille ' + (fe || n >= est ? 'reel">noté' : 'est">en partie') + '</span>' : ' <span class="ca-pastille est">estimé</span>'}`
+    + (!fe && n > 0 && n < est ? '<br>Encore estimé : ' + caMontant(est - n) + ' (en attendant les vrais frais).' : '') + (fe && n < est ? '<br>Tout est noté : vous avez dépensé ' + caMontant(est - n) + ' de moins que prévu.' : '');
+  const c = e.ca, aPart = R.inclure_voyage === false, ligne = (k) => {
+    const cpt = k === 'arrivee' ? c.compte.douane + c.compte.transit : c.compte[k], fe = !!R.fermees[k];
+    const cle = k === 'transport' ? (c.avion ? 'au poids des cartons (avion)' : 'au volume des cartons (m³)') : k === 'arrivee' ? 'douane sur (achat + bateau) ; transitaire selon la valeur' : 'selon la valeur des produits';
+    const regle = k === 'achat' ? (R.acc && R.acc.mode ? caAccTexte() : 'accompagnateur pas réglé') : k === 'voyage' ? nf(c.P, 1) + ' % de la marchandise'
+      : k === 'transport' ? (c.avion ? nf(num(R.fret_kg_usd), 2) + ' $ le kg' : (num(C.voyage.px_fret_m3_usd) > 0 ? nf(num(C.voyage.px_fret_m3_usd)) + ' $ le m³' : 'prix du m³ pas réglé') + ' · ' + nf(c.Vtot, 3) + ' m³')
+      : 'douane ' + (num(R.douane_pct) > 0 ? nf(num(R.douane_pct), 2) + ' %' : 'pas réglée') + ' · transitaire ' + (num(R.transit_pct) > 0 ? nf(num(R.transit_pct), 1) + ' %' : 'pas réglé');
+    const corps = k === 'arrivee'
+      ? `<div class="l"><b>Douane</b> : ${etat(c.estimes.douane, c.N.douane, fe)}</div><div class="l"><b>Transitaire, port</b> : ${etat(c.estimes.transit, c.N.transit, fe)}</div>`
+      : `<div class="l">${etat(c.estimes[k], c.N[k], fe)}</div>`;
+    return `<div class="ca-c${fe ? ' ferme' : ''}"><div class="t"><span>${CA_NOMS[k]}</span><span>${caMontant(cpt)}</span></div>
+      ${corps}
+      <div class="cle">${E(regle)} — ${k === 'voyage' && aPart ? 'hors coût des produits (votre choix : « Non, à part »)' : 'partagé ' + E(cle)}</div>
+      <button type="button" class="b ${fe ? 'gris' : 'contour'}" onclick="caFermer('${k}')">${fe ? '↩ Pas encore tout noté' : '✅ Tout est noté dans cette caisse'}</button></div>`;
+  };
+  const inc = c.inconnus.length;
+  return `<div class="carte ca-carte" id="ca-caisses"><h2>🧺 Les caisses de votre argent</h2>
+    <p>Chaque frais va dans sa caisse ; chaque caisse se partage entre les produits avec sa propre clé. Une caisse compte l'estimation tant que
+      vos vrais frais ne la dépassent pas, ou jusqu'à « ✅ Tout est noté ».</p>
+    <div class="ca-c"><div class="t"><span>🛍 Marchandise</span><span>${caMontant(e.M)}</span></div><div class="cle">payée aux fournisseurs — chaque produit a son prix</div></div>
+    ${CA_ORDRE.map(ligne).join('')}
+    ${e.H - (c.Hv || 0) > 0.5 ? `<div class="ca-c"><div class="t"><span>${CA_NOMS.hors}</span><span>${caMontant(e.H - (c.Hv || 0))}</span></div><div class="cle">dans l'argent sorti, pas dans le coût des produits</div></div>` : ''}
+    <div class="ca-c" style="border-color:var(--bleu)"><div class="t"><span>Total investi</span><span>${caMontant(e.M + e.E + e.H)}</span></div></div>
+    ${inc && c.fretM3 > 0 ? `<div class="alerte a-ambre">${inc} produit(s) sans carton mesuré : ${c.eff.densite > 0 ? 'leur bateau est estimé avec la moyenne de vos produits mesurés' : (caSansBateau(c) ? 'leur bateau n\'est pas compté' : 'le vrai bateau noté leur est partagé selon la valeur')}.
+      Notez « Qté / carton » et la taille du carton (🏷 Codes-barres ou la fiche de l'achat).</div>` : ''}
+    <button type="button" class="b contour" onclick="caRegler()">⚙ Régler mes caisses</button></div>`;
+}
+function caAccTexte() {
+  const a = caReg().acc || {}, d = a.devise || deviseDuMarche();
+  if (a.mode === 'jour') return 'accompagnateur ' + nf(num(a.montant), 2) + ' ' + d + ' × ' + nf(num(a.jours)) + ' jours';
+  if (a.mode === 'forfait') return 'accompagnateur au forfait : ' + nf(num(a.montant), 2) + ' ' + d;
+  if (a.mode === 'pct') return 'accompagnateur : ' + nf(num(a.pct), 1) + ' % des achats';
+  return '';
+}
+function caFermer(k) { const R = caReg(); R.fermees[k] = !R.fermees[k]; sauverLocal(); dessiner(); }
+const caEcranFraisAvant = ecranFrais;
+ecranFrais = function () {
+  let h = caEcranFraisAvant.apply(this, arguments);
+  try {
+    if (caActif()) h = h.replace(/<div class="alerte a-(ambre|info)" id="f1-frais-estimes">[\s\S]*?<\/div>/, '');
+    const carte = caCarteHtml();
+    const i = h.indexOf('<div class="carte');
+    h = i >= 0 ? h.slice(0, i) + carte + h.slice(i) : carte + h;
+  } catch (x) { console.log('caisses : ' + x.message); }
+  return h;
+};
+
+// ---------- Régler ses caisses ----------
+function caRegler() {
+  const R = caReg(), a = R.acc || {}, dv = codesDevises(), pr = caPropose();
+  const opt = (v, t, cur) => `<option value="${v}"${cur === v ? ' selected' : ''}>${t}</option>`;
+  mkBoite(`<div class="mk-dlg ct-champs"><h3>⚙ Régler mes caisses</h3>
+    <p class="px-aide">Une fois pour le voyage. Ce sont des estimations : dès que vous notez les vrais frais (onglet Frais), ils les remplacent.${!R.regle_le && pr.etude ? ' Les chiffres déjà écrits viennent de votre étude : vérifiez-les, puis « ✅ Garder ».' : ''} Rien ne compte avant « ✅ Garder ».</p>
+    <div class="px-titre">✈️ Voyage (billet, hôtel, repas, taxi…)</div>
+    <div class="duo"><div><label for="ca_v">% de la marchandise</label><input id="ca_v" inputmode="decimal" value="${E(caPctVoyage() || '')}"></div>
+      <div><label for="ca_vi">Dans le coût des produits ?</label><select id="ca_vi">${opt('oui', 'Oui (conseillé)', R.inclure_voyage === false ? 'non' : 'oui')}${opt('non', 'Non, à part', R.inclure_voyage === false ? 'non' : 'oui')}</select></div></div>
+    <div class="px-titre">🤝 Celui qui vous accompagne (interprète, agent)</div>
+    <label for="ca_am">Comment vous le payez</label>
+    <select id="ca_am" onchange="caMajAcc()">${opt('', 'Pas d\'accompagnateur', a.mode || '')}${opt('jour', 'Par jour', a.mode || '')}${opt('forfait', 'Au forfait (un montant pour tout)', a.mode || '')}${opt('pct', 'En % de mes achats (commission)', a.mode || '')}</select>
+    <div id="ca_acc"></div>
+    <div class="px-titre">🚢 Transport jusqu'à Conakry</div>
+    <label for="ca_tm">Comment part la marchandise</label>
+    <select id="ca_tm">${opt('bateau', 'Bateau : au volume (m³)', R.transport || 'bateau')}${opt('avion', 'Avion : au poids (kg)', R.transport || 'bateau')}</select>
+    <div class="duo"><div><label for="ca_m3">Bateau : $ par m³</label><input id="ca_m3" inputmode="decimal" value="${E(num(C.voyage.px_fret_m3_usd) || (!R.regle_le && pr.fret) || '')}" placeholder="demandez au cargo"></div>
+      <div><label for="ca_kg">Avion : $ par kg</label><input id="ca_kg" inputmode="decimal" value="${E(num(R.fret_kg_usd) || '')}"></div></div>
+    <div class="px-titre">🛃 Douane et arrivée à Conakry</div>
+    <div class="duo"><div><label for="ca_d">Douane (% de achat + bateau)</label><input id="ca_d" inputmode="decimal" value="${E(num(R.douane_pct) || (!R.regle_le && pr.douane) || '')}"></div>
+      <div><label for="ca_t">Transitaire de Conakry (% de la valeur)</label><input id="ca_t" inputmode="decimal" value="${E(num(R.transit_pct) || (!R.regle_le && pr.transit) || '')}"></div></div>
+    <p class="px-aide">Quand Claude connaît la douane d'un genre de produit (étude), c'est elle qui compte pour ce produit.</p>
+    <div class="mk-boutons"><button class="b vert" onclick="caGarder()">✅ Garder</button><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+  caMajAcc();
+}
+function caMajAcc() {
+  const z = document.getElementById('ca_acc'), m = (document.getElementById('ca_am') || {}).value || ''; if (!z) return;
+  const a = caReg().acc || {}, d = a.devise || deviseDuMarche(), dev = `<div><label for="ca_ad">Devise</label><select id="ca_ad">${codesDevises().map(x => `<option${x === d ? ' selected' : ''}>${x}</option>`).join('')}</select></div>`;
+  z.innerHTML = m === 'jour' ? `<div class="duo"><div><label for="ca_amt">Par jour</label><input id="ca_amt" inputmode="decimal" value="${E(num(a.montant) || '')}"></div>${dev}</div>
+      <label for="ca_aj">Nombre de jours</label><input id="ca_aj" inputmode="numeric" value="${E(num(a.jours) || '')}">`
+    : m === 'forfait' ? `<div class="duo"><div><label for="ca_amt">Pour tout le voyage</label><input id="ca_amt" inputmode="decimal" value="${E(num(a.montant) || '')}"></div>${dev}</div>`
+    : m === 'pct' ? `<label for="ca_ap">% de vos achats</label><input id="ca_ap" inputmode="decimal" value="${E(num(a.pct) || '')}">` : '';
+}
+function caGarder() {
+  const R = caReg(), g = (id) => { const e = document.getElementById(id); return e ? String(e.value || '').trim() : ''; }, n = (id) => { const x = lireNombre(g(id)); return Number.isFinite(x) && x >= 0 ? x : 0; };
+  const vp = n('ca_v'); if (vp > 0) C.voyage.frais_pourcent = vp;
+  R.inclure_voyage = g('ca_vi') !== 'non';
+  const m = g('ca_am'); R.acc = { mode: m };
+  if (m === 'jour') Object.assign(R.acc, { montant: n('ca_amt'), jours: n('ca_aj'), devise: g('ca_ad') || deviseDuMarche() });
+  if (m === 'forfait') Object.assign(R.acc, { montant: n('ca_amt'), devise: g('ca_ad') || deviseDuMarche() });
+  if (m === 'pct') R.acc.pct = n('ca_ap');
+  R.transport = g('ca_tm') === 'avion' ? 'avion' : 'bateau';
+  C.voyage.px_fret_m3_usd = n('ca_m3'); R.fret_kg_usd = n('ca_kg'); R.douane_pct = n('ca_d'); R.transit_pct = n('ca_t'); R.regle_le = new Date().toISOString();
+  sauverLocal(); fermerBoite(); dessiner();
+  avertir('🧺 Caisses réglées : chaque produit porte maintenant sa part du voyage, du bateau, de la douane et de l\'accompagnateur.', 5000);
+}
+
+// ---------- La fenêtre d'un frais : sa caisse ----------
+const caModifierFraisAvant = modifierFrais;
+modifierFrais = function (idF) {
+  const r = caModifierFraisAvant.apply(this, arguments);
+  try {
+    const f = (C.frais || []).find(x => x.id === idF), rep = document.getElementById('f_rep'); if (!f || !rep) return r;
+    const lab = rep.previousElementSibling, c = caCaisseDe(f);
+    const html = `<label for="f_caisse">Dans quelle caisse ?</label><select id="f_caisse" data-auto="${f.caisse || f.repartition === 'aucune' ? '0' : '1'}" onchange="caCaisseChoisie()">
+      ${['achat', 'voyage', 'transport', 'arrivee', 'hors'].map(k => `<option value="${k}"${c === k ? ' selected' : ''}>${CA_NOMS[k]}</option>`).join('')}</select>`;
+    (lab && lab.tagName === 'LABEL' ? lab : rep).insertAdjacentHTML('beforebegin', html);
+    // « Ne pas répartir » (case de la 1.18.0) et la caisse 🏠 Hors coût disent la même chose : les deux cases suivent l'une l'autre.
+    rep.addEventListener('change', caRepChoisie);
+    const t = document.getElementById('f_type'), l = document.getElementById('f_lib');
+    // La caisse se propose d'après le TYPE (le libellé seulement pour « Autre »). Seul le type « Achats personnels / cadeaux » met hors coût :
+    // un libellé tapé (« Cadeau pour le fournisseur ») ne change jamais la répartition, et un choix précis (« un seul produit »,
+    // « selon la quantité ») n'est jamais touché.
+    const auto = () => { const s = document.getElementById('f_caisse'); if (!s || s.dataset.auto !== '1') return;
+      const tv = String((t && t.value) || ''), lv = String((l && l.value) || '');
+      let k = caCaisseDuType(tv && tv !== 'Autre' ? tv : (lv || tv));
+      const precis = rep.value === 'produit' || rep.value === 'quantite';
+      if (k === 'hors' && (!/personnel|cadeau/i.test(tv) || precis)) k = 'voyage';
+      s.value = k;
+      if (precis) return;
+      if (k === 'hors') { rep.value = 'aucune'; rep.dataset.auto = '1'; }
+      else if (rep.value === 'aucune' && rep.dataset.auto === '1') { rep.value = 'valeur'; rep.dataset.auto = ''; } };
+    if (t) t.addEventListener('change', () => setTimeout(auto, 0)); if (l) l.addEventListener('input', auto);
+  } catch (x) {}
+  return r;
+};
+function caCaisseChoisie() {
+  const s = document.getElementById('f_caisse'), rep = document.getElementById('f_rep'); if (!s) return; s.dataset.auto = '0';
+  if (!rep) return;
+  if (s.value === 'hors') rep.value = 'aucune'; else if (rep.value === 'aucune') rep.value = 'valeur';
+}
+function caRepChoisie() {
+  const s = document.getElementById('f_caisse'), rep = document.getElementById('f_rep'); if (!s || !rep) return; rep.dataset.auto = '';
+  if (rep.value === 'aucune') { s.value = 'hors'; s.dataset.auto = '0'; }
+  else if (s.value === 'hors') { const t = document.getElementById('f_type'), l = document.getElementById('f_lib');
+    const k = caCaisseDuType((l && l.value) || (t && t.value)); s.value = k === 'hors' ? 'voyage' : k; s.dataset.auto = '1'; }
+}
+const caEnregistrerFraisAvant = enregistrerFrais;
+enregistrerFrais = function (idF) {
+  const f = (C.frais || []).find(x => x.id === idF), s = document.getElementById('f_caisse'), rep = document.getElementById('f_rep');
+  if (f && s) {
+    const lib = String((document.getElementById('f_lib') || {}).value || '').trim() || String((document.getElementById('f_type') || {}).value || '');
+    // Hors coût si l'une OU l'autre case le dit (jamais une case qui en efface une autre en silence).
+    if (s.value === 'hors' || (rep && rep.value === 'aucune')) { if (rep) rep.value = 'aucune'; delete f.caisse; }
+    else if (s.value === caCaisseDuType(lib)) delete f.caisse; else f.caisse = s.value;
+  }
+  return caEnregistrerFraisAvant.apply(this, arguments);
+};
+
+// ---------- Le détail du coût d'un produit ----------
+function caDetail(a) {
+  const e = caEtat(); if (!e || !a) return null;
+  const c = e.ca, q = num(a.quantite), id = a.id, achat = e.val[id] || 0;
+  const L = [['🛍 Achat', achat, q > 0 ? nf(q) + ' × ' + nf(num(a.prix_unitaire), 2) + ' ' + deviseDe(a) + (e.remise[id] ? ' (pénalité de retard retirée)' : '') : '', null],
+    [CA_NOMS.voyage, c.part.voyage[id] || 0, c.R.inclure_voyage === false ? 'hors coût des produits (votre choix)' : nf(c.P, 1) + ' % de la valeur' + (c.N.voyage > 0 ? ', vrais frais du voyage partagés' : ''), c.R.inclure_voyage === false ? null : c.N.voyage >= c.estimes.voyage || c.R.fermees.voyage],
+    [CA_NOMS.achat, c.part.achat[id] || 0, c.R.acc && c.R.acc.mode ? 'accompagnateur, partagé selon la valeur' : 'accompagnateur pas réglé', c.N.achat >= c.estimes.achat || c.R.fermees.achat],
+    ['🚢 ' + (c.avion ? 'Avion' : 'Bateau'), c.part.transport[id] || 0, c.avion && c.poids[id] > 0 ? nf(c.poids[id], 1) + ' kg' : (c.vol[id] > 0 ? nf(c.vol[id], 3) + ' m³' + ({ carton: ' (ses cartons)', typique: ' (taille habituelle)', moyenne: ' (moyenne de vos produits mesurés)' }[c.src[id]] || '') : (c.part.transport[id] > 0 ? 'aucun carton mesuré : vrai bateau partagé selon la valeur' : 'carton pas mesuré : pas compté')), c.N.transport >= c.estimes.transport || c.R.fermees.transport],
+    ['🛃 Douane', c.part.douane[id] || 0, nf(c.douPct[id], 2) + ' % de (achat + bateau)', c.N.douane >= c.estimes.douane || c.R.fermees.arrivee],
+    ['🛃 Transitaire, port', c.part.transit[id] || 0, nf(num(c.R.transit_pct), 1) + ' % de la valeur', (c.N.transit >= c.estimes.transit) || c.R.fermees.arrivee]];
+  const total = L.reduce((s, x) => s + x[1], 0);
+  return { L, total, q, unitaire: q > 0 ? total / q : 0, vente: prixDetail(a) };
+}
+function caCoutBoite(aid) {
+  const a = trouverAchat(aid), d = a && caDetail(a);
+  if (!d) { avertir('Réglez d\'abord vos caisses (onglet Frais → 🧺).', 4000); return; }
+  mkBoite(`<div class="mk-dlg"><h3>🧮 Le coût de « ${E(a.nom || 'ce produit')} »</h3>
+    <table class="ca-tab">${d.L.map(([t, m, s, reel]) => `<tr><td>${E(t)}${reel === null ? '' : ' <span class="ca-pastille ' + (reel ? 'reel">noté' : 'est">estimé') + '</span>'}<span class="s">${E(s)}</span></td><td>${E(gnf(m))}</td></tr>`).join('')}
+      <tr class="tot"><td>Coût rendu magasin</td><td>${E(gnf(d.total))}</td></tr>
+      <tr><td>Par pièce (${E(nf(d.q))} pièces)</td><td>${E(gnf(d.unitaire))}</td></tr>
+      ${d.vente > 0 ? `<tr><td>Prix de vente</td><td>${E(gnf(d.vente))}</td></tr><tr><td>Il vous reste par pièce${d.vente < d.unitaire ? ' ⚠' : ''}</td><td>${E(gnf(d.vente - d.unitaire))}</td></tr>
+        <tr><td>Sur les ${E(nf(d.q))} pièces</td><td>${E(gnf((d.vente - d.unitaire) * d.q))}</td></tr>` : '<tr><td colspan="2">Prix de vente à fixer (onglet Prix de vente).</td></tr>'}</table>
+    <p class="px-aide">« Estimé » : d'après vos réglages (🧺 onglet Frais). Il devient « noté » quand vos vrais frais de cette caisse (payés ou prévus) atteignent l'estimation, ou après « ✅ Tout est noté ».</p>
+    <div class="mk-boutons"><button class="b contour" onclick="fermerBoite();allerA('frais')">🧺 Mes caisses</button><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+}
+// Le bouton, sous chaque produit dans Achats.
+if (typeof haLigneAchatHtml === 'function') {
+  const caLigneAvant = haLigneAchatHtml;
+  haLigneAchatHtml = function (a) {
+    const h = caLigneAvant.apply(this, arguments);
+    try { if (!a || !caActif() || !(num(a.quantite) > 0)) return h; const d = caDetail(a); if (!d) return h;
+      return h + `<button type="button" class="b contour ca-cout" onclick="event.stopPropagation();caCoutBoite('${E(a.id)}')">🧮 Son coût : ${E(gnf(d.unitaire))} la pièce</button>`;
+    } catch (x) { return h; }
+  };
+}
+
+// ---------- Argent : l'argent à prévoir, caisse par caisse, et ce qu'il reste à la fin ----------
+function caArgentHtml() {
+  const e = caEtat(); if (!e) return '';
+  const c = e.ca, A = C.achats || [];
+  // Marchandise : ce qui est payé = exactement ce que l'écran Argent compte déjà (paiements 💵 des contrats, achats payés sur place
+  // sans contrat payé, registre des acomptes) — la même liste, jamais deux fois.
+  let payeM = 0;
+  try { f2Sorties().forEach(x => { if (x.source !== 'frais') payeM += num(x.gnf); }); } catch (x) { payeM = 0; }
+  const payeC = { achat: 0, voyage: 0, transport: 0, arrivee: 0, hors: 0 };
+  (C.frais || []).forEach(f => { if (f.f2_brouillon || f.etat === 'prevu') return; const k = caCaisseDe(f); if (payeC[k] !== undefined) payeC[k] += fraisGnf(f); });
+  const aPart = c.R.inclure_voyage === false, Hh = Math.max(0, e.H - (c.Hv || 0));
+  const lignes = [['🛍 Marchandise', e.M, payeM, CA_QUAND.marchandise]].concat(CA_ORDRE.map(k => [CA_NOMS[k] + (k === 'voyage' && aPart ? ' (hors coût des produits)' : ''), k === 'arrivee' ? c.compte.douane + c.compte.transit : c.compte[k], payeC[k], CA_QUAND[k]]))
+    .concat(Hh > 0 ? [[CA_NOMS.hors, Hh, payeC.hors, 'pendant le voyage (pas dans le coût des produits)']] : []);
+  const tot = lignes.reduce((s, x) => s + x[1], 0), payeT = lignes.reduce((s, x) => s + Math.min(x[2], x[1]), 0);
+  const chiffres = A.filter(a => num(a.quantite) > 0 && prixDetail(a) > 0), aFixer = A.filter(a => num(a.quantite) > 0 && !(prixDetail(a) > 0)).length;
+  const vente = chiffres.reduce((s, a) => s + prixDetail(a) * num(a.quantite), 0), cout = chiffres.reduce((s, a) => s + coutRenduGnf(a) * num(a.quantite), 0);
+  return `<div class="carte ca-carte" id="ca-argent"><h2>🧺 L'argent à prévoir, caisse par caisse</h2>
+    <p class="px-aide">Pour chaque caisse : ce qui est compté, quand la payer, ce qui est déjà payé et ce qui reste.</p>
+      ${lignes.map(([t, cpt, p, q]) => `<div class="ca-ar"><div class="t"><span>${E(t)}</span><b>${E(gnf(cpt))}</b></div><div class="s">${E(q)}</div>
+        <div class="s">payé <b>${E(gnf(Math.min(p, cpt)))}</b> · reste <b>${E(gnf(Math.max(0, cpt - p)))}</b></div></div>`).join('')}
+      <div class="ca-ar tot"><div class="t"><span>Tout le voyage</span><b>${E(gnf(tot))}</b></div>
+        <div class="s">payé <b>${E(gnf(payeT))}</b> · reste <b>${E(gnf(Math.max(0, tot - payeT)))}</b></div></div>
+    <div class="px-titre">À la fin</div>
+    <p>${chiffres.length ? `Vente prévue de ${chiffres.length} produit(s) : <b>${E(gnf(vente))}</b> − leur coût rendu magasin <b>${E(gnf(cout))}</b> = il vous reste <b>${E(gnf(vente - cout))}</b>.` : 'Aucun prix de vente fixé : le carnet ne peut pas encore dire ce qu\'il vous reste.'}
+      ${aFixer ? '<br>' + aFixer + ' produit(s) sans prix de vente : pas comptés ici (onglet Prix de vente).' : ''}${e.H > 0 && chiffres.length ? '<br>Moins ce qui est hors coût des produits (' + E(gnf(e.H)) + ') : il vous reste <b>' + E(gnf(vente - cout - e.H)) + '</b>.' : ''}</p>
+    <button type="button" class="b contour" onclick="allerA('frais')">🧺 Mes caisses et leurs réglages</button></div>`;
+}
+const caEcranArgentAvant = ecranArgent;
+ecranArgent = function () {
+  const h = caEcranArgentAvant.apply(this, arguments);
+  try { if (!caActif()) return h; const carte = caArgentHtml(); const i = h.indexOf('<div class="carte'); return i >= 0 ? h.slice(0, i) + carte + h.slice(i) : carte + h; }
+  catch (x) { return h; }
+};
+
+// ---------- 🧭 : les réglages qui manquent, les cartons pas mesurés ----------
+function caInstaller() {
+  if (caInstaller.fait) return; caInstaller.fait = true;
+  if (typeof piLignes !== 'function') return;
+  const avant = piLignes;
+  piLignes = function () {
+    const L = avant.apply(this, arguments);
+    try {
+      const A = (C.achats || []).filter(a => num(a.quantite) > 0);
+      if (A.length) {
+        const R = caReg();
+        if (!caActif()) L.push({ niv: 'ambre', qui: 'Argent', ic: '🧺', titre: 'Régler vos caisses : douane, bateau, accompagnateur',
+          detail: 'Sans elles, le coût rendu magasin ne compte que ' + nf(f1PctVoyage(), 0) + ' % de frais : ni le bateau, ni la douane. Le prix de revient est trop bas.', bouton: '⚙ Régler mes caisses', action: 'fermerBoite();caRegler()' });
+        else {
+          const manque = [!(num(R.douane_pct) > 0) && 'la douane', !(num(C.voyage.px_fret_m3_usd) > 0 || num(R.fret_kg_usd) > 0) && 'le prix du bateau'].filter(Boolean);
+          if (manque.length) L.push({ niv: 'ambre', qui: 'Argent', ic: '🧺', titre: 'Caisses : ' + manque.join(' et ') + ' pas réglé' + (manque.length > 1 ? 's' : ''), detail: 'Le coût rendu de vos produits est trop bas tant que ' + manque.join(' et ') + ' manque' + (manque.length > 1 ? 'nt' : '') + '.', bouton: '⚙ Régler mes caisses', action: 'fermerBoite();caRegler()' });
+          // Un taux de change manquant : l'estimation tomberait à 0 sans rien dire.
+          const devs = [(num(C.voyage.px_fret_m3_usd) > 0 || num(R.fret_kg_usd) > 0) ? 'USD' : '', R.acc && (R.acc.mode === 'jour' || R.acc.mode === 'forfait') ? (R.acc.devise || deviseDuMarche()) : '']
+            .filter((d, i, t) => d && t.indexOf(d) === i && !(tauxDe(d) > 0));
+          if (devs.length) L.push({ niv: 'ambre', qui: 'Argent', ic: '💱', titre: 'Taux du ' + devs.join(' et du ') + ' manquant',
+            detail: 'Sans lui, le bateau ou l\'accompagnateur ne sont pas comptés dans le coût de vos produits.', bouton: '🧳 Mes taux', action: 'fermerBoite();allerA(\'voyage\')' });
+          const e = caEtat();
+          if (e && e.ca.inconnus.length && e.ca.fretM3 > 0) L.push({ niv: 'bleu', qui: 'Argent', ic: '📦', titre: e.ca.inconnus.length + ' produit(s) sans carton mesuré',
+            detail: e.ca.eff.densite > 0 ? 'Leur bateau est estimé avec la moyenne de vos produits mesurés. Avec leur carton, il serait juste.' : caSansBateau(e.ca) ? 'Leur bateau n\'est pas compté dans leur coût.' : 'Le vrai bateau noté leur est partagé selon la valeur, pas selon leur volume.', bouton: '🛒 Mes achats', action: 'fermerBoite();allerA(\'achats\')' });
+          if (e && e.ca.avion && e.ca.sansPoids.length) L.push({ niv: 'bleu', qui: 'Argent', ic: '✈️', titre: e.ca.sansPoids.length + ' produit(s) sans poids de carton (avion)',
+            detail: e.ca.fretM3 > 0 ? 'Leur transport est compté au prix du bateau (au volume), pas de l\'avion. Notez le poids d\'un carton dans 🏷.' : 'Leur transport n\'est pas compté dans leur coût. Notez le poids d\'un carton dans 🏷.', bouton: '🛒 Mes achats', action: 'fermerBoite();allerA(\'achats\')' });
+        }
+      }
+    } catch (x) {}
+    const ordre = { rouge: 0, ambre: 1, bleu: 2 };
+    return L.sort((a, b) => (ordre[a.niv] ?? 3) - (ordre[b.niv] ?? 3));
+  };
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', caInstaller); else caInstaller();
+// Un carnet ouvert pour la première fois en 1.19.0 : ses caisses sont préparées (depuis son étude s'il en a une), rien d'autre ne change.
+const caCompleterAvant = completerCarnet;
+completerCarnet = function () { const c = caCompleterAvant.apply(this, arguments); try { if (c && c.voyage && !c.voyage.caisses) { const g = C; C = c; try { caReg(); } finally { C = g; } } } catch (x) {} return c; };
+</script>
+
 
 
 

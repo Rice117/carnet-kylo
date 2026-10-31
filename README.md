@@ -357,6 +357,18 @@ Fichiers `suivi-1.19.0-caisses.html`, `construire-1.19.0.py` (part de la 1.18.0)
 chaque coût refait à la main), plus les suites 1.18.0, 1.17.0 et 1.16.0 rejouées, `test-maj-1190.js`, réserve. Rien de retiré.
 ⚠ Même remarque pour `KYLO-Achats.html`.
 
+Version 1.20.0 — 31/10/2026 : **★ Ma liste, et une seule règle pour les listes**. Dans l'onglet ⭐, à côté de la liste de Claude,
+« ★ Ma liste » réunit les modèles étoilés (★ M'intéresse) de tous les catalogues : prix du fournisseur, coût rendu au magasin, prix
+affiché à Conakry (tapé, sinon celui de la liste de Claude pour ce modèle, sinon le marché connu), 2ᵉ prix, marge sur la vente et sur
+le coût, feu, « à ne pas dépasser », quantité, total, « ☆ Retirer », « 📋 Copier ma liste ». Les deux listes comptent le même coût (R1 : l'achat, sinon
+Comparer, sinon l'estimation — avec les caisses, ou sans caisses exactement celle d'avant) et une seule règle « au moins +N % sur
+mon coût », la même que l'étude (75 par défaut), au lieu de 35 % de la vente ; « à ne pas dépasser » arrondi vers le bas. Relu par un
+second contrôle indépendant (8 défauts corrigés). Sur chaque fiche, « 🧮 Comment ce % est
+calculé » montre le prix qui compte (achat, prix reçu, stand ou fourchette), le bateau, la douane, le reste, le coût rendu, le 2ᵉ prix
+et les deux pourcentages. Fichiers `suivi-1.20.0-listes.html`, `construire-1.20.0.py` (part de la 1.19.0). Tests :
+`test-listes-1200.js` (35 contrôles), plus les suites 1.19.0, 1.18.0, 1.17.0 et 1.16.0 rejouées, `test-maj-1200.js`, réserve. Rien de retiré.
+⚠ Même remarque pour `KYLO-Achats.html`.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

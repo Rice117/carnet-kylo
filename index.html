@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.19.0';
+window.KYLO_APPLICATION = '1.20.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -27632,6 +27632,351 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 // Un carnet ouvert pour la première fois en 1.19.0 : ses caisses sont préparées (depuis son étude s'il en a une), rien d'autre ne change.
 const caCompleterAvant = completerCarnet;
 completerCarnet = function () { const c = caCompleterAvant.apply(this, arguments); try { if (c && c.voyage && !c.voyage.caisses) { const g = C; C = c; try { caReg(); } finally { C = g; } } } catch (x) {} return c; };
+</script>
+<style>
+/* ===================== Carnet 1.20.0 — ★ Ma liste, et une seule règle de marge pour les listes (Riche, 31/10/2026 à 8 h 40) ===================== */
+.ls-regle{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:16px;line-height:1.45;background:var(--bleu-pale);border-radius:12px;padding:10px;margin:8px 0}
+.ls-regle input{width:5.2em;min-height:44px;font-size:18px;font-weight:800;text-align:right;border:2px solid var(--lisiere);border-radius:10px;padding:6px 8px}
+.ls-regle small{display:block;width:100%;font-size:14px;color:var(--anthracite)}
+.ls-feu{display:inline-block;font-size:14px;font-weight:800;border-radius:999px;padding:2px 10px;margin:4px 0}
+.ls-feu.vert{background:#e3f4ea;color:#155c35}.ls-feu.jaune{background:#fff3cd;color:#6b4e00}.ls-feu.rouge{background:#fde2e2;color:#8a1c1c}.ls-feu.gris{background:var(--gris-clair);color:var(--anthracite)}
+html[data-theme="sombre"] .ls-feu.vert{background:#11331f;color:#a8e6bf}
+html[data-theme="sombre"] .ls-feu.jaune{background:#3d3000;color:#ffe08a}
+html[data-theme="sombre"] .ls-feu.rouge{background:#3d1212;color:#ffb4b4}
+.ls-calc{margin:6px 0 0;border-top:1px solid var(--lisiere)}
+.ls-calc summary{padding:10px 0;cursor:pointer;color:var(--bleu);font-weight:800;font-size:15px;min-height:44px;display:flex;align-items:center}
+.ls-calc .l{display:flex;justify-content:space-between;gap:10px;font-size:15px;line-height:1.45;padding:2px 0}
+.ls-calc .l b{white-space:nowrap}
+.ls-calc .tot{border-top:1px solid var(--lisiere);margin-top:4px;padding-top:4px;font-weight:800}
+.ls-calc p{font-size:15px;line-height:1.45;margin:6px 0}
+.ls-item .cx-nom .etoile{color:#e0a100}
+.ls-car{font-size:15px;line-height:1.4;margin:2px 0}
+.ls-tot{font-size:16px;line-height:1.5;margin:6px 0}
+.et-vues .ls-vue small{display:block;font-weight:400;color:var(--gris);font-size:14px}
+</style>
+<script>
+// =====================================================================================================
+// Carnet 1.20.0 — ★ MA LISTE, ET UNE SEULE RÈGLE POUR LES LISTES
+// Riche (31/10, 8 h 40, à Yiwu) :
+//   1. « Les produits où j'avais noté la marge à 75 %, je les retrouve dans la liste à −6 %, −10 % au prix de vente : je ne comprends
+//      pas le calcul. » → La liste de Claude affichait (2ᵉ prix − coût) ÷ 2ᵉ prix, avec son PROPRE coût (usine + bateau + douane + 5 %,
+//      sans le voyage ni les caisses) et « à ne pas dépasser » avec 35 % de la vente — trois règles différentes de celles de l'étude
+//      (+75 % sur le coût) et des caisses. Maintenant : le même coût que le carnet (achat, Comparer, ou les caisses), SA règle
+//      (+75 % sur le coût, la même que l'étude), et sur chaque fiche « 🧮 Comment ce % est calculé », avec ses chiffres.
+//   2. « Il me faut la liste des produits où je mets des étoiles : celle de Claude est là, pas la mienne. » → « ★ Ma liste » dans ⭐ :
+//      tous les modèles étoilés (★ M'intéresse) de tous les catalogues, avec le même calcul, ma quantité, mon prix de vente à Conakry.
+//   3. « Que Claude révise sa liste et sa politique » → la règle est la même partout (ci-dessus) ; la révision de la liste elle-même se
+//      fait avec le fichier « 📤 Ma journée pour Claude » (aucune nouvelle version n'est nécessaire : elle arrive par fichier).
+// Rien n'est retiré. Sans caisses réglées, le coût de la liste de Claude est EXACTEMENT celui de la 1.19.0.
+// =====================================================================================================
+
+// ---------- La règle : « au moins +N % sur mon coût » — UNE seule, la même que l'étude « Achats Chine KYLO » ----------
+// S'il y a une étude : sa « Ma marge sur le prix arrivé » (75 par défaut). Sinon : celle tapée ici (75 par défaut).
+// La changer ici change aussi celle de l'étude, et l'inverse : les deux listes et l'étude disent toujours la même chose.
+function lsEtude() { try { return typeof etActuelle === 'function' ? etActuelle() : null; } catch (x) { return null; } }
+function lsMargeCout() {
+  const e = lsEtude();
+  if (e && typeof etReg === 'function') { const m = num(etReg(e).marge); if (m > 0) return m; }
+  const v = C.voyage && C.voyage.marge_cout_pct;
+  return v !== undefined && v !== null && v !== '' && num(v) > 0 ? num(v) : 75;
+}
+function lsMargeVente(mc) { return mc / (100 + mc) * 100; }     // +75 % sur le coût = 42,9 % de la vente
+function lsReglerMarge(v) {
+  const n = lireNombre(v);
+  if (!Number.isFinite(n) || n <= 0 || n > 1000) { avertir('Tapez un pourcentage, par exemple 75.', 4000); dessiner(); return; }
+  C.voyage.marge_cout_pct = n;
+  const e = lsEtude(); if (e) { const t = C.etude_reg || (C.etude_reg = {}); (t[e.id] || (t[e.id] = {})).marge = n; }
+  sauverLocal(); dessiner();
+}
+function lsRegleHtml() {
+  const mc = lsMargeCout();
+  return `<div class="ls-regle"><label for="ls_marge">🎯 Ma règle : au moins +</label><input id="ls_marge" inputmode="decimal" value="${E(nf(mc, 0))}" onchange="lsReglerMarge(this.value)"><span>% sur mon coût</span>
+    <small>= ${E(nf(lsMargeVente(mc), 0))} % du prix de vente. Le feu et « à ne pas dépasser » suivent cette règle, dans ⭐ Choix de Claude, dans ★ Ma liste et dans l'étude.</small></div>`;
+}
+// Un montant en francs ou une quantité : des chiffres seulement (« 650.000 », « 650 000 », « 650,000 » = 650 000).
+function lsEntier(v) { const t = String(v === null || v === undefined ? '' : v).replace(/[^\d]/g, ''); return t ? parseInt(t, 10) : 0; }
+
+// ---------- Le calcul. Trois sortes de coût, dans cet ordre (la règle R1 de la 1.18.0) :
+//   1. déjà acheté : le coût rendu de l'achat (onglet Achats ; avec les caisses, son détail « 🧮 Son coût ») ;
+//   2. un prix reçu ou noté dans Comparer : le calcul de Comparer pour cette offre (son carton, son marché) ;
+//   3. sinon une estimation : avec les caisses, celle des caisses ; sans caisses, celle de la liste de Claude depuis le 23/10
+//      (usine + bateau au volume + douane + 5 %), inchangée.
+function lsRendu(md, prix) {
+  return md.type === 'volume' ? prix + md.F + (prix + md.F) * md.d + md.local * prix : md.type === 'pct' ? prix * (1 + md.pct / 100) : num(md.rendu);
+}
+function lsModele(article, m, m3) {
+  if (typeof caActif === 'function' && caActif()) {
+    const md = pxModele({ article: article || '', marche: Object.assign({}, m || {}, { volume_m3: m3 > 0 ? m3 : num(m && m.volume_m3), douane_pct: num(m && m.douane_pct) }) }, null);
+    if (md && md.type === 'volume') return { type: 'volume', F: num(md.F), d: num(md.d), local: num(md.local), caisses: true, vsrc: md.vsrc };
+  }
+  const d = m && num(m.douane_pct) > 0 ? num(m.douane_pct) / 100 : 0.4485;
+  return { type: 'volume', F: m3 > 0 ? m3 * pxFretM3().gnf : 0, d, local: 0.05, caisses: false, vsrc: m3 > 0 ? 'volume' : 'inconnu' };
+}
+function lsModeleDePx(c, o, prix, rendu) {
+  let md = null; try { md = pxModele(c, o); } catch (x) { md = null; }
+  const caisses = typeof caActif === 'function' && caActif();
+  md = md && md.type === 'volume' ? { type: 'volume', F: num(md.F), d: num(md.d), local: num(md.local), caisses, vsrc: md.vsrc } : md ? { type: 'pct', pct: num(md.pct), caisses } : null;
+  // le détail doit faire EXACTEMENT le coût de Comparer ; sinon une seule ligne, sans inventer de détail
+  return md && Math.abs(lsRendu(md, prix) - rendu) <= 1 ? md : { type: 'fixe', rendu, quoi: 'Comparer', caisses };
+}
+function lsModeleAchat(a, rendu) {
+  const q = num(a && a.quantite), caisses = typeof caActif === 'function' && caActif();
+  let L = null;
+  try { if (caisses && typeof caDetail === 'function') { const d = caDetail(a); if (d && q > 0 && Math.abs(d.total / q - rendu) <= 1) L = d.L.slice(1).map(x => [x[0] + (x[2] ? ' — ' + x[2] : ''), x[1] / q]); } } catch (x) { L = null; }
+  return { type: 'fixe', rendu, quoi: 'achat', lignes: L, caisses };
+}
+// prix (GNF la pièce) → tout. affiche = le prix affiché à Conakry (1er prix), 0 si inconnu.
+function lsCalcul(md, prixGnf, affiche) {
+  const mc = lsMargeCout();
+  const rendu = prixGnf > 0 || md.type === 'fixe' ? lsRendu(md, prixGnf) : 0;
+  const bateau = md.type === 'volume' ? md.F : 0, douane = md.type === 'volume' ? (prixGnf + md.F) * md.d : 0;
+  const reste = md.type === 'volume' ? md.local * prixGnf : md.type === 'pct' ? prixGnf * md.pct / 100 : 0;
+  const vente = affiche > 0 ? affiche * (1 - coRabaisPct() / 100) : 0;
+  const gain = rendu > 0 && vente > 0 ? vente - rendu : 0;
+  const pv = rendu > 0 && vente > 0 ? gain / vente * 100 : 0, pc = rendu > 0 && vente > 0 ? gain / rendu * 100 : 0;
+  const cible = vente > 0 ? vente / (1 + mc / 100) : 0;
+  const max = md.type === 'volume' ? Math.max(0, (cible - md.F * (1 + md.d)) / (1 + md.d + md.local)) : md.type === 'pct' ? Math.max(0, cible / (1 + md.pct / 100)) : 0;
+  const feu = !(rendu > 0) || !(vente > 0) ? 'gris' : pc >= mc - 1e-9 ? 'vert' : pc >= 35 ? 'jaune' : 'rouge';
+  return { mc, md, prixGnf, bateau, douane, reste, rendu, affiche, vente, gain, pv, pc, max, feu, achete: md.quoi === 'achat' };
+}
+const LS_FEU = { vert: '🟢 Bon : ta règle passe au prix du marché', jaune: '🟡 Un peu juste : moins que ta règle', rouge: '🔴 Trop cher à ce prix : négocier ou écarter', gris: 'Prix à connaître' };
+// Un maximum en devise : arrondi VERS LE BAS au dixième (6,83 ¥ → 6,8 ¥ : payer le prix affiché garde la règle).
+function lsMaxTxt(k, devise, taux) {
+  if (k.achete) return 'déjà acheté';
+  if (!(k.vente > 0)) return '?';
+  if (!(k.max > 0)) return 'aucun prix : même gratuit, trop cher rendu';
+  if (!(taux > 0)) return gnfStrict(Math.floor(k.max));
+  return nf(Math.floor(k.max / taux * 10) / 10, 1) + ' ' + (devise === 'CNY' ? '¥' : devise);
+}
+// « 🧮 Comment ce % est calculé » : ses chiffres, ligne par ligne.
+function lsCalcHtml(k, prixTxt, maxTxt, tauxManquant) {
+  const g = (x) => E(gnfStrict(x));
+  const l = (t, v) => `<div class="l"><span>${t}</span><b>${v}</b></div>`;
+  const ouvre = '<details class="ls-calc"><summary>🧮 Comment ce % est calculé</summary>';
+  if (tauxManquant) return ouvre + `<p>Le prix est noté (${E(prixTxt)}), mais le taux du ${E(tauxManquant)} n'est pas dans le carnet : Voyage → « Préparer mon voyage » → mes taux.</p></details>`;
+  if (!(k.rendu > 0)) return ouvre + '<p>Il faut d\'abord le prix du fournisseur : touchez « 💰 Demander son prix ».</p></details>';
+  let corps = '';
+  if (k.md.type === 'volume') {
+    const est = k.md.caisses && (k.md.vsrc === 'moyenne' || k.md.vsrc === 'valeur');
+    const reste = k.md.caisses ? 'Voyage, accompagnateur, transitaire (vos caisses)' + (k.md.vsrc === 'moyenne' ? ', et le bateau à la moyenne de vos produits mesurés' : k.md.vsrc === 'valeur' ? ', et le vrai bateau noté partagé selon la valeur' : '') : 'Transitaire et transport jusqu\'au magasin (5 %)';
+    corps = l('Prix du fournisseur' + (prixTxt ? ' (' + E(prixTxt) + ')' : ''), g(k.prixGnf))
+      + l('Bateau' + (k.bateau > 0 ? '' : est ? ' (compté dans la ligne plus bas)' : ' (carton pas mesuré : pas compté)'), g(k.bateau))
+      + l('Douane ' + E(nf(k.md.d * 100, 2)) + ' % de (prix + bateau)', g(k.douane)) + l(E(reste), g(k.reste));
+  } else if (k.md.type === 'pct') {
+    corps = l('Prix du fournisseur' + (prixTxt ? ' (' + E(prixTxt) + ')' : ''), g(k.prixGnf)) + l('Frais du voyage : ' + E(nf(k.md.pct, 1)) + ' % du prix (comme dans Comparer)', g(k.reste));
+  } else if (k.md.lignes && k.md.lignes.length) {
+    corps = l('Prix de l\'achat' + (prixTxt ? ' (' + E(prixTxt) + ')' : ''), g(k.prixGnf)) + k.md.lignes.map(x => l(E(x[0]), g(x[1]))).join('');
+  } else {
+    corps = l(k.md.quoi === 'achat' ? 'Coût rendu de l\'achat (onglet Achats)' : 'Coût rendu, le même que dans Comparer' + (prixTxt ? ' (' + E(prixTxt) + ')' : ''), g(k.rendu));
+  }
+  return ouvre + corps + `<div class="l tot"><span>Coût rendu au magasin</span><b>${g(k.rendu)}</b></div>
+    ${k.vente > 0 ? `${l('Prix affiché à Conakry', g(k.affiche))}${l('− marchandage ' + E(nf(coRabaisPct(), 0)) + ' % = 2ᵉ prix', g(k.vente))}
+      <div class="l tot"><span>${k.gain >= 0 ? 'Tu gagnes' : 'Tu perds'} par pièce</span><b>${g(Math.abs(k.gain))}</b></div>
+      <p>${E(gnfStrict(k.gain))} ÷ ${E(gnfStrict(k.vente))} (le 2ᵉ prix) = <b>${E(nf(k.pv, 1))} % de la vente</b>.<br>
+        ${E(gnfStrict(k.gain))} ÷ ${E(gnfStrict(k.rendu))} (ton coût) = <b>${k.pc >= 0 ? '+' : ''}${E(nf(k.pc, 1))} % sur ton coût</b> — ta règle : +${E(nf(k.mc, 0))} %.</p>
+      <p>${k.pc < 0 ? 'Négatif : les autres boutiques vendent moins cher que ce que le produit te coûte rendu. ' : ''}${k.achete ? 'Déjà acheté : il reste à fixer ton prix de vente (onglet Prix de vente).' : 'Pour garder +' + E(nf(k.mc, 0)) + ' % au 2ᵉ prix, le prix du fournisseur doit rester sous <b>' + E(maxTxt) + '</b>.'}</p>`
+      : '<p>Le prix de vente à Conakry n\'est pas connu : tapez le prix affiché par les autres boutiques, le carnet calcule la marge.</p>'}
+  </details>`;
+}
+
+// ---------- ⭐ Choix de Claude : le même coût (R1), la même règle, le calcul montré ----------
+const lsCxCoutAvant = cxCout;
+cxCout = function (c) {
+  const v = lsCxCoutAvant.apply(this, arguments);
+  try {
+    let r = null; try { r = typeof f6PrixChoix === 'function' ? f6PrixChoix(c) : null; } catch (x) { r = null; }
+    let md, prixGnf = num(v.prixGnf), devise = 'CNY';
+    if (v.f6Rendu && r) {                                   // 1 et 2 : le coût de la 1.18.0 (achat ou Comparer) reste LE coût
+      prixGnf = enGnf(r.prix, r.devise); devise = r.devise || 'CNY';
+      md = r.quoi === 'achete' ? lsModeleAchat(r.a, num(v.rendu)) : lsModeleDePx(r.l.c, r.l.o, prixGnf, num(v.rendu));
+    } else {                                                // 3 : l'estimation
+      const m = (Array.isArray(C.marche_guinee) ? C.marche_guinee : []).find(x => pxMemeArticle(x, c.article)) || null;
+      md = lsModele(c.article, m, num(v.m3));
+      if (!(typeof caActif === 'function' && caActif()) && Math.abs(lsRendu(md, prixGnf) - num(v.rendu)) > 1) md = { type: 'fixe', rendu: num(v.rendu), quoi: 'liste' };
+    }
+    const k = lsCalcul(md, prixGnf, num(v.affiche)), q = cxQte(c), t = v.t || tauxDe('CNY'), tu = v.usd || tauxDe('USD') || 8800;
+    k.devise = devise;
+    return Object.assign(v, { rendu: k.rendu, vente: k.vente, max: k.max, maxCny: t > 0 ? k.max / t : k.max / tu * 7.1, margePct: k.pv, gain: k.gain, gainLot: k.gain * q,
+      avance: k.rendu * q, rendement: k.rendu > 0 ? k.gain / k.rendu * 100 : 0, ls: k });
+  } catch (x) { return v; }
+};
+const lsCxItemAvant = cxItemHtml;
+cxItemHtml = function (c) {
+  const h = lsCxItemAvant.apply(this, arguments);
+  try {
+    const v = cxCout(c), k = v.ls; if (!k) return h;
+    const maxTxt = lsMaxTxt(k, 'CNY', tauxDe('CNY'));
+    // Les retouches se font DANS le bloc des chiffres seulement (jamais dans le texte « pourquoi » de Claude).
+    const a = h.indexOf('<div class="cx-chiffres">'), b = h.indexOf(`<div id="cx_tot_${c.id}"`);
+    if (a < 0 || b < a) return h;
+    let ch = h.slice(a, b);
+    ch = ch.replace(/(À ne pas dépasser<br><b>)[^<]*(<\/b>)\s*(\(marge [^)]*\))?/, (t, x, y) => x + E(maxTxt) + y + (k.vente > 0 && !k.achete && k.max > 0 ? ' (pour +' + E(nf(k.mc, 0)) + ' % sur ton coût)' : ''))
+      .replace(/( → marge [^<]*?) %<\/div>/, '$1 % de la vente</div>');
+    let r = null; try { r = typeof f6PrixChoix === 'function' ? f6PrixChoix(c) : null; } catch (x) { r = null; }
+    const prixTxt = r ? ({ achete: 'prix de l\'achat', recu: 'prix reçu', stand: 'prix noté au stand' }[r.quoi] || 'prix reçu') + ' ' + nf(r.prix, 2) + ' ' + (r.devise || 'CNY')
+      : c.prix_cny && num(c.prix_cny.min) > 0 ? 'milieu de ' + nf(num(c.prix_cny.min), 0) + '–' + nf(num(c.prix_cny.max), 0) + ' ¥' : '';
+    const bloc = `<div><span class="ls-feu ${k.feu}">${E(LS_FEU[k.feu])}</span></div>${lsCalcHtml(k, prixTxt, maxTxt)}`;
+    return h.slice(0, a) + ch + bloc + h.slice(b);
+  } catch (x) { return h; }
+};
+const lsCxBudgetAvant = cxBudgetHtml;
+cxBudgetHtml = function () {
+  const h = lsCxBudgetAvant.apply(this, arguments);
+  if (!(typeof caActif === 'function' && caActif())) return h;
+  return h.replace('Coût rendu = prix usine estimé (milieu de la fourchette) + bateau + douane + 5 %.',
+    'Coût rendu = prix usine estimé (milieu de la fourchette) + vos caisses : voyage, accompagnateur, bateau au volume, douane, transitaire — le même que partout dans le carnet.');
+};
+
+// ---------- ★ Ma liste : mes modèles étoilés, de tous les catalogues ----------
+let lsFiltre = 'tous', lsTri = 'fournisseur';
+function lsProduits() {
+  const L = [];
+  fournisseursListe().forEach(f => ctProduits(f).forEach(p => { if (p && p.interesse) L.push({ f, p }); }));
+  return L;
+}
+function lsM3(p) { return num(p.colisage) > 0 && num(p.dim_l) > 0 && num(p.dim_la) > 0 && num(p.dim_h) > 0 ? num(p.dim_l) * num(p.dim_la) * num(p.dim_h) / 1e6 / num(p.colisage) : 0; }
+// Le prix affiché à Conakry : celui que Riche a tapé, sinon celui de la liste de Claude pour ce modèle, sinon le marché connu de Claude.
+function lsChoixDe(f, p) {
+  if (ctCleRef(p.ref).length < 3) return null;
+  try { return cxListe().find(c => !c.retire && cxFournisseur(c) === f && cxProduit(c) === p) || null; } catch (x) { return null; }
+}
+function lsMarche(p) { const a = p.categorie || p.ref || ''; return (Array.isArray(C.marche_guinee) ? C.marche_guinee : []).find(x => pxMemeArticle(x, a)) || null; }
+function lsAffiche(f, p) {
+  if (num(p.vente_gnf) > 0) return { v: num(p.vente_gnf), src: 'moi' };
+  const c = lsChoixDe(f, p); if (c && num(c.vente_gnf) > 0) return { v: num(c.vente_gnf), src: 'claude' };
+  const m = lsMarche(p); if (m && num(m.conseille) > 0) return { v: num(m.conseille), src: 'marche' };
+  return { v: 0, src: '' };
+}
+// Le prix qui compte pour un modèle : celui de son achat, sinon le prix reçu ou noté dans Comparer, sinon celui du catalogue.
+function lsPrixConnu(f, p) {
+  let l = null;
+  try { if (typeof f6RelierModeles === 'function') f6RelierModeles(f); l = pxLignesDe(f).find(x => (x.pc && x.pc.id === p.id) || (x.p && x.p.id === p.id)) || null; } catch (x) { l = null; }
+  if (l) {
+    let a = null; try { a = typeof f6AchatDeLigne === 'function' ? f6AchatDeLigne(f, l) : null; } catch (x) { a = null; }
+    if (a && num(a.prix_unitaire) > 0 && num(a.quantite) > 0) return { prix: num(a.prix_unitaire), devise: deviseDe(a), quoi: 'achete', a, l };
+    if (l.o && l.c && num(l.o.prix) > 0) return { prix: num(l.o.prix), devise: l.o.devise || 'CNY', quoi: typeof pxQualites === 'function' && pxQualites(l.o).length && l.o.cotation_source !== 'claude' ? 'recu' : 'stand', l };
+  }
+  if (num(p.prix) > 0) return { prix: num(p.prix), devise: p.devise || 'USD', quoi: 'catalogue' };
+  return null;
+}
+const LS_QUOI = { achete: 'prix de l\'achat', recu: 'prix reçu', stand: 'prix noté au stand', catalogue: 'prix du catalogue' };
+function lsCalculDe(f, p) {
+  const r = lsPrixConnu(f, p), a = lsAffiche(f, p), devise = r ? r.devise : (p.devise || 'USD'), t = tauxDe(devise);
+  const prixGnf = r && t > 0 ? r.prix * t : 0;
+  let md;
+  if (r && r.quoi === 'achete') md = lsModeleAchat(r.a, coutRenduGnf(r.a));
+  else if (r && (r.quoi === 'recu' || r.quoi === 'stand') && prixGnf > 0) md = lsModeleDePx(r.l.c, r.l.o, prixGnf, pxRenduGnf(r.l.c, r.l.o, prixGnf));
+  else { const m = lsMarche(p); md = lsModele(p.categorie || p.ref, m, lsM3(p) || num(m && m.volume_m3)); }
+  const k = lsCalcul(md, prixGnf, a.v);
+  k.src = a.src; k.q = num(p.qte_liste) || 0; k.r = r; k.devise = devise; k.taux = t;
+  k.tauxManquant = r && !(t > 0) ? devise : '';
+  k.prixTxt = r ? LS_QUOI[r.quoi] + ' ' + nf(r.prix, 2) + ' ' + devise : '';
+  return k;
+}
+function lsVente(fid, pid, v) {
+  const f = mkFournisseur(fid), p = f && ctProduit(f, pid); if (!p) return;
+  p.vente_gnf = lsEntier(v); sauverLocal(); dessiner();
+}
+function lsQte(fid, pid, v) {
+  const f = mkFournisseur(fid), p = f && ctProduit(f, pid); if (!p) return;
+  p.qte_liste = lsEntier(v); sauverLocal(); dessiner();
+}
+function lsRetirer(fid, pid) {
+  const f = mkFournisseur(fid), p = f && ctProduit(f, pid); if (!p) return;
+  p.interesse = false; sauverLocal(); dessiner(); avertir('☆ ' + (p.ref || 'Le modèle') + ' n\'est plus dans ma liste (l\'étoile est enlevée dans son catalogue).', 4000);
+}
+function lsDemanderPrix(fid, pid) {
+  const f = mkFournisseur(fid), p = f && ctProduit(f, pid); if (!f) return;
+  pxBoiteDemande(f.id);
+  try { if (p && pxD) { const l = pxLignesDe(f).find(x => (x.p && x.p.id === p.id) || (x.pc && x.pc.id === p.id)); if (l) { pxD.choix.add(l.cle); pxDessinerDemande(); } } } catch (x) {}
+}
+function lsItemHtml(x) {
+  const { f, p } = x, k = x.k || lsCalculDe(f, p);
+  const photo = p.photo_doc ? `<img class="ct-mini" data-doc="${E(p.photo_doc)}" alt="${E(p.ref || '')}" onclick="trVoirProduit('${f.id}','${p.id}')">` : '<span class="cx-vide">📦</span>';
+  const maxTxt = lsMaxTxt(k, k.devise, k.taux);
+  const src = { claude: ' <span class="muet">(prix de la liste de Claude)</span>', marche: ' <span class="muet">(prix connu de Claude)</span>' }[k.src] || '';
+  const prixCase = k.r ? E(nf(k.r.prix, 2) + ' ' + k.devise) + (k.tauxManquant ? ' <span class="muet">(taux du ' + E(k.devise) + ' manquant)</span>' : ' ≈ ' + E(gnfStrict(k.prixGnf))) + '<br><span class="muet">' + E(LS_QUOI[k.r.quoi]) + '</span>' : 'à demander';
+  return `<div class="cx-item ls-item" id="ls_${E(p.id)}">
+    <div class="cx-haut">${photo}<div style="min-width:0;flex:1">
+      <div class="cx-nom"><span class="etoile">★</span> ${E(p.ref || '(sans référence)')}${p.categorie ? ' — ' + E(p.categorie) : ''}</div>
+      ${p.caracteristiques ? `<div class="ls-car">${E(p.caracteristiques)}</div>` : ''}
+      <div class="cx-four">🏭 ${E(mkNomFournisseur(f))}${p.page ? ' · ' + E(p.page) : ''}${num(p.moq) > 0 ? ' · minimum ' + E(nf(num(p.moq), 0)) + ' pièces' : ''}</div>
+      <span class="ls-feu ${k.feu}">${E(LS_FEU[k.feu])}</span></div></div>
+    <div class="cx-chiffres">
+      <div>Prix du fournisseur<br><b>${prixCase}</b></div>
+      <div>Rendu magasin / pièce<br><b>${k.rendu > 0 ? E(gnfStrict(k.rendu)) : '?'}</b></div>
+      <div><label for="lsv_${E(p.id)}" style="font-size:14px">Prix affiché à Conakry (GNF)</label><input id="lsv_${E(p.id)}" inputmode="numeric" value="${num(p.vente_gnf) > 0 ? E(nf(num(p.vente_gnf), 0)) : ''}" placeholder="${k.affiche > 0 ? E(nf(k.affiche, 0)) : 'ex : 650 000'}" onchange="lsVente('${f.id}','${p.id}',this.value)"></div>
+      <div>Vente (2ᵉ prix)<br><b>${k.vente > 0 ? E(gnfStrict(k.vente)) : '?'}</b>${src}${k.rendu > 0 && k.vente > 0 ? ' → marge ' + E(nf(k.pv, 0)) + ' % de la vente (' + (k.pc >= 0 ? '+' : '') + E(nf(k.pc, 0)) + ' % sur ton coût)' : ''}</div>
+      <div>Gain par pièce<br><b style="color:${k.gain < 0 ? '#b91c1c' : '#166534'}">${k.rendu > 0 && k.vente > 0 ? (k.gain < 0 ? '⚠ perte ' : '') + E(gnfStrict(Math.abs(k.gain))) : '?'}</b></div>
+      <div>À ne pas dépasser<br><b>${E(maxTxt)}</b>${k.vente > 0 && !k.achete && k.max > 0 ? ' (pour +' + E(nf(k.mc, 0)) + ' % sur ton coût)' : ''}</div>
+      <div><label for="lsq_${E(p.id)}" style="font-size:14px">Ma quantité</label><input id="lsq_${E(p.id)}" inputmode="numeric" value="${k.q > 0 ? E(k.q) : ''}" placeholder="${num(p.moq) > 0 ? 'ex : ' + E(nf(num(p.moq), 0)) : 'pièces'}" onchange="lsQte('${f.id}','${p.id}',this.value)"></div>
+      <div>${k.q > 0 ? 'Pour ' + E(nf(k.q, 0)) + ' pièces<br><b>' + (k.rendu > 0 ? E(gnfStrict(k.rendu * k.q)) : '?') + '</b>' + (k.rendu > 0 && k.vente > 0 ? ' · gain ' + E(gnfStrict(k.gain * k.q)) : '') : 'Le lot<br><span class="muet">tapez votre quantité</span>'}</div>
+    </div>
+    ${lsCalcHtml(k, k.prixTxt, maxTxt, k.tauxManquant)}
+    <div class="cx-liens">
+      <button class="b contour" onclick="ctOuvrirDossier('${f.id}')">👁 Sa fiche et son catalogue</button>
+      <button class="b contour" onclick="lsDemanderPrix('${f.id}','${p.id}')">💰 Demander son prix</button>
+      <button class="b contour" onclick="lsRetirer('${f.id}','${p.id}')">☆ Retirer de ma liste</button></div>
+  </div>`;
+}
+function lsTexteListe() {
+  return lsProduits().map(({ f, p }, i) => { const k = lsCalculDe(f, p), mx = lsMaxTxt(k, k.devise, k.taux);
+    return (i + 1) + '. ' + (p.ref || '') + (p.categorie ? ' — ' + p.categorie : '') + ' — ' + mkNomFournisseur(f) + ' — ' + (k.q > 0 ? k.q + ' pièces' : 'quantité à décider')
+      + ' — ' + (k.r ? nf(k.r.prix, 2) + ' ' + k.devise : 'prix à demander') + (k.vente > 0 && k.max > 0 && !k.achete ? ' — maximum ' + mx : ''); }).join('\n');
+}
+function lsCopier(b) { etCopier(b, '★ Ma liste — ' + mkJour(mkMaintenant()) + '\n' + lsTexteListe()); }
+function lsEcran() {
+  const tous = lsProduits().map(x => Object.assign(x, { k: lsCalculDe(x.f, x.p) }));
+  const avec = tous.filter(x => x.k.r && !x.k.tauxManquant), sansTaux = tous.filter(x => x.k.tauxManquant), sans = tous.filter(x => !x.k.r);
+  let L = lsFiltre === 'prix' ? avec : lsFiltre === 'sans' ? sans : lsFiltre === 'rouge' ? tous.filter(x => x.k.feu === 'rouge') : tous;
+  L = L.slice().sort((a, b) => lsTri === 'gain' ? (b.k.gain - a.k.gain) : mkNomFournisseur(a.f).localeCompare(mkNomFournisseur(b.f), 'fr', { numeric: true }) || String(a.p.ref).localeCompare(String(b.p.ref), 'fr', { numeric: true }));
+  const q = (x) => x.k.q > 0 && x.k.rendu > 0;
+  const rendu = tous.filter(q).reduce((s, x) => s + x.k.rendu * x.k.q, 0), gain = tous.filter(x => q(x) && x.k.vente > 0).reduce((s, x) => s + x.k.gain * x.k.q, 0);
+  const nR = tous.filter(x => x.k.feu === 'rouge').length;
+  const puce = (on, t, js) => `<button type="button" class="mk-puce${on ? ' on' : ''}" onclick="${js}">${t}</button>`;
+  const tete = `<div class="carte"><h2>★ Ma liste</h2>
+    <p style="font-size:16px;line-height:1.5;margin:4px 0">Les modèles où vous avez mis l'étoile <b>★ M'intéresse</b>, dans les catalogues de tous vos fournisseurs. Le même calcul que la liste de Claude : coût rendu au magasin, prix des autres boutiques à Conakry, votre règle.</p>
+    <div class="ls-tot"><b>${E(nf(tous.length, 0))}</b> modèle(s) · ${E(nf(avec.length, 0))} avec un prix · ${E(nf(sans.length, 0))} prix à demander${sansTaux.length ? ' · ' + sansTaux.length + ' taux manquant(s)' : ''}${nR ? ' · <b style="color:#b91c1c">' + nR + ' trop cher(s) au prix du marché</b>' : ''}</div>
+    ${rendu > 0 ? `<div class="ls-tot">Avec mes quantités : <b>${E(gnfStrict(rendu))}</b> rendus au magasin${gain ? ' → gain attendu <b style="color:' + (gain < 0 ? '#b91c1c' : '#166534') + '">' + E(gnfStrict(gain)) + '</b>' : ''}</div>` : ''}
+    ${lsRegleHtml()}
+    ${tous.length ? '<button type="button" class="b contour" style="min-height:50px;font-size:16px" onclick="lsCopier(this)">📋 Copier ma liste (pour l\'agent ou WeChat)</button>' : ''}</div>
+    ${tous.length ? `<div class="cx-filtres">${puce(lsFiltre === 'tous', 'Tous (' + tous.length + ')', "lsFiltre='tous';dessiner()")}${puce(lsFiltre === 'prix', 'Avec prix (' + avec.length + ')', "lsFiltre='prix';dessiner()")}${puce(lsFiltre === 'sans', 'Prix à demander (' + sans.length + ')', "lsFiltre='sans';dessiner()")}${nR ? puce(lsFiltre === 'rouge', '🔴 Trop chers (' + nR + ')', "lsFiltre='rouge';dessiner()") : ''}</div>
+      <div class="cx-filtres"><span style="font-size:14px;align-self:center;flex:none">Trier :</span>${puce(lsTri === 'fournisseur', 'Par fournisseur', "lsTri='fournisseur';dessiner()")}${puce(lsTri === 'gain', '💰 Gain par pièce', "lsTri='gain';dessiner()")}</div>` : ''}`;
+  if (!tous.length) return tete + `<div class="carte"><p style="font-size:16px;line-height:1.5">Aucune étoile pour l'instant. Dans la fiche d'un fournisseur (🏭 Fournisseurs → sa fiche → ses produits), ou dans « 📊 Comparer les prix par produit », touchez l'étoile <b>☆</b> d'un modèle : il arrive ici.</p></div>`;
+  return tete + (L.length ? L.map(lsItemHtml).join('') : '<div class="carte"><p class="muet">Rien dans ce choix.</p></div>');
+}
+
+// ---------- L'onglet ⭐ : « ★ Ma liste » à côté de la liste de Claude (et de l'étude, de la commande) ----------
+const lsEcranChoixAvant = ecranChoix;
+ecranChoix = function () {
+  const n = lsProduits().length;
+  const bouton = (on) => `<button type="button" class="ls-vue${on ? ' on' : ''}" onclick="cxVue='moi';dessiner()">★ Ma liste<small>${E(nf(n, 0))} modèle(s) étoilé(s)</small></button>`;
+  if (cxVue === 'moi') {
+    try { if (localStorage.getItem('kylo_onglet') === 'choix_commande') localStorage.setItem('kylo_onglet', 'choix'); } catch (x) {}
+    const e = typeof etActuelle === 'function' ? etActuelle() : null, k = typeof cmActuelle === 'function' ? cmActuelle() : null, nCx = cxListe().filter(c => !c.retire).length;
+    return `<div class="et-vues">
+      <button type="button" onclick="cxVue='choix';dessiner()">⭐ Choix de Claude<small>${E(nf(nCx, 0))} produits</small></button>${bouton(true)}
+      ${e ? `<button type="button" onclick="cxVue='etude';dessiner()">📊 ${E(e.titre)}<small>${E(nf(e.nb || 0, 0))} produits · par groupes</small></button>` : ''}
+      ${k ? `<button type="button" class="cm-vue" onclick="cxVue='commande';dessiner()">📦 ${E(k.titre)}<small>${E(nf(k.nb || 0))} produits</small></button>` : ''}</div>` + lsEcran();
+  }
+  const h = lsEcranChoixAvant.apply(this, arguments);
+  if (h.startsWith('<div class="et-vues">')) {
+    // le bouton ★ se pose juste après « ⭐ Choix de Claude » (le 1er bouton de la bascule)
+    const i = h.indexOf('</button>') + '</button>'.length;
+    return h.slice(0, i) + bouton(false) + h.slice(i);
+  }
+  return `<div class="et-vues"><button type="button" class="on">⭐ Choix de Claude</button>${bouton(false)}</div>` + h;
+};
+// La liste de Claude, elle aussi, montre la règle (au-dessus de son budget).
+const lsCxBudgetRegle = cxBudgetHtml;
+cxBudgetHtml = function () { return lsRegleHtml() + lsCxBudgetRegle.apply(this, arguments); };
+// Une liste de Claude qui arrive par fichier s'ouvre sur la liste de Claude (pas sur ★ Ma liste).
+const lsImportAvant = ctAppliquerImport;
+ctAppliquerImport = async function () {
+  try { const imp = ctImportEnCours; if (imp && Array.isArray(imp.choix_claude) && imp.choix_claude.length && cxVue === 'moi') cxVue = 'choix'; } catch (x) {}
+  return lsImportAvant.apply(this, arguments);
+};
+window.KYLO_LISTES = '1.20.0';
 </script>
 
 

@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.21.0';
+window.KYLO_APPLICATION = '1.22.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -28213,6 +28213,253 @@ lsItemHtml = function (x) {
   } catch (e) { return h; }
 };
 window.KYLO_PRIX_STAND = '1.21.0';
+</script>
+<style>
+/* ===================== Carnet 1.22.0 — ta commande par fichier de Claude (Riche, 01/11/2026 à 1 h 26) ===================== */
+.cfi-apercu{border:2px solid var(--vert, #15803d);border-radius:12px;padding:10px 12px;margin:10px 0;background:var(--carte)}
+.cfi-apercu p{margin:4px 0;font-size:16px;line-height:1.45}
+.cfi-apercu ul{margin:6px 0 4px 18px;padding:0}
+.cfi-apercu li{font-size:15px;margin:3px 0}
+.cfi-apercu .att{color:#854d0e;font-weight:700}
+html[data-theme="sombre"] .cfi-apercu .att{color:#ffe08a}
+</style>
+<script>
+// =====================================================================================================
+// Carnet 1.22.0 — TA COMMANDE PAR FICHIER DE CLAUDE
+// Riche (01/11, 1 h 26, à Yiwu), en envoyant la photo d'un bon de commande : « À travers ce document, fais-moi le choix des
+// produits que j'ai pris et de ceux que je n'ai pas pris, pour qu'ils soient relevés dans les produits achetés. »
+// La veille : « Aujourd'hui ça m'a empêché de noter la commande que j'ai faite sur mon carnet : ce n'était pas prêt sur ma liste et
+// c'était compliqué de les rajouter. »
+// Le fichier de Claude (📥, format kylo-import) peut maintenant porter, pour un fournisseur :
+//   - « achats » : [{ ref, quantite, prix_unitaire, devise, famille, note, cle }] → ils vont dans « Mes achats », exactement comme si Riche les
+//     avait cochés dans « 🛒 Acheter chez » (même chemin : code-barres, marge à fixer, carton, photo du modèle, contrat) ;
+//     un modèle déjà acheté chez lui est MIS À JOUR (jamais en double) ; un achat qu'il a fait lui-même avec la même référence, pas
+//     relié, est relié (pas en double) ; « quantite » 0 retire un achat qu'un fichier avait mis — jamais un achat fait à la main ;
+//     une ligne déjà posée (même « cle ») que Riche a CHANGÉE ou SUPPRIMÉE depuis n'est plus touchée : sa main passe avant le fichier ;
+//   - « reunir » : [{ nom }] → une fiche qu'un fichier de Claude avait créée en trop (même fournisseur) est réunie dans celle-ci :
+//     modèles, étoiles, prix (dont un prix dit au stand), achats et lignes de Comparer passent ; rien n'est perdu, rien n'est doublé.
+// L'aperçu (avant « ✅ Ajouter au carnet ») dit ce qui va se passer, ligne par ligne, et ce qui manque ; un contrat déjà envoyé ou
+// signé est rappelé. Les messages du chemin « 🛒 Acheter chez » (code-barres impossible, pièces manquantes) restent affichés.
+// Rien n'est retiré : un fichier sans « achats » ni « reunir » fait exactement ce qu'il faisait en 1.21.0.
+// (Toutes les fonctions commencent par « cfi » : aucun nom déjà pris dans le carnet.)
+// =====================================================================================================
+
+function cfiFournisseur(x) {
+  try { if (typeof f6Reconnaitre === 'function') { const r = f6Reconnaitre(x, fournisseursListe()); if (r && r.f) return r.f; } } catch (e) {}
+  return ctTrouverFournisseur(x);
+}
+// Les lignes d'achat du fichier : une seule par modèle (la 1re ; les suivantes sont signalées).
+function cfiLignes(x) {
+  const vues = new Set(), L = [], doubles = [];
+  (x && Array.isArray(x.achats) ? x.achats : []).forEach(a => {
+    if (!a || !String(a.ref || '').trim()) return;
+    const k = ctCleRef(a.ref); if (vues.has(k)) { doubles.push(a.ref); return; }
+    vues.add(k); L.push(a);
+  });
+  return { L, doubles };
+}
+function cfiModele(f, ref) { const k = ctCleRef(ref); return f && k ? ctProduits(f).find(p => ctCleRef(p.ref) === k) || null : null; }
+// La ligne de Comparer du modèle : celle qui porte déjà l'achat d'abord.
+function cfiLigne(f, p) {
+  const L = pxLignesDe(f).filter(l => (l.o && l.o.produit_id === p.id) || (l.p && l.p.id === p.id));
+  return L.find(l => l.o && pxAchatDe(l.o)) || L[0] || null;
+}
+// La référence écrite dans le nom d'un achat fait à la main (« Papier peint AB-333 ») : pas « AB-33 » dans « AB-333 ».
+function cfiRefDans(texte, ref) {
+  const k = ctCleRef(ref); if (!k || k.length < 4 || !/\d/.test(k)) return false;
+  const motif = k.split('').map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[\\s\\-_.]?');
+  return new RegExp('(^|[^A-Z0-9])' + motif + '($|[^A-Z0-9])', 'i').test(String(texte || '').toUpperCase());
+}
+// Ce qu'un fichier a déjà posé chez ce fournisseur (pour ne jamais défaire ce que Riche a changé depuis).
+function cfiPoses(f) { return f && f.cfi_poses && typeof f.cfi_poses === 'object' ? f.cfi_poses : {}; }
+function cfiAchatDuModele(f, p) {
+  const l = p ? cfiLigne(f, p) : null; if (l && l.o) { const a = pxAchatDe(l.o); if (a) return a; }
+  return p ? (haNonRelies(f).find(y => ctCleRef(y.reference) === ctCleRef(p.ref) || cfiRefDans(y.nom, p.ref)) || null) : null;
+}
+// Le sort d'une ligne : mettre (nouveau ou mis à jour), retirer, garder le sien, ou rien (déjà fait / changé par lui).
+function cfiSort(f, a, dansFichier) {
+  const p = cfiModele(f, a.ref), q = num(a.quantite), pr = num(a.prix_unitaire), d = a.devise || 'CNY';
+  if (!p && !dansFichier) return { s: 'manque' };
+  const ach = f && p ? cfiAchatDuModele(f, p) : null, pose = a.cle ? cfiPoses(f)[String(a.cle)] : null;
+  if (pose) {
+    const encore = pose.achat && (C.achats || []).find(y => y.id === pose.achat);
+    if (!encore) return { s: 'supprime_par_toi' };
+    if (num(encore.quantite) !== num(pose.q) || Math.abs(num(encore.prix_unitaire) - num(pose.p)) > 1e-9 || deviseDe(encore) !== (pose.d || 'CNY')) return { s: 'change_par_toi', a: encore };
+    if (q > 0 && num(pose.q) === q && Math.abs(num(pose.p) - pr) < 1e-9 && (pose.d || 'CNY') === d) return { s: 'deja' };
+  }
+  if (q > 0) return { s: ach ? 'maj' : 'nouveau', ach };
+  if (!ach) return { s: 'pas_achete' };
+  return ach.de_claude ? { s: 'retirer', ach } : { s: 'le_tien', ach };
+}
+// Ce que le fichier va faire, sans rien changer (pour l'aperçu) — le même tri que l'application.
+function cfiPlan(imp) {
+  const res = [];
+  (imp && Array.isArray(imp.fournisseurs) ? imp.fournisseurs : []).forEach(x => {
+    if (!x) return;
+    const { L, doubles } = cfiLignes(x), R = Array.isArray(x.reunir) ? x.reunir : [];
+    if (!L.length && !R.length) return;
+    const f = cfiFournisseur(x), dansFichier = new Set((Array.isArray(x.produits) ? x.produits : []).map(p => ctCleRef(p && p.ref)));
+    const t = { x, f, nom: f ? mkNomFournisseur(f) : (x.nom || x.societe || 'nouveau fournisseur'), mettre: [], retirer: [], le_tien: [], pas_achete: [], manque: [],
+      deja: [], change: [], supprime: [], doubles, parDev: {}, ailleurs: [], reunir: [], contrat: null, libres: [] };
+    R.forEach(r => { const g = cfiFicheEnTrop(f, r); if (g) t.reunir.push(g); });
+    const passent = new Set(t.reunir.map(g => g.id));        // les achats de la fiche en trop passent chez lui : pas « ailleurs »
+    L.forEach(a => {
+      const r = cfiSort(f, a, dansFichier.has(ctCleRef(a.ref))), k = ctCleRef(a.ref);
+      if (r.s === 'manque') t.manque.push(a.ref);
+      else if (r.s === 'nouveau' || r.s === 'maj') { t.mettre.push(Object.assign({ maj: r.s === 'maj' }, a)); const pr = num(a.prix_unitaire), d = a.devise || 'CNY'; if (pr > 0) t.parDev[d] = (t.parDev[d] || 0) + num(a.quantite) * pr; }
+      else if (r.s === 'retirer') t.retirer.push(a.ref);
+      else if (r.s === 'le_tien') t.le_tien.push(a.ref);
+      else if (r.s === 'pas_achete') t.pas_achete.push(a.ref);
+      else if (r.s === 'deja') t.deja.push(a.ref);
+      else if (r.s === 'change_par_toi') t.change.push(a.ref);
+      else if (r.s === 'supprime_par_toi') t.supprime.push(a.ref);
+      if (num(a.quantite) > 0) (C.achats || []).forEach(y => { if ((!f || y.fournisseur_id !== f.id) && !passent.has(y.fournisseur_id) && (ctCleRef(y.reference) === k || cfiRefDans(y.nom, a.ref))) t.ailleurs.push(a.ref + ' (' + (y.fournisseur || '?') + ')'); });
+    });
+    try { if (f && typeof f3Versions === 'function') { const V = f3Versions(f), der = V[V.length - 1]; if (der && (t.mettre.length || t.retirer.length)) t.contrat = der; } } catch (e) {}
+    if (f) { const refs = L.map(a => a.ref); t.libres = haNonRelies(f).filter(y => !refs.some(r => ctCleRef(y.reference) === ctCleRef(r) || cfiRefDans(y.nom, r))).map(y => y.nom || 'sans nom'); }
+    res.push(t);
+  });
+  return res;
+}
+// Une fiche en trop : créée par un fichier de Claude, au nom exact donné, autre que la fiche gardée.
+function cfiFicheEnTrop(f, r) {
+  const n = normaliserNom(r && r.nom); if (!n) return null;
+  return fournisseursListe().find(g => g !== f && g.source === 'claude' && normaliserNom(g.nom) === n) || null;
+}
+function cfiMontant(parDev) { return Object.keys(parDev).map(d => nf(parDev[d], 2) + ' ' + mkSym(d)).join(' + '); }
+function cfiApercuHtml(plan) {
+  if (!plan.length) return '';
+  const liste = (a) => E(a.slice(0, 12).join(', ') + (a.length > 12 ? '… (' + a.length + ')' : ''));
+  return plan.map(t => `<div class="cfi-apercu">
+    ${t.reunir.map(g => `<p>🔁 <b>${E(mkNomFournisseur(g))}</b> est le même fournisseur : sa fiche est réunie dans <b>${E(t.nom)}</b>. Modèles, étoiles, prix et achats passent ; rien n'est perdu, rien n'est doublé.</p>`).join('')}
+    ${t.mettre.length ? `<p>🛒 <b>${E(t.mettre.length)} produit${t.mettre.length > 1 ? 's' : ''} dans « Mes achats »</b> chez ${E(t.nom)}${Object.keys(t.parDev).length ? ' : <b>' + E(cfiMontant(t.parDev)) + '</b>' : ''}</p>
+      <ul>${t.mettre.map(a => `<li>${E(a.ref)} : ${E(nf(num(a.quantite)))} × ${E(nf(num(a.prix_unitaire), 2))} ${E(mkSym(a.devise || 'CNY'))}${a.maj ? ' (déjà dans tes achats : mis à jour)' : ''}</li>`).join('')}</ul>` : ''}
+    ${t.retirer.length ? `<p>🗑 ${E(t.retirer.length)} retiré${t.retirer.length > 1 ? 's' : ''} de tes achats (pas pris) : ${liste(t.retirer)}.</p>` : ''}
+    ${t.le_tien.length ? `<p>✋ Gardé${t.le_tien.length > 1 ? 's' : ''} : ${liste(t.le_tien)} — un achat que tu as fait toi-même n'est jamais retiré par un fichier.</p>` : ''}
+    ${t.pas_achete.length ? `<p>— Pas dans tes achats (rien à retirer) : ${liste(t.pas_achete)}.</p>` : ''}
+    ${t.deja.length ? `<p>✔ Déjà dans tes achats, pareil : ${liste(t.deja)}.</p>` : ''}
+    ${t.change.length ? `<p>✋ Tu as changé ${liste(t.change)} depuis le dernier fichier : ton chiffre est gardé.</p>` : ''}
+    ${t.supprime.length ? `<p>✋ Tu as supprimé ${liste(t.supprime)} de tes achats : il n'est pas remis.</p>` : ''}
+    ${t.doubles.length ? `<p class="att">⚠ En double dans le fichier : ${liste(t.doubles)} — seule la 1re ligne est prise.</p>` : ''}
+    ${t.manque.length ? `<p class="att">⚠ Pas trouvé dans son catalogue : ${liste(t.manque)} — pas mis dans tes achats.</p>` : ''}
+    ${t.ailleurs.length ? `<p class="att">⚠ Déjà dans tes achats chez un autre fournisseur : ${E(t.ailleurs.slice(0, 6).join(', '))}. Vérifie qu'il n'est pas en double.</p>` : ''}
+    ${t.libres.length ? `<p>Chez lui, déjà dans tes achats sans produit noté : ${E(t.libres.slice(0, 6).join(', '))} — ils restent tels quels.</p>` : ''}
+    ${t.contrat ? `<p class="att">⚠ Son contrat ${E(t.contrat.no || '')} est déjà ${t.contrat.signe_le ? 'SIGNÉ' : 'envoyé'} : ces achats le changent. Envoie-lui l'avenant (📝 Contrat d'achat).</p>` : ''}
+  </div>`).join('');
+}
+const cfiApercuAvant = ctApercuImport;
+ctApercuImport = async function () {
+  await cfiApercuAvant.apply(this, arguments);
+  const imp = ctImportEnCours, z = document.getElementById('ct_apercu_import');
+  if (!imp || !z) return;
+  try { const h = cfiApercuHtml(cfiPlan(imp)); if (h) z.insertAdjacentHTML('beforeend', h); } catch (e) { console.warn('1.22 aperçu', e); }
+};
+
+// Réunir une fiche en trop : d'abord, tout ce qui pointait vers ses modèles pointe vers les modèles gardés (pas d'achat en double),
+// ses étoiles et ce qui manque passent, un prix dit au stand reste le prix (l'autre va dans l'historique) ; puis fsReunir.
+function cfiReunir(f, g) {
+  const parRef = new Map(ctProduits(f).map(p => [ctCleRef(p.ref), p]));
+  const PRIX = ['prix', 'devise', 'moq', 'prix_le', 'prix_note', 'prix_dit_le', 'historique'];
+  ctProduits(g).forEach(pg => {
+    const pa = parRef.get(ctCleRef(pg.ref)); if (!pa) return;
+    (C.comparaisons || []).forEach(c => (c.offres || []).forEach(o => { if (o.produit_id === pg.id) o.produit_id = pa.id; }));
+    Object.keys(pg).forEach(k => { if (k !== 'id' && PRIX.indexOf(k) < 0 && pg[k] && !pa[k]) pa[k] = pg[k]; });
+    const hist = (p) => Array.isArray(p.historique) ? p.historique : [];
+    if (num(pg.prix) > 0 && !(num(pa.prix) > 0)) { PRIX.forEach(k => { if (pg[k] !== undefined) pa[k] = pg[k]; }); }
+    else if (num(pg.prix) > 0 && (num(pg.prix) !== num(pa.prix) || (pg.devise || 'USD') !== (pa.devise || 'USD'))) {
+      const garderLeSien = !!pg.prix_dit_le;                    // un prix qu'il a dit au stand passe avant le prix du tableau
+      const [haut, bas] = garderLeSien ? [pg, pa] : [pa, pg];
+      const h = hist(pa).concat(hist(pg), [{ prix: bas.prix, devise: bas.devise, moq: bas.moq, le: bas.prix_le }]);
+      if (garderLeSien) ['prix', 'devise', 'moq', 'prix_le', 'prix_note', 'prix_dit_le'].forEach(k => { pa[k] = haut[k]; });
+      pa.historique = h;
+    } else if (hist(pg).length) pa.historique = hist(pa).concat(hist(pg));
+  });
+  fsReunir(f.id, g.id);
+  return true;
+}
+// Les achats d'un fournisseur : le même chemin que « 🛒 Acheter chez » (haValiderSuite), avec les pièces et le prix du fichier.
+async function cfiPasser(x, f, le) {
+  const { L } = cfiLignes(x), choix = {}, retires = [], marques = [], res = { n: 0, retires: 0, manque: [], parDev: {}, gardes: 0, messages: [] };
+  haRelier(f);
+  for (const a of L) {
+    const r = cfiSort(f, a, true);
+    if (r.s === 'manque') { res.manque.push(a.ref); continue; }
+    if (r.s === 'deja' || r.s === 'change_par_toi' || r.s === 'supprime_par_toi' || r.s === 'le_tien' || r.s === 'pas_achete') { if (r.s !== 'pas_achete' && r.s !== 'deja') res.gardes++; continue; }
+    const p = cfiModele(f, a.ref); if (!p) { res.manque.push(a.ref); continue; }
+    let l = cfiLigne(f, p); if (!l) { res.manque.push(a.ref); continue; }
+    // Un achat qu'il a fait lui-même chez ce fournisseur (même référence), pas encore relié : relié ici, pas en double.
+    if (!(l.o && pxAchatDe(l.o))) {
+      const a0 = haNonRelies(f).find(y => ctCleRef(y.reference) === ctCleRef(a.ref) || cfiRefDans(y.nom, a.ref));
+      if (a0) { const o2 = pxOffrePour(f, l); o2.o.achat_id = a0.id; a0.px = Object.assign({}, a0.px, { cid: o2.c.id, oid: o2.o.id }); l = cfiLigne(f, p); }
+    }
+    if (r.s === 'retirer') { retires.push(l); continue; }
+    const q = num(a.quantite), pr = num(a.prix_unitaire), d = a.devise || 'CNY';
+    choix[l.cle] = { qte: q, prix: pr, devise: d };
+    marques.push({ p, a });
+    if (pr > 0) res.parDev[d] = (res.parDev[d] || 0) + q * pr;
+  }
+  if (!Object.keys(choix).length && !retires.length) return res;
+  const siens = new Set((C.achats || []).filter(y => !y.de_claude).map(y => y.id));   // les siens : jamais retirés par un fichier
+  const retiresCles = retires.map(l => { const y = pxAchatDe(l.o); return y && y.de_claude ? y.de_claude.cle : ''; });
+  haEtat = { fid: f.id, remplacer: '', choix, cherche: '' };
+  const avertirAvant = avertir, familleAvant = proposerFamille;
+  avertir = function (texte) { res.messages.push(String(texte || '')); };       // ses messages (code-barres, pièces manquantes) gardés
+  // La famille du magasin donnée par le fichier (« Papier peint » n'est pas « Hygiène » : le mot « papier » trompait la devinette) :
+  // elle entre dans le code-barres. Une famille inconnue de ce carnet : la devinette d'avant.
+  const familles = marques.filter(m => /^\d{2}$/.test(String(m.a.famille || '')) && FAMILLES_CARNET.some(x => x[0] === String(m.a.famille)));
+  if (familles.length) proposerFamille = function (nom) {
+    const m = familles.find(x => cfiRefDans(nom, x.a.ref) || ctCleRef(nom).endsWith(ctCleRef(x.a.ref)));
+    return m ? { code: String(m.a.famille), libelle: libelleFamille(m.a.famille), mot: '' } : familleAvant.apply(this, arguments);
+  };
+  try { await haValiderSuite(f, pxLignesDe(f), retires); }
+  finally { avertir = avertirAvant; proposerFamille = familleAvant; }
+  res.retires = retires.length;
+  const poses = f.cfi_poses = Object.assign({}, cfiPoses(f));
+  retiresCles.forEach(k => { if (k) delete poses[k]; });
+  marques.forEach(({ p, a }) => {
+    const l = cfiLigne(f, p), ach = l && l.o ? pxAchatDe(l.o) : null; if (!ach) return;
+    res.n++;
+    if (!String(ach.reference || '').trim()) ach.reference = p.ref;
+    if (!siens.has(ach.id)) ach.de_claude = { cle: String(a.cle || ''), le: le || mkMaintenant().slice(0, 10) };
+    else ach.maj_claude = { cle: String(a.cle || ''), le: le || mkMaintenant().slice(0, 10) };
+    if (a.note && String(ach.note || '').indexOf(a.note) < 0) ach.note = [ach.note, String(a.note)].filter(Boolean).join(' · ');
+    if (a.cle) poses[String(a.cle)] = { achat: ach.id, q: num(ach.quantite), p: num(ach.prix_unitaire), d: deviseDe(ach), le: le || mkMaintenant().slice(0, 10) };
+  });
+  sauverLocal();
+  return res;
+}
+const cfiAppliquerAvant = ctAppliquerImport;
+ctAppliquerImport = async function () {
+  const imp = ctImportEnCours;
+  const avec = imp && Array.isArray(imp.fournisseurs) && imp.fournisseurs.some(x => x && (cfiLignes(x).L.length || (Array.isArray(x.reunir) && x.reunir.length)));
+  const r = await cfiAppliquerAvant.apply(this, arguments);
+  if (!avec) return r;
+  const bilan = [];
+  try {
+    for (const x of imp.fournisseurs) {
+      if (!x) continue;
+      const A = cfiLignes(x).L, R = Array.isArray(x.reunir) ? x.reunir : [];
+      if (!A.length && !R.length) continue;
+      const f = cfiFournisseur(x); if (!f) continue;
+      let reunis = 0;
+      R.forEach(rr => { const g = cfiFicheEnTrop(f, rr); if (g && cfiReunir(f, g)) reunis++; });
+      const res = A.length ? await cfiPasser(x, f, imp.le) : { n: 0, retires: 0, manque: [], parDev: {}, gardes: 0, messages: [] };
+      bilan.push({ f, reunis, res });
+    }
+  } catch (e) { console.warn('1.22 achats', e); avertir('⚠ Les achats du fichier n\'ont pas tous pu être rangés : ' + (e && e.message || e), 8000); return r; }
+  if (bilan.some(b => b.res.n || b.res.retires || b.reunis || b.res.gardes || b.res.messages.length)) {
+    sauverLocal(); allerA('achats');
+    const alertes = (b) => b.res.messages.join('\n').split('\n').filter(s => /⚠|🏷/.test(s));
+    avertir(bilan.map(b => (b.reunis ? '🔁 ' + b.reunis + ' fiche(s) réunie(s) dans ' + (b.f.code || mkNomFournisseur(b.f)) + '.\n' : '')
+      + (b.res.n ? '🛒 ' + b.res.n + ' produit(s) chez ' + mkNomFournisseur(b.f) + ' dans mes achats : ' + cfiMontant(b.res.parDev) + '.' : '')
+      + (b.res.retires ? '\n🗑 ' + b.res.retires + ' retiré(s).' : '') + (b.res.gardes ? '\n✋ ' + b.res.gardes + ' gardé(s) comme tu les as laissés.' : '')
+      + (b.res.manque.length ? '\n⚠ Pas trouvé : ' + b.res.manque.join(', ') + '.' : '')
+      + (alertes(b).length ? '\n' + alertes(b).join('\n') : '')).join('\n')
+      + '\nTotal de mes achats : ' + gnfStrict(totalAchatsGnf()), 10000);
+  }
+  return r;
+};
+window.KYLO_COMMANDE_FICHIER = '1.22.0';
 </script>
 
 

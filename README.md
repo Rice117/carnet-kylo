@@ -381,6 +381,20 @@ Relu par un second contrôle indépendant (9 défauts corrigés). Le même calcu
 1.16.0 rejouées, `test-maj-1210.js`, réserve. Rien de retiré.
 ⚠ Même remarque pour `KYLO-Achats.html`.
 
+Version 1.22.0 — 01/11/2026 : **Ta commande par fichier de Claude**. Un fichier de Claude (📥, format kylo-import) peut porter, pour
+un fournisseur, des `achats` ({ ref, quantite, prix_unitaire, devise, famille, note, cle }) : l'aperçu les montre ligne par ligne
+(montant, mis à jour ou nouveau, retirés, gardés, en double, introuvables, contrat déjà envoyé ou signé), puis « ✅ Ajouter au carnet »
+les met dans « Mes achats » par le même chemin que « 🛒 Acheter chez » (code-barres du bloc, famille du magasin donnée par le fichier,
+carton, photo du modèle, marge à fixer, contrat qui suit, messages gardés). Jamais en double : un achat déjà relié est mis à jour, un
+achat noté à la main avec la même référence est relié ; une ligne déjà posée et changée ou supprimée à la main depuis n'est plus
+touchée ; « quantite » 0 retire seulement un achat posé par un fichier. Un fichier peut aussi `reunir` une fiche qu'un fichier de
+Claude avait créée en trop (même fournisseur) : modèles, étoiles, prix (un prix dit au stand reste le prix), lignes de Comparer et achats
+passent, sans doublon. Relu par un second contrôle indépendant (10 points, dont un nom de fonction déjà pris dans le carnet et un achat
+doublé à la réunion : tous corrigés). Fichiers `suivi-1.22.0-commande-par-fichier.html`, `construire-1.22.0.py` (part de la 1.21.0).
+Tests : `test-achats-1220.js` (31 contrôles), plus les suites 1.21.0, 1.20.0, 1.19.0, 1.18.0, 1.17.0 et 1.16.0 rejouées,
+`test-maj-1220.js`, réserve. Rien de retiré.
+⚠ Même remarque pour `KYLO-Achats.html`.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

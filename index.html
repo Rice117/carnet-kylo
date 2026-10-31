@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.20.0';
+window.KYLO_APPLICATION = '1.21.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -27977,6 +27977,242 @@ ctAppliquerImport = async function () {
   return lsImportAvant.apply(this, arguments);
 };
 window.KYLO_LISTES = '1.20.0';
+</script>
+<style>
+/* ===================== Carnet 1.21.0 — le prix dit au stand, dans ★ Ma liste (Riche, 31/10/2026 à 11 h 47) ===================== */
+.ls-stand{border:2px solid var(--bleu);border-radius:12px;padding:10px;margin:8px 0;background:var(--bleu-pale)}
+.ls-stand label{display:block;font-size:16px;font-weight:800;margin-bottom:6px}
+.ls-stand .ligne{display:flex;gap:8px;align-items:stretch}
+.ls-stand input{flex:1;min-width:0;font-size:22px;font-weight:900;min-height:52px;padding:8px 10px;border:2px solid var(--lisiere);border-radius:10px;background:var(--champ)}
+.ls-stand .unite{align-self:center;font-size:22px;font-weight:900}
+.ls-stand .micro{flex:none;min-width:56px;min-height:52px;font-size:24px;border:2px solid var(--bleu);border-radius:10px;background:var(--carte);color:var(--bleu)}
+.ls-stand .micro.ecoute{background:#fde2e2;border-color:#b91c1c}
+.ls-stand .res{font-size:16px;line-height:1.5;margin-top:8px}
+.ls-stand .res b{white-space:nowrap}
+.ls-stand .verdict{display:block;font-size:17px;font-weight:900;margin-top:4px}
+.ls-stand .verdict.vert{color:#166534}.ls-stand .verdict.jaune{color:#854d0e}.ls-stand .verdict.rouge{color:#b91c1c}
+html[data-theme="sombre"] .ls-stand .verdict.vert{color:#a8e6bf}
+html[data-theme="sombre"] .ls-stand .verdict.jaune{color:#ffe08a}
+html[data-theme="sombre"] .ls-stand .verdict.rouge{color:#ffb4b4}
+.ls-stand small{display:block;font-size:14px;color:var(--anthracite);margin-top:4px}
+</style>
+<script>
+// =====================================================================================================
+// Carnet 1.21.0 — LE PRIX DIT AU STAND, DANS ★ MA LISTE
+// Riche (31/10, 11 h 47, à Yiwu) : « Dans l'espace des produits que j'ai choisis, il faut une case : au magasin, le fournisseur me dit
+// son prix ; je le note en yuans, directement ça sort en dollars, je peux le dire à voix haute, et ça me dit si c'est bon ou mauvais
+// et combien ça va coûter rendu au pays. »
+// Sur chaque fiche de ★ Ma liste (sauf un modèle déjà acheté) : « 💬 Prix dit par le fournisseur » en ¥.
+//   - pendant qu'il tape (ou dicte) : en dollars, le coût rendu au magasin en Guinée, et le verdict (🟢 bon / 🟡 juste / 🔴 trop cher,
+//     avec son maximum) — le même calcul que ★ Ma liste et ⭐ Choix de Claude (1.20.0) ;
+//   - quand il quitte la case : le prix est GARDÉ, une seule fois (R6 : jamais retaper) — dans l'offre de Comparer si ce modèle en a
+//     une (Comparer, la liste de Claude et ★ Ma liste le voient), sinon comme prix du modèle dans son catalogue (avec la date).
+//   - 🎤 : dicter le prix (« trente-cinq », « 35 », « douze virgule cinq »), quand le téléphone le permet ; sinon le micro du clavier.
+// Rien n'est retiré : sans prix tapé, la fiche est celle de la 1.20.0.
+// =====================================================================================================
+
+// ---- Le modèle de coût pour un prix tapé : celui de Comparer si le modèle a une offre, sinon l'estimation (comme ★ Ma liste) ----
+function stLigne(f, p) {
+  try { if (typeof f6RelierModeles === 'function') f6RelierModeles(f); return pxLignesDe(f).find(x => (x.pc && x.pc.id === p.id) || (x.p && x.p.id === p.id)) || null; } catch (e) { return null; }
+}
+function stCalcul(f, p, cny) {
+  const t = tauxDe('CNY'), tu = tauxDe('USD'), prixGnf = cny > 0 && t > 0 ? cny * t : 0, l = stLigne(f, p);
+  let md;
+  if (l && l.o && l.c && prixGnf > 0) md = lsModeleDePx(l.c, l.o, prixGnf, pxRenduGnf(l.c, l.o, prixGnf));
+  else { const m = lsMarche(p); md = lsModele(p.categorie || p.ref, m, lsM3(p) || num(m && m.volume_m3)); }
+  const k = lsCalcul(md, prixGnf, lsAffiche(f, p).v);
+  k.cny = cny; k.usd = prixGnf > 0 && tu > 0 ? prixGnf / tu : 0; k.t = t; k.tu = tu; k.l = l;
+  return k;
+}
+function stResultatHtml(f, p, cny) {
+  if (!(cny > 0)) return '<span class="muet">Tapez le prix dit par le fournisseur : le carnet donne les dollars, le coût rendu en Guinée, et si c\'est un bon prix.</span>';
+  const k = stCalcul(f, p, cny);
+  if (!(k.t > 0)) return 'Le taux du yuan n\'est pas dans le carnet : Voyage → « Préparer mon voyage » → mes taux.';
+  const max = k.max > 0 && k.md.type !== 'fixe' ? Math.floor(k.max / k.t * 10) / 10 : 0;
+  const verdict = !(k.vente > 0) ? '<span class="verdict">Pour savoir si c\'est bon : tapez plus bas le prix affiché à Conakry.</span>'
+    : k.feu === 'vert' ? `<span class="verdict vert">🟢 Bon prix : ta règle (+${E(nf(k.mc, 0))} %) passe${max > 0 ? ' — ton maximum : ' + E(nf(max, 1)) + ' ¥' : ''}</span>`
+    : k.feu === 'jaune' ? `<span class="verdict jaune">🟡 Un peu juste : demande moins${max > 0 ? ' — ton maximum : ' + E(nf(max, 1)) + ' ¥' : ''}</span>`
+    : `<span class="verdict rouge">🔴 Trop cher : ${max > 0 ? 'ton maximum est ' + E(nf(max, 1)) + ' ¥, demande moins' : k.md.type === 'fixe' ? 'demande moins' : 'même gratuit, trop cher rendu : laisse-le'}</span>`;
+  return `${E(nf(cny, 2))} ¥ = <b>${k.usd > 0 ? E(nf(k.usd, 2)) + ' $' : '? $ (taux du dollar manquant)'}</b> · rendu au magasin en Guinée : <b>${E(gnfStrict(k.rendu))}</b> la pièce`
+    + (k.vente > 0 ? `<br>Vendu ${E(gnfStrict(k.vente))} (2ᵉ prix) → ${k.gain >= 0 ? 'tu gagnes' : 'tu perds'} <b>${E(gnfStrict(Math.abs(k.gain)))}</b> par pièce (${k.pc >= 0 ? '+' : ''}${E(nf(k.pc, 0))} % sur ton coût)` : '')
+    + verdict + (stQualites(k.l) ? '<br><span class="muet">Ce modèle a plusieurs qualités dans Comparer : ce prix se note là-bas, à sa qualité.</span>' : '');
+}
+// ---- Un modèle dont l'offre de Comparer a plusieurs qualités (A, B, C…) : le prix dit ne sait pas pour quelle qualité ----
+function stQualites(l) { try { return !!(l && l.o && typeof pxQualites === 'function' && pxQualites(l.o).length); } catch (e) { return false; } }
+// ---- Pendant la frappe : seulement le résultat et le feu se mettent à jour (la case garde le doigt) ----
+function stEssai(fid, pid, v) {
+  const f = mkFournisseur(fid), p = f && ctProduit(f, pid), z = document.getElementById('str_' + pid); if (!p || !z) return;
+  const n = lireNombre(v), cny = Number.isFinite(n) && n > 0 ? n : 0; z.innerHTML = stResultatHtml(f, p, cny);
+  const b = document.querySelector('#ls_' + pid + ' .cx-haut .ls-feu');
+  if (b) {
+    if (!b.dataset.avant) { b.dataset.avant = b.textContent; b.dataset.classe = b.className; }
+    if (cny > 0) { const k = stCalcul(f, p, cny); b.className = 'ls-feu ' + k.feu; b.textContent = LS_FEU[k.feu] + (k.feu === 'gris' ? '' : ' (à ' + nf(cny, 2) + ' ¥)'); }
+    else { b.className = b.dataset.classe; b.textContent = b.dataset.avant; }       // case vidée : le feu d'avant revient
+  }
+}
+// ---- Après « gardé » : la fiche se met à jour SANS redessiner les cases et les boutons (le doigt qui touche ailleurs n'est pas perdu) ----
+function stRafraichir(fid, pid) {
+  const f = mkFournisseur(fid), p = f && ctProduit(f, pid), carte = document.getElementById('ls_' + pid); if (!p || !carte) { dessiner(); return; }
+  const t = document.createElement('div'); t.innerHTML = lsItemHtml({ f, p }); const neuve = t.firstElementChild; if (!neuve) return;
+  const remplace = (sel) => { const a = carte.querySelector(sel), b = neuve.querySelector(sel); if (a && b) a.replaceWith(b); };
+  remplace('.cx-haut');
+  const va = carte.querySelectorAll('.cx-chiffres > div'), vb = neuve.querySelectorAll('.cx-chiffres > div');
+  va.forEach((d, i) => { if (vb[i] && !d.querySelector('input')) d.replaceWith(vb[i]); });
+  const da = carte.querySelector('details.ls-calc'), db = neuve.querySelector('details.ls-calc'); if (da && db) { db.open = da.open; da.replaceWith(db); }
+  const sa = carte.querySelector('.ls-stand small'), sb = neuve.querySelector('.ls-stand small'); if (sa && sb) sa.replaceWith(sb);
+  // en haut de ★ Ma liste : les totaux (pas les cases)
+  try { const h = document.createElement('div'); h.innerHTML = lsEcran(); const ta = document.querySelectorAll('#ecran .ls-tot'), tb = h.querySelectorAll('.ls-tot');
+    if (ta.length && tb.length) { ta[0].before(...tb); ta.forEach(x => x.remove()); } } catch (e) {}
+  setTimeout(ctRemplirMinis, 0);
+}
+// ---- Garder le prix (une seule fois) ----
+function stGarder(fid, pid, v) {
+  const f = mkFournisseur(fid), p = f && ctProduit(f, pid); if (!p) return;
+  const brut = String(v === null || v === undefined ? '' : v).trim(); if (!brut) return;
+  const n = lireNombre(brut);
+  if (!Number.isFinite(n) || n <= 0) { avertir('Tapez le prix en yuans, par exemple 35 ou 12,5.', 4000); return; }
+  const l = stLigne(f, p), maintenant = mkMaintenant();
+  if (stQualites(l)) { avertir('Ce modèle a plusieurs qualités dans Comparer : notez ce prix dans Comparer (💰 Demander son prix), à sa qualité. Le calcul ci-dessus reste juste.', 7000); return; }
+  const histo = (x, devDefaut) => { if (num(x.prix) > 0) { x.historique = Array.isArray(x.historique) ? x.historique : []; x.historique.push({ prix: x.prix, devise: x.devise || devDefaut, moq: x.moq, le: x.prix_le || x.vu_le || '' }); } };
+  const pareil = (x, devDefaut) => num(x.prix) === n && (x.devise || devDefaut) === 'CNY';
+  if (l && l.o) {
+    // le modèle a une offre dans Comparer : l'offre ET le modèle du catalogue prennent le prix (sinon une retouche du catalogue
+    // recopierait l'ancien prix sur l'offre) ; la date de la visite (vu_le) ne bouge pas : l'ordre des produits du fournisseur reste.
+    const o = l.o;
+    if (pareil(o, 'CNY') && pareil(p, f.prix_devise || 'USD')) { avertir('💬 ' + (p.ref || 'Prix') + ' : ' + nf(n, 2) + ' ¥, déjà noté.', 2500); return; }
+    if (!pareil(o, 'CNY')) { histo(o, 'CNY'); o.prix = n; o.devise = 'CNY'; o.prix_dit_le = maintenant; }
+    if (!pareil(p, f.prix_devise || 'USD')) { histo(p, f.prix_devise || 'USD'); p.prix = n; p.devise = 'CNY'; p.prix_le = maintenant; p.prix_dit_le = maintenant; }
+  } else {
+    if (pareil(p, f.prix_devise || 'USD')) { avertir('💬 ' + (p.ref || 'Prix') + ' : ' + nf(n, 2) + ' ¥, déjà noté.', 2500); return; }
+    histo(p, f.prix_devise || 'USD'); p.prix = n; p.devise = 'CNY'; p.prix_le = maintenant; p.prix_dit_le = maintenant;
+  }
+  sauverLocal(); stRafraichir(fid, pid);
+  const ok = document.getElementById('stok_' + pid); if (ok) ok.hidden = true;
+  avertir('💬 ' + (p.ref || 'Prix') + ' : ' + nf(n, 2) + ' ¥ gardé (Comparer, ★ Ma liste et la liste de Claude le voient).', 3500);
+}
+// ---- 🎤 Dicter le prix ----
+function stMicroPossible() { return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }
+const ST_UNITES = { zero: 0, 'zéro': 0, un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, six: 6, sept: 7, huit: 8, neuf: 9, dix: 10, onze: 11, douze: 12, treize: 13, quatorze: 14, quinze: 15, seize: 16,
+  vingt: 20, vingts: 20, trente: 30, quarante: 40, cinquante: 50, soixante: 60, cent: 100, cents: 100, mille: 1000 };
+const ST_SEP = /^(virgule|yuans?|kuai|rmb|euros?|dollars?)$/;
+// Une suite de mots-nombres → un entier (« quatre-vingt-dix-neuf » → 99), ou des groupes quand deux nombres se suivent
+// (« douze cinquante » → [12, 50] : douze yuans cinquante).
+function stGroupes(mots) {
+  const G = []; let total = 0, cour = 0, vu = false, unites = false;
+  const fin = () => { if (vu) G.push(total + cour); total = 0; cour = 0; vu = false; unites = false; };
+  for (const w of mots) {
+    if (w === 'et') continue;
+    const v = ST_UNITES[w];
+    if (v === 1000) { total += (cour || 1) * 1000; cour = 0; vu = true; unites = false; continue; }
+    if (v === 100) { cour = (cour || 1) * 100; vu = true; unites = false; continue; }
+    if (v === 20 && cour % 100 === 4) { cour += 76; vu = true; continue; }                                  // quatre-vingt(s)
+    if (v === 10 && (cour % 100 === 60 || cour % 100 === 80)) { cour += 10; continue; }                      // soixante-dix, quatre-vingt-dix
+    if (v >= 11 && v <= 16 && (cour % 100 === 60 || cour % 100 === 80)) { cour += v; unites = true; continue; } // soixante-douze
+    if (v >= 20 && v <= 60 && vu && (cour % 100 !== 0 || unites)) { fin(); }                                  // « douze cinquante » : un 2e nombre
+    else if (v < 20 && vu && cour % 10 !== 0 && cour % 100 > 0 && !(cour % 100 > 16 && cour % 10 === 0)) { fin(); }
+    cour += v; vu = true; unites = unites || (v > 0 && v < 20);
+  }
+  fin(); return G;
+}
+// « trente-cinq » → 35 ; « douze virgule cinq » → 12,5 ; « douze virgule zéro cinq » → 12,05 ; « vingt yuans cinquante » → 20,50 ;
+// « 35 yuans 50 » → 35,5 ; « 12 virgule 5 » → 12,5 ; « 1 200 » → 1 200 ; « deux pièces à trente-cinq » → 35 (le nombre après « à »).
+function stNombreParle(texte) {
+  let t = String(texte || '').toLowerCase().replace(/[’']/g, ' ').replace(/ | /g, ' ');
+  t = t.replace(/(\d)\s+(?=\d{3}\b)/g, '$1');                                                    // « 1 200 » → 1200
+  t = t.replace(/(\d+)\s*(?:virgule|yuans?|kuai|rmb|,|\.)\s*(\d+)/g, (m, a, b) => a + '.' + b);     // « 12 virgule 5 », « 35 yuans 50 »
+  // les morceaux : ce qui suit le dernier « à » / « pour » / « prix » s'il y a un nombre après
+  const cle = /\b(à|a|pour|prix|fait|c est)\b/g; let dernier = -1, m;
+  while ((m = cle.exec(t))) dernier = m.index + m[0].length;
+  const apres = dernier >= 0 ? t.slice(dernier) : '';
+  const lire = (u) => {
+    const d = u.match(/\d+(?:\.\d+)?/); if (d) return parseFloat(d[0]);
+    const mots = u.split(/[\s\-]+/).filter(Boolean);
+    // des « suites » de mots-nombres (avec virgule / yuan au milieu) ; un « un / une » tout seul est un article
+    const suites = []; let cur = [];
+    mots.forEach(w => { if (w in ST_UNITES || (cur.length && (w === 'et' || ST_SEP.test(w)))) cur.push(w); else { if (cur.length) suites.push(cur); cur = []; } });
+    if (cur.length) suites.push(cur);
+    const bonnes = suites.map(sx => { while (sx.length && (sx[sx.length - 1] === 'et' || ST_SEP.test(sx[sx.length - 1]))) sx.pop(); return sx; })
+      .filter(sx => sx.length && !(sx.length === 1 && (sx[0] === 'un' || sx[0] === 'une') && suites.length > 1));
+    if (!bonnes.length) return NaN;
+    const sx = bonnes[bonnes.length - 1];
+    const i = sx.findIndex(w => ST_SEP.test(w));
+    if (i > 0) {                                                       // « douze virgule cinq », « vingt yuans cinquante »
+      const a = stGroupes(sx.slice(0, i)), bMots = sx.slice(i + 1), zeros = (bMots.join(' ').match(/^((zéro|zero)\s*)+/) || [''])[0].trim().split(/\s+/).filter(Boolean).length;
+      const b = stGroupes(bMots.filter(w => w !== 'zéro' && w !== 'zero'));
+      if (a.length !== 1) return NaN;
+      if (!b.length) return a[0];
+      const vb = b[0], div = sx[i] === 'virgule' ? Math.pow(10, zeros + String(vb).length) : (vb < 10 && !zeros ? 10 : 100);
+      return a[0] + vb / div;
+    }
+    const g = stGroupes(sx);
+    if (g.length === 1) return g[0] + (/\bet demie?\b/.test(u) ? 0.5 : 0);           // « douze et demi » → 12,5
+    if (g.length === 2 && g[1] < 100) return g[0] + g[1] / (g[1] < 10 ? 10 : 100);           // « douze cinquante » → 12,50
+    return NaN;
+  };
+  const x = apres ? lire(apres) : NaN;
+  return Number.isFinite(x) ? x : lire(t);
+}
+let stEcoute = null, stEcoutePid = '', stEcouteBouton = null;
+function stArreter() {
+  const r = stEcoute; stEcoute = null; stEcoutePid = '';
+  if (stEcouteBouton) stEcouteBouton.classList.remove('ecoute'); stEcouteBouton = null;
+  if (r) { try { r.abort ? r.abort() : r.stop(); } catch (e) {} }
+}
+function stMicro(fid, pid, bouton) {
+  const R = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!R) { avertir('Ce téléphone ne permet pas la dictée ici : touchez la case, puis le micro 🎤 du clavier.', 5000); return; }
+  const memeCase = stEcoute && stEcoutePid === pid;
+  stArreter(); if (memeCase) return;                                     // 2e appui sur le même micro : il s'arrête
+  let r; try { r = new R(); } catch (e) { avertir('Le micro ne s\'ouvre pas : utilisez le micro du clavier.', 5000); return; }
+  stEcoute = r; stEcoutePid = pid; stEcouteBouton = bouton || null; r.lang = 'fr-FR'; r.interimResults = false; r.maxAlternatives = 3;
+  if (bouton) bouton.classList.add('ecoute');
+  const actif = () => stEcoute === r;                                     // un micro arrêté ou remplacé ne parle plus
+  // Sans réponse au bout de 15 secondes (pas de réseau, micro refusé) : on arrête et on le dit.
+  const delai = setTimeout(() => { if (!actif()) return; stArreter(); avertir('Le micro n\'a rien rendu : touchez la case, puis le micro 🎤 du clavier.', 5000); }, 15000);
+  r.onresult = (ev) => {
+    if (!actif()) return; clearTimeout(delai);
+    const alts = []; try { for (let i = 0; i < ev.results[0].length; i++) alts.push(ev.results[0][i].transcript); } catch (e) {}
+    const n = alts.map(stNombreParle).find(x => Number.isFinite(x) && x > 0);
+    stArreter();
+    if (!(n > 0)) { avertir('Je n\'ai pas compris un prix : « ' + (alts[0] || '') + ' ». Redites-le, ou tapez-le.', 5000); return; }
+    // le prix entendu est MONTRÉ, pas gardé : « ✓ Garder » le garde (ou corriger dans la case)
+    const z = document.getElementById('stp_' + pid); if (z) z.value = nf(n, 2);
+    stEssai(fid, pid, String(n));
+    const ok = document.getElementById('stok_' + pid); if (ok) { ok.hidden = false; ok.textContent = '✓ Garder ' + nf(n, 2) + ' ¥'; ok.dataset.val = String(n); }
+    avertir('🎤 J\'ai entendu ' + nf(n, 2) + ' ¥ (« ' + (alts[0] || '') + ' ») : touchez « ✓ Garder », ou corrigez dans la case.', 6000);
+  };
+  r.onerror = () => { if (!actif()) return; clearTimeout(delai); stArreter(); avertir('Le micro n\'a rien entendu (ou n\'est pas permis) : touchez la case, puis le micro 🎤 du clavier.', 5000); };
+  r.onend = () => { if (actif()) { clearTimeout(delai); stArreter(); } };
+  try { r.start(); } catch (e) { clearTimeout(delai); stArreter(); avertir('Le micro ne s\'ouvre pas : utilisez le micro du clavier.', 5000); }
+}
+// ---- La case, sur chaque fiche de ★ Ma liste (pas sur un modèle déjà acheté) ----
+function stDitAuStand(p) { return !!(p.prix_dit_le && p.prix_le === p.prix_dit_le && num(p.prix) > 0 && p.devise === 'CNY'); }
+function stCaseHtml(f, p) {
+  const k = lsCalculDe(f, p);
+  if (k.r && k.r.quoi === 'achete') return '';
+  const o = k.r && k.r.l && k.r.l.o;
+  const deja = o && o.prix_dit_le && (o.devise || 'CNY') === 'CNY' ? num(o.prix) : stDitAuStand(p) ? num(p.prix) : 0;
+  return `<div class="ls-stand"><label for="stp_${E(p.id)}">💬 Prix dit par le fournisseur</label>
+    <div class="ligne"><input id="stp_${E(p.id)}" inputmode="decimal" autocomplete="off" value="${deja > 0 ? E(nf(deja, 2)) : ''}" placeholder="ex : 35"
+      oninput="stEssai('${f.id}','${p.id}',this.value)" onchange="stGarder('${f.id}','${p.id}',this.value)"><span class="unite">¥</span>
+      ${stMicroPossible() ? `<button type="button" class="micro" aria-label="Dicter le prix" onclick="stMicro('${f.id}','${p.id}',this)">🎤</button>` : ''}</div>
+    <button type="button" class="b vert" id="stok_${E(p.id)}" hidden style="margin-top:8px;min-height:48px;font-size:17px" onclick="stGarder('${f.id}','${p.id}',this.dataset.val)">✓ Garder</button>
+    <div class="res" id="str_${E(p.id)}">${stResultatHtml(f, p, deja)}</div>
+    <small>${stMicroPossible() ? '🎤 : dites le prix (« trente-cinq »), puis « ✓ Garder ». ' : ''}Le prix tapé est gardé quand vous quittez la case : Comparer, ★ Ma liste et la liste de Claude le voient.</small></div>`;
+}
+const stItemAvant = lsItemHtml;
+lsItemHtml = function (x) {
+  const h = stItemAvant.apply(this, arguments);
+  try {
+    const bloc = stCaseHtml(x.f, x.p); if (!bloc) return h;
+    let g = h;
+    // un prix dit au stand n'est pas « le prix du catalogue » : il le dit, avec sa date (seulement tant que ce prix n'a pas été changé ailleurs)
+    if (stDitAuStand(x.p)) g = g.split('prix du catalogue').join('prix dit au stand le ' + mkJour(x.p.prix_dit_le));
+    const i = g.indexOf('<div class="cx-chiffres">');
+    return i > 0 ? g.slice(0, i) + bloc + g.slice(i) : g;
+  } catch (e) { return h; }
+};
+window.KYLO_PRIX_STAND = '1.21.0';
 </script>
 
 

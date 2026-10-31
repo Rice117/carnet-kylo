@@ -369,6 +369,18 @@ et les deux pourcentages. Fichiers `suivi-1.20.0-listes.html`, `construire-1.20.
 `test-listes-1200.js` (35 contrôles), plus les suites 1.19.0, 1.18.0, 1.17.0 et 1.16.0 rejouées, `test-maj-1200.js`, réserve. Rien de retiré.
 ⚠ Même remarque pour `KYLO-Achats.html`.
 
+Version 1.21.0 — 31/10/2026 : **Le prix dit au stand, dans ★ Ma liste**. Sur chaque fiche de « ★ Ma liste » (sauf un modèle déjà
+acheté), une case « 💬 Prix dit par le fournisseur » en ¥ : pendant la frappe (ou la dictée 🎤, quand le téléphone la permet : « trente-
+cinq », « douze virgule cinq »), les dollars, le coût rendu au magasin en Guinée et le verdict (🟢 / 🟡 / 🔴 avec le maximum en ¥,
+arrondi vers le bas), sans redessiner l'écran ; le feu de la fiche suit. En quittant la case (ou « ✓ Garder » après la dictée),
+le prix est gardé une seule fois : dans l'offre de Comparer ET le modèle du catalogue s'il y a une offre (anciens prix dans leur
+historique, avec leur devise ; la date de visite ne bouge pas), sinon comme prix du modèle (en ¥, daté, « prix dit au stand ») ; une
+offre à plusieurs qualités n'est jamais écrasée ; le même prix redit ne change rien ; la fiche se met à jour sans redessiner les cases.
+Relu par un second contrôle indépendant (9 défauts corrigés). Le même calcul que ★ Ma liste (1.20.0). Fichiers `suivi-1.21.0-prix-au-stand.html`,
+`construire-1.21.0.py` (part de la 1.20.0). Tests : `test-prix-stand-1210.js` (27 contrôles), plus les suites 1.20.0, 1.19.0, 1.18.0, 1.17.0 et
+1.16.0 rejouées, `test-maj-1210.js`, réserve. Rien de retiré.
+⚠ Même remarque pour `KYLO-Achats.html`.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

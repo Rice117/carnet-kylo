@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.22.0';
+window.KYLO_APPLICATION = '1.23.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -28460,6 +28460,420 @@ ctAppliquerImport = async function () {
   return r;
 };
 window.KYLO_COMMANDE_FICHIER = '1.22.0';
+</script>
+<style>
+/* ===================== Carnet 1.23.0 — le Choix de Claude suit tes achats ; ajouter vite un produit (Riche, 01/11/2026, 3 h 28 – 3 h 31) ===================== */
+.chx-cmd{border:2px solid var(--vert, #15803d);border-radius:12px;padding:8px 10px;margin:8px 0;background:var(--carte);font-size:15px;line-height:1.45}
+.chx-cmd b{font-size:16px}
+.chx-cmd ul{margin:4px 0 2px 18px;padding:0}
+.chx-cmd li{margin:2px 0}
+.chx-marche{border-left:4px solid var(--bleu, #1d4ed8);padding:6px 10px;margin:8px 0;font-size:15px;line-height:1.45;background:var(--bleu-pale, #eff6ff);border-radius:0 10px 10px 0}
+html[data-theme="sombre"] .chx-marche{background:transparent}
+.chx-facultatif{font-weight:400;color:#475569;font-size:14px}
+html[data-theme="sombre"] .chx-facultatif{color:#cbd5e1}
+</style>
+<script>
+// =====================================================================================================
+// Carnet 1.23.0 — LE CHOIX DE CLAUDE SUIT TES ACHATS · AJOUTER VITE UN PRODUIT · LES TEXTES DE CLAUDE SE METTENT À JOUR
+// Riche (01/11, 3 h 28 à 3 h 31, à Yiwu) :
+//   « Faites la mise à jour du Choix de Claude sur les produits que j'ai commandés… et n'oublie pas de laisser synchroniser aussi avec
+//     les autres côtés du carnet de voyage. »
+//   « J'ai créé un nouvel espace de fournisseur… le côté achat, pour ajouter un produit, me demandait l'information des produits et pas
+//     la photo… lorsqu'on remplit 3 m, il doit y avoir la taille, la référence… le temps ça compte, je ne peux pas passer la journée à
+//     remplir ça. »
+// 1. ⭐ Choix de Claude ↔ 🛒 Mes achats : un choix COMMANDÉ passe tout seul en « ✅ Je prends » (marqué « posé par le carnet ») ; il montre
+//    TOUS ses achats (plusieurs dessins d'une même série, ou un achat noté chez une fiche en double, retrouvé par son code-barres),
+//    la quantité commandée remplace « Ma quantité ». Un achat supprimé → le choix revient « à décider » (si c'est le carnet qui l'avait posé).
+//    Ce que Riche a décidé lui-même (❌ Écarter, ⏸ Plus tard) n'est jamais changé.
+// 2. 🛒 Mes achats ← ⭐ Choix de Claude : sous chaque achat relié, le prix de vente conseillé par Claude (vérifié au marché) ; dans la fiche
+//    de l'achat, le même conseil juste au-dessus de la marge.
+// 3. ➕ Nouveau produit chez un fournisseur : nom et description « pas obligatoire » (la photo suffit) ; deux cases en plus, Référence
+//    et Taille / longueur (« 1,2 × 3 m ») ; dans la fiche d'un achat aussi.
+// 4. Un fichier de Claude peut remettre à jour le TEXTE d'un modèle que Claude avait écrit (« texte_maj ») — jamais un texte que Riche
+//    a retouché (le carnet le note désormais quand il retouche).
+// Toutes les fonctions commencent par « chx » ; la 1.23.0 enveloppe les fonctions existantes, rien n'est retiré.
+// =====================================================================================================
+
+// ---------- 1. Les liens d'un choix : ses références (plusieurs dessins) et les codes-barres de ses achats ----------
+const chxPoserAvant = cxPoserChoix;
+cxPoserChoix = function (x) {
+  const r = chxPoserAvant.apply(this, arguments);
+  try {
+    const c = r && x && x.id ? cxListe().find(y => y.id === String(x.id)) : null;
+    if (c) {
+      c.refs = Array.isArray(x.refs) ? x.refs.map(v => String(v || '').trim()).filter(Boolean).slice(0, 40) : [];
+      c.achat_codes = Array.isArray(x.achat_codes) ? x.achat_codes.map(v => String(v || '').replace(/\D/g, '')).filter(v => v.length >= 8).slice(0, 40) : [];
+      if (!c.refs.length) delete c.refs;
+      if (!c.achat_codes.length) delete c.achat_codes;
+    }
+  } catch (e) { console.warn('1.23 choix', e); }
+  return r;
+};
+function chxRefs(c) {
+  const vus = new Set();
+  return [String(c && c.ref || '').split('/')[0]].concat(c && Array.isArray(c.refs) ? c.refs : []).map(s => String(s || '').trim()).filter(s => {
+    const k = ctCleRef(s); if (k.length < 4 || !/\d/.test(k) || vus.has(k)) return false; vus.add(k); return true;
+  });
+}
+// Les achats d'un choix : par les codes-barres donnés (même s'ils sont chez une fiche en double), par la référence chez son fournisseur,
+// par les lignes de Comparer reliées à ses modèles, et par le chemin de la 1.18.0.
+function chxAchats(c) {
+  if (!c) return [];
+  const A = C.achats || [], out = [], add = (a) => { if (a && out.indexOf(a) < 0) out.push(a); };
+  const codes = Array.isArray(c.achat_codes) ? c.achat_codes : [];
+  if (codes.length) A.forEach(a => { const k = String(a.code_barres || '').replace(/\D/g, ''); if (k && codes.indexOf(k) >= 0) add(a); });
+  let f = null; try { f = cxFournisseur(c); } catch (e) { f = null; }
+  if (f) {
+    const refs = chxRefs(c);
+    if (refs.length) {
+      const P = ctProduits(f), O = mkOffresDe(f);
+      refs.forEach(r => {
+        const k = ctCleRef(r), p = P.find(x => ctCleRef(x.ref) === k);
+        A.forEach(a => { if (a.fournisseur_id === f.id && ctCleRef(a.reference || '') === k) add(a); });
+        O.forEach(({ o }) => { if ((p && o.produit_id === p.id) || ctCleRef(o.modele || '') === k) add(pxAchatDe(o)); });
+      });
+    }
+    try { add(chxF6AchatAvant(c)); } catch (e) {}
+  }
+  return out;
+}
+let chxMemo = null;
+function chxCommande(c) {
+  if (!c) return null;
+  if (chxMemo && chxMemo.has(c.id)) return chxMemo.get(c.id);
+  let A = [];
+  try { A = chxAchats(c); } catch (e) { console.warn('1.23 achats du choix', e); A = []; }
+  let k = null;
+  if (A.length) {
+    const q = A.reduce((s, a) => s + num(a.quantite), 0);
+    const cny = A.reduce((s, a) => s + f6EnYuans(num(a.prix_unitaire), deviseDe(a)) * num(a.quantite), 0);
+    k = { A, q, cny, moyen: q > 0 ? cny / q : 0 };
+  }
+  if (chxMemo) chxMemo.set(c.id, k);
+  return k;
+}
+// Une série dont les achats n'ont pas le même coût rendu : le coût d'une pièce est la moyenne de ses achats (pas le 1er seulement).
+const chxCoutAvant = cxCout;
+cxCout = function (c) {
+  const v = chxCoutAvant.apply(this, arguments);
+  try {
+    const k = chxCommande(c); if (!k || k.A.length < 2 || !(k.q > 0)) return v;
+    const R = k.A.map(a => typeof coutRenduGnf === 'function' ? num(coutRenduGnf(a)) : 0);
+    if (R.some(x => !(x > 0)) || Math.max.apply(null, R) - Math.min.apply(null, R) < 1) return v;
+    const rendu = k.A.reduce((s, a, i) => s + R[i] * num(a.quantite), 0) / k.q, q = cxQte(c), vente = num(v.vente);
+    const gain = vente > 0 ? vente - rendu : 0;
+    return Object.assign({}, v, { rendu, gain, gainLot: gain * q, avance: rendu * q, rendement: rendu > 0 ? gain / rendu * 100 : 0, margePct: vente > 0 ? gain / vente * 100 : 0 });
+  } catch (e) { return v; }
+};
+// La 1.18.0 ne retrouvait l'achat que chez le fournisseur du choix : avec les codes-barres, on le retrouve aussi chez une fiche en double.
+const chxF6AchatAvant = f6ChoixAchat;
+f6ChoixAchat = function (c) {
+  const a = chxF6AchatAvant.apply(this, arguments); if (a) return a;
+  const codes = c && Array.isArray(c.achat_codes) ? c.achat_codes : [];
+  return codes.length ? (C.achats || []).find(x => { const k = String(x.code_barres || '').replace(/\D/g, ''); return k && codes.indexOf(k) >= 0; }) || null : null;
+};
+// L'état : commandé → « ✅ Je prends » posé par le carnet ; plus commandé → revient à décider (seulement si le carnet l'avait posé).
+function chxSynchro() {
+  let n = 0;
+  cxListe().forEach(c => {
+    if (c.retire) return;
+    let k = null; try { k = chxCommande(c); } catch (e) { k = null; }
+    if (k && !c.etat) { c.etat = 'pris'; c.etat_auto = true; c.decide_le = mkMaintenant(); n++; }
+    else if (!k && c.etat_auto) { if (c.etat === 'pris') c.etat = ''; delete c.etat_auto; n++; }
+  });
+  if (n) sauverLocal();
+  return n;
+}
+const chxEtatAvant = cxEtat;
+cxEtat = function (id, etat) {
+  const c = cxListe().find(x => x.id === id);
+  if (c && etat === 'pris') {
+    let k = null; try { k = chxCommande(c); } catch (e) { k = null; }
+    if (c.etat === 'pris' && c.etat_auto) {                       // posé par le carnet : son appui le confirme, il reste « Je prends »
+      delete c.etat_auto; c.decide_le = mkMaintenant(); sauverLocal(); dessiner();
+      avertir('✅ Confirmé : je prends' + (k ? ' (déjà commandé : ' + nf(k.q) + ' pièces).' : '.'), 3500); return;
+    }
+    if (c.etat !== 'pris' && k) {                                 // déjà commandé : on n'ouvre pas une 2ᵉ commande
+      c.etat = 'pris'; delete c.etat_auto; c.decide_le = mkMaintenant(); sauverLocal(); dessiner();
+      avertir('✅ Je prends — déjà commandé : ' + nf(k.q) + ' pièces. Pour en ajouter : onglet Achats, « 🛒 Ajouter / enlever des produits chez lui ».', 6000); return;
+    }
+  }
+  if (c) delete c.etat_auto;                                      // sa main passe avant le carnet
+  return chxEtatAvant.apply(this, arguments);
+};
+const chxQteAvant = cxQte;
+cxQte = function (c) { let k = null; try { k = chxCommande(c); } catch (e) { k = null; } return k && k.q > 0 ? k.q : chxQteAvant.apply(this, arguments); };
+const chxEcranAvant = ecranChoix;
+ecranChoix = function () {
+  const dehors = !chxMemo;
+  if (dehors) chxMemo = new Map();
+  try { chxSynchro(); return chxEcranAvant.apply(this, arguments); }
+  finally { if (dehors) chxMemo = null; }
+};
+const chxBudgetAvant = cxBudgetChiffres;
+cxBudgetChiffres = function () {
+  const dehors = !chxMemo;
+  if (dehors) chxMemo = new Map();
+  try { chxSynchro(); return chxBudgetAvant.apply(this, arguments); }
+  finally { if (dehors) chxMemo = null; }
+};
+function chxPrixTxt(a) { return nf(num(a.prix_unitaire), 2) + ' ' + mkSym(deviseDe(a)); }
+const chxItemAvant = cxItemHtml;
+cxItemHtml = function (c) {
+  let h = chxItemAvant.apply(this, arguments);
+  try {
+    const k = chxCommande(c); if (!k) return h;
+    const parF = {}; k.A.forEach(a => { const f = a.fournisseur_id ? mkFournisseur(a.fournisseur_id) : null; const n = f ? (f.code || mkNomFournisseur(f)) : (a.fournisseur || ''); parF[n] = 1; });
+    const lignes = k.A.slice(0, 12).map(a => `<li>${E(a.reference || payCourt(a.nom || '', 40))} : ${E(nf(a.quantite))} × ${E(chxPrixTxt(a))}
+      <button type="button" class="mk-lien" onclick="modifierAchat('${a.id}')">🛒 voir</button></li>`).join('');
+    const bloc = `<div class="chx-cmd">✅ <b>Commandé : ${E(nf(k.q))} pièces</b>${k.cny > 0 ? ' · ' + E(nf(k.cny, 0)) + ' ¥' : ''} chez ${E(Object.keys(parF).join(', '))}
+      ${c.etat_auto ? '<br><span class="muet" style="font-size:14px">« ✅ Je prends » posé par le carnet parce que c\'est commandé.</span>' : ''}
+      <ul>${lignes}</ul>${k.A.length > 12 ? '<span class="muet">… et ' + (k.A.length - 12) + ' autres</span>' : ''}</div>`;
+    const debut = h.indexOf('<div class="f6-cx achete">');
+    let fc = null; try { fc = cxFournisseur(c); } catch (e) { fc = null; }
+    if (debut >= 0 && k.A.length === 1 && fc && k.A[0].fournisseur_id === fc.id) {   // un seul achat, chez lui : le bloc de la 1.18.0 (« ✅ Déjà acheté ») suffit
+      const fin = h.indexOf('</div>', debut);
+      if (c.etat_auto) h = h.slice(0, fin) + '<br><span class="muet" style="font-size:14px">« ✅ Je prends » posé par le carnet parce que c\'est commandé.</span>' + h.slice(fin);
+    } else if (debut >= 0) { const fin = h.indexOf('</div>', debut); h = h.slice(0, debut) + bloc + h.slice(fin + 6); }
+    else h = h.replace('<div class="cx-chiffres">', bloc + '<div class="cx-chiffres">');
+    h = h.replace(/<div><label style="font-size:14px">Ma quantité<\/label><input[^>]*><\/div>/, `<div>Commandé<br><b>${E(nf(k.q))} pièces</b></div>`);
+  } catch (e) { console.warn('1.23 choix', e); }
+  return h;
+};
+// ★ Ma liste : un modèle d'une série commandée (AB-319…) retrouve le choix de Claude de sa série.
+if (typeof lsChoixDe === 'function') {
+  const chxLsAvant = lsChoixDe;
+  lsChoixDe = function (f, p) {
+    const r = chxLsAvant.apply(this, arguments); if (r) return r;
+    const k = ctCleRef(p && p.ref || ''); if (k.length < 4) return null;
+    try { return cxListe().find(c => !c.retire && Array.isArray(c.refs) && c.refs.some(x => ctCleRef(x) === k) && cxFournisseur(c) === f) || null; } catch (x) { return null; }
+  };
+}
+
+// ---------- 2. 🛒 Mes achats : le prix de vente conseillé par Claude, vérifié au marché ----------
+let chxIndex = null;
+function chxChoixDeAchat(a) {
+  if (!a) return null;
+  if (!chxIndex) {
+    chxIndex = new Map();
+    // Seulement les choix qui peuvent avoir un achat : ceux qui portent des codes-barres, ou dont le fournisseur a des achats.
+    const chez = new Set((C.achats || []).map(x => x.fournisseur_id).filter(Boolean));
+    cxListe().forEach(c => {
+      if (c.retire || !(num(c.vente_gnf) > 0)) return;
+      if (!(Array.isArray(c.achat_codes) && c.achat_codes.length)) { let f = null; try { f = cxFournisseur(c); } catch (e) { f = null; } if (!f || !chez.has(f.id)) return; }
+      let k = null; try { k = chxCommande(c); } catch (e) { k = null; }
+      if (k) k.A.forEach(x => { if (!chxIndex.has(x.id)) chxIndex.set(x.id, c); });
+    });
+    setTimeout(() => { chxIndex = null; }, 0);
+  }
+  return chxIndex.get(a.id) || null;
+}
+function chxConseilHtml(a, court) {
+  const c = chxChoixDeAchat(a); if (!c) return '';
+  const v = num(c.vente_gnf), v2 = v * (1 - coRabaisPct() / 100);
+  if (court) return `<div class="det">💡 Claude : affiché <b>${E(gnfStrict(v))}</b> · 2ᵉ prix ≈ ${E(gnfStrict(v2))}</div>`;
+  return `<div class="chx-marche" id="chx_conseil">💡 <b>Prix conseillé par Claude</b> (marché vérifié${c.le ? ' le ' + E(mkJour(c.le)) : ''}) : affiché <b>${E(gnfStrict(v))}</b>,
+    2ᵉ prix ≈ ${E(gnfStrict(v2))}.${c.marche && c.marche.guinee ? '<br>🇬🇳 ' + E(payCourt(c.marche.guinee, 220)) : ''}
+    <br><span class="muet" style="font-size:14px">⭐ Choix de Claude n° ${E(c.rang || '?')} — ${E(payCourt(c.article || c.ref, 60))}</span></div>`;
+}
+const chxLigneAchatAvant = haLigneAchatHtml;
+haLigneAchatHtml = function (a) {
+  let h = chxLigneAchatAvant.apply(this, arguments);
+  try {
+    const plus = [a.taille && String(a.nom || '').indexOf(a.taille) < 0 ? '📏 ' + a.taille : '', a.reference && String(a.nom || '').indexOf(a.reference) < 0 ? 'réf. ' + a.reference : '']
+      .filter(Boolean).join(' · ');
+    const extra = (plus ? `<div class="det">${E(plus)}</div>` : '') + chxConseilHtml(a, true);
+    if (extra) { const i = h.indexOf('<div class="det">'); if (i >= 0) h = h.slice(0, i) + extra + h.slice(i); }
+  } catch (e) { console.warn('1.23 achat', e); }
+  return h;
+};
+
+// ---------- 3. Ajouter vite : la photo suffit ; Référence et Taille / longueur ----------
+const CHX_FACULTATIF = ' <span class="chx-facultatif">(pas obligatoire)</span>';
+function chxCasesRefTaille(pre, a) {
+  return `<div class="duo"><div><label for="${pre}_ref">Référence${CHX_FACULTATIF}</label><input id="${pre}_ref" value="${E(a && a.reference || '')}" placeholder="ex : AB-333" autocapitalize="characters"></div>
+    <div><label for="${pre}_taille">Taille / longueur${CHX_FACULTATIF}</label><input id="${pre}_taille" value="${E(a && a.taille || '')}" placeholder="ex : 1,2 × 3 m"></div></div>`;
+}
+const chxFormNouveauAvant = haFormNouveau;
+haFormNouveau = function () {
+  const r = chxFormNouveauAvant.apply(this, arguments);
+  try {
+    const z = document.getElementById('ha_nouveau'); if (!z) return r;
+    const ln = z.querySelector('label[for="han_nom"]'), ld = z.querySelector('label[for="han_desc"]'), lp = z.querySelector('label[for="han_file"]');
+    if (ln && ln.innerHTML.indexOf('chx-facultatif') < 0) ln.insertAdjacentHTML('beforeend', CHX_FACULTATIF);
+    if (ld && ld.innerHTML.indexOf('chx-facultatif') < 0) ld.insertAdjacentHTML('beforeend', CHX_FACULTATIF);
+    if (lp && !z.querySelector('#chx_aide_photo')) lp.insertAdjacentHTML('afterend', '<div id="chx_aide_photo" class="muet" style="font-size:14px;margin-top:4px">La photo suffit : le nom se met tout seul.</div>');
+    const desc = z.querySelector('#han_desc');
+    if (desc && !z.querySelector('#han_ref')) desc.insertAdjacentHTML('afterend', chxCasesRefTaille('han', null));
+  } catch (e) { console.warn('1.23 nouveau', e); }
+  return r;
+};
+const chxAjouterNouveauAvant = haAjouterNouveau;
+haAjouterNouveau = function () {
+  const val = (id) => String((document.getElementById(id) || {}).value || '').trim();
+  const ref = val('han_ref'), taille = val('han_taille'), fid = haEtat && haEtat.fid;
+  const nomE = document.getElementById('han_nom'), descE = document.getElementById('han_desc');
+  if (nomE && !val('han_nom') && ref) nomE.value = ref + (taille ? ' — ' + taille : '');
+  if (descE && taille && val('han_desc').indexOf(taille) < 0) descE.value = ['Taille : ' + taille, val('han_desc')].filter(Boolean).join(' · ');
+  const avant = new Set(haEtat && haEtat.choix ? Object.keys(haEtat.choix) : []);
+  const ancienRemplacer = haEtat && haEtat.remplacer;
+  // Remplacer : la nouvelle offre reçoit sa référence et sa taille AVANT que l'achat soit refait à partir d'elle.
+  const remplacerAvant = typeof haRemplacerPar === 'function' ? haRemplacerPar : null;
+  if (ancienRemplacer && remplacerAvant && (ref || taille)) {
+    haRemplacerPar = function (cle) {
+      try {
+        const f = mkFournisseur(fid), id = String(cle || '').replace(/^o:/, ''), x = f ? mkOffresDe(f).find(y => y.o.id === id) : null;
+        if (x) { if (ref && !x.o.modele) x.o.modele = ref; if (taille) x.o.taille = taille; }
+      } catch (e) {}
+      const res = remplacerAvant.apply(this, arguments);
+      Promise.resolve(res).then(() => { const a = trouverAchat(ancienRemplacer); if (a) { if (ref && !a.reference) a.reference = ref; if (taille) a.taille = taille; sauverLocal(); } }).catch(() => {});
+      return res;
+    };
+  }
+  let r;
+  try { r = chxAjouterNouveauAvant.apply(this, arguments); }
+  finally { if (remplacerAvant) haRemplacerPar = remplacerAvant; }
+  try {
+    if ((ref || taille) && fid) {
+      const f = mkFournisseur(fid), cles = haEtat && haEtat.choix ? Object.keys(haEtat.choix).filter(k => !avant.has(k)) : [];
+      const O = f ? mkOffresDe(f) : [];
+      let o = null;
+      if (cles.length) { const id = cles[0].replace(/^o:/, ''); const x = O.find(y => y.o.id === id); o = x ? x.o : null; }
+      if (!o && ancienRemplacer) o = (O[0] || {}).o || null;   // remplacer : la plus récente
+      if (o) { if (ref && !o.modele) o.modele = ref; if (taille) o.taille = taille; sauverLocal(); }
+    }
+  } catch (e) { console.warn('1.23 nouveau', e); }
+  return r;
+};
+// La taille d'une offre suit l'achat qui en vient.
+const chxValiderSuiteAvant = haValiderSuite;
+haValiderSuite = async function (f) {
+  const avant = new Set((C.achats || []).map(a => a.id));
+  const r = await chxValiderSuiteAvant.apply(this, arguments);
+  try {
+    let n = 0;
+    if (f) mkOffresDe(f).forEach(({ o }) => { const a = o.taille ? pxAchatDe(o) : null; if (a && !avant.has(a.id) && a.taille === undefined) { a.taille = o.taille; n++; } });
+    if (n) sauverLocal();
+  } catch (e) { console.warn('1.23 taille', e); }
+  return r;
+};
+// La fiche d'un achat : Référence et Taille / longueur sous la description ; le conseil de Claude au-dessus de la marge.
+if (typeof F5_NOMS_CHAMPS === 'object') { F5_NOMS_CHAMPS.a_ref = 'Référence'; F5_NOMS_CHAMPS.a_taille = 'Taille / longueur'; }
+const chxModifierAchatAvant = modifierAchat;
+modifierAchat = function (idA) {
+  const r = chxModifierAchatAvant.apply(this, arguments);
+  try {
+    const a = trouverAchat(idA), d = document.getElementById('contenuBoite'); if (!a || !d) return r;
+    const desc = d.querySelector('#a_desc');
+    if (desc && !d.querySelector('#a_ref')) desc.insertAdjacentHTML('afterend', chxCasesRefTaille('a', a));
+    const marge = d.querySelector('#a_marge'), lab = marge && marge.previousElementSibling;
+    if (lab && !d.querySelector('#chx_conseil')) { const h = chxConseilHtml(a, false); if (h) lab.insertAdjacentHTML('beforebegin', h); }
+    if (typeof f5Fiche !== 'undefined' && f5Fiche && f5Fiche.id === idA && f5Fiche.snap) { f5Fiche.snap.a_ref = String(a.reference || ''); f5Fiche.snap.a_taille = String(a.taille || ''); }
+  } catch (e) { console.warn('1.23 fiche', e); }
+  return r;
+};
+const chxEnregistrerAchatAvant = enregistrerAchat;
+enregistrerAchat = function (idA) {
+  const rf = document.getElementById('a_ref'), tl = document.getElementById('a_taille');
+  const ref = rf ? String(rf.value || '').trim() : null, taille = tl ? String(tl.value || '').trim() : null;
+  const r = chxEnregistrerAchatAvant.apply(this, arguments);
+  try {
+    const ouverte = typeof f5BoiteOuverte === 'function' ? f5BoiteOuverte() : !!(document.getElementById('boite') || {}).open;
+    if (ouverte && document.getElementById('a_ref')) return r;            // pas enregistré (le carnet demande encore quelque chose)
+    const a = trouverAchat(idA); if (!a || (ref === null && taille === null)) return r;
+    let change = false;
+    if (ref !== null && ref !== String(a.reference || '')) { a.reference = ref; change = true; }
+    if (taille !== null && taille !== String(a.taille || '')) { if (taille) a.taille = taille; else a.taille = ''; change = true; }
+    if (change) {
+      const f = a.fournisseur_id ? mkFournisseur(a.fournisseur_id) : null;
+      if (f) mkOffresDe(f).forEach(({ o }) => { if (o.achat_id === a.id) { if (ref !== null) o.modele = ref; if (taille !== null) o.taille = taille; } });
+      sauverLocal(); dessiner();
+    }
+  } catch (e) { console.warn('1.23 enregistrer', e); }
+  return r;
+};
+
+// ---------- 4. Les textes des modèles écrits par Claude se mettent à jour ; jamais un texte retouché par Riche ----------
+const chxEnregistrerProduitAvant = ctEnregistrerProduit;
+ctEnregistrerProduit = function (fid, pid) {
+  const f = mkFournisseur(fid), p = f && pid ? ctProduit(f, pid) : null, avant = p ? String(p.caracteristiques || '') : null;
+  const r = chxEnregistrerProduitAvant.apply(this, arguments);
+  try { if (p && avant !== null && String(p.caracteristiques || '') !== avant) { p.texte_riche = true; sauverLocal(); } } catch (e) {}
+  return r;
+};
+function chxRemettreTexte(fid, pid) {
+  const f = mkFournisseur(fid), p = f ? ctProduit(f, pid) : null, t = document.getElementById('ctm_car');
+  if (p && t && p.texte_avant !== undefined) { t.value = p.texte_avant; avertir('↩ Texte d\'avant remis dans la case : touche « Enregistrer » pour le garder.', 5000); }
+}
+const chxBoiteProduitAvant = ctBoiteProduit;
+ctBoiteProduit = function (fid, pid) {
+  const r = chxBoiteProduitAvant.apply(this, arguments);
+  try {
+    const f = mkFournisseur(fid), p = f && pid ? ctProduit(f, pid) : null, t = document.getElementById('ctm_car');
+    if (p && t && p.texte_avant && !document.getElementById('chx_texte_avant')) t.insertAdjacentHTML('afterend', `<div id="chx_texte_avant" class="muet" style="font-size:14px;margin-top:4px">
+      Texte d'avant la mise à jour de Claude${p.texte_maj_le ? ' (' + E(mkJour(p.texte_maj_le)) + ')' : ''} : « ${E(payCourt(String(p.texte_avant), 160))} »
+      <button type="button" class="mk-lien" onclick="chxRemettreTexte('${fid}','${pid}')">↩ Le remettre</button></div>`);
+  } catch (e) { console.warn('1.23 texte d\'avant', e); }
+  return r;
+};
+function chxFournisseurImport(x) {
+  try { if (typeof f6Reconnaitre === 'function') { const r = f6Reconnaitre(x, fournisseursListe()); return r && r.f ? r.f : null; } } catch (e) { return null; }
+  return ctTrouverFournisseur(x);
+}
+// Ce qu'un fichier changerait : [{ f, p, xp }] — seulement les modèles écrits par Claude, jamais retouchés par Riche, dont le texte change.
+function chxTextesAMettreAJour(imp) {
+  const L = [];
+  ((imp && imp.fournisseurs) || []).forEach(x => {
+    const P = Array.isArray(x.produits) ? x.produits.filter(xp => xp && xp.texte_maj && xp.caracteristiques) : [];
+    if (!P.length) return;
+    const f = chxFournisseurImport(x); if (!f) return;
+    const parRef = new Map(ctProduits(f).map(p => [ctCleRef(p.ref), p]));
+    P.forEach(xp => {
+      const p = parRef.get(ctCleRef(xp.ref)); if (!p || p.source !== 'claude' || p.texte_riche) return;
+      const actuel = String(p.caracteristiques || '').trim();
+      if (actuel === String(xp.caracteristiques).trim()) return;
+      if (xp.texte_ancien !== undefined) {
+        const anciens = (Array.isArray(xp.texte_ancien) ? xp.texte_ancien : [xp.texte_ancien]).map(t => String(t || '').trim());
+        if (anciens.indexOf(actuel) < 0) return;
+      }
+      L.push({ f, p, xp });
+    });
+  });
+  return L;
+}
+const chxFusionAvant = ctFusion;
+ctFusion = function (imp, appliquer) {
+  if (appliquer) {
+    try {
+      const L = chxTextesAMettreAJour(imp);
+      L.forEach(({ p, xp }) => {
+        p.texte_avant = String(p.caracteristiques || '');
+        p.caracteristiques = String(xp.caracteristiques);
+        p.texte_maj_le = mkMaintenant();
+      });
+      if (imp) imp.chx_textes = L.length;
+    } catch (e) { console.warn('1.23 textes', e); }
+  }
+  return chxFusionAvant.apply(this, arguments);
+};
+const chxApercuAvant = ctApercuImport;
+ctApercuImport = async function () {
+  await chxApercuAvant.apply(this, arguments);
+  const imp = ctImportEnCours, z = document.getElementById('ct_apercu_import');
+  if (!imp || !z) return;
+  try {
+    const n = chxTextesAMettreAJour(imp).length;
+    if (n) z.insertAdjacentHTML('beforeend', `<p style="margin:6px 0;font-size:16px">📝 <b>${E(nf(n))} textes de modèles</b> écrits par Claude mis à jour (jamais un texte que tu as retouché).</p>`);
+    const nc = Array.isArray(imp.choix_claude) ? imp.choix_claude.filter(x => {
+      if (!x || !x.id) return false;
+      const c = { id: 'apercu-' + x.id, fid: String(x.fid || ''), code: String(x.code || ''), societe: String(x.societe || ''), ref: String(x.ref || ''), article: String(x.article || ''),
+        refs: Array.isArray(x.refs) ? x.refs.map(String) : [], achat_codes: Array.isArray(x.achat_codes) ? x.achat_codes.map(v => String(v).replace(/\D/g, '')) : [] };
+      try { return chxAchats(c).length > 0; } catch (e) { return false; }
+    }).length : 0;
+    if (nc) z.insertAdjacentHTML('beforeend', `<p style="margin:6px 0;font-size:16px">🔗 <b>${E(nf(nc))} choix déjà commandés</b> : ils passeront en « ✅ Je prends » avec tes achats.</p>`);
+  } catch (e) { console.warn('1.23 aperçu', e); }
+};
+window.KYLO_CHOIX_SYNCHRO = '1.23.0';
 </script>
 
 

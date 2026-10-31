@@ -395,6 +395,18 @@ Tests : `test-achats-1220.js` (31 contrôles), plus les suites 1.21.0, 1.20.0, 1
 `test-maj-1220.js`, réserve. Rien de retiré.
 ⚠ Même remarque pour `KYLO-Achats.html`.
 
+Version 1.23.0 — 01/11/2026 : **Le Choix de Claude suit tes achats ; ajouter vite un produit**. ⭐ Choix de Claude ↔ 🛒 Mes achats :
+un choix commandé passe tout seul en « ✅ Je prends » (marqué « posé par le carnet » ; ce que Riche a décidé lui-même n'est jamais
+changé) et montre TOUS ses achats — plusieurs dessins d'une série (`refs`), ou un achat noté chez une fiche en double, retrouvé par son
+code-barres (`achat_codes`) ; la quantité commandée remplace « Ma quantité » ; un achat supprimé → le choix revient à décider. Dans
+« Mes achats », sous chaque achat relié et dans sa fiche : le prix de vente conseillé par Claude (affiché et 2ᵉ prix). ★ Ma liste :
+chaque dessin d'une série commandée retrouve le choix de sa série. ➕ Nouveau produit chez un fournisseur : nom et description
+« (pas obligatoire) », la photo suffit ; cases Référence et Taille / longueur (aussi dans la fiche d'un achat). Un fichier de Claude
+peut remettre à jour le texte d'un modèle qu'il avait écrit (`texte_maj`), jamais un texte retouché à la main (le carnet le note
+désormais). Fichiers `suivi-1.23.0-choix-achats.html`, `construire-1.23.0.py` (part de la 1.22.0). Tests : `test-choix-achats-1230.js`,
+plus les suites 1.22.0, 1.21.0, 1.20.0, 1.19.0, 1.18.0, 1.17.0 et 1.16.0 rejouées, `test-maj-1230.js`, réserve. Rien de retiré.
+⚠ Même remarque pour `KYLO-Achats.html`.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

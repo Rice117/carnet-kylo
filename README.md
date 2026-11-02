@@ -422,6 +422,18 @@ elle n'est plus dans le téléphone (une photo présente n'est jamais remplacée
 `construire-1.24.0.py` (part de la 1.23.0). Tests : `test-facture-paiements-1240.js`, `test-photos-reprises-1240.js`, plus les
 suites 1.23.0 à 1.16.0 rejouées. Rien de retiré.
 
+Version 1.24.1 — 03/11/2026 : **Plusieurs fichiers de Claude d'un coup ; l'essentiel pour Claude à copier-coller**. « 🤖 Ajouter
+ce que Claude a lu » → « 📄 Ou choisir le(s) fichier(s) de Claude » accepte plusieurs fichiers à la fois, ou le zip de Claude tel quel
+(lu dans le téléphone, `DecompressionStream('deflate-raw')`) ; ils passent un par un, triés par nom (1, 2, … 10), par le même chemin
+qu'à la main (aperçu, puis « Ajouter ») ; ce qui n'est pas un fichier pour le carnet (LISEZ-MOI) est laissé ; une liste dit ce qui a été
+ajouté. « 📋 L'essentiel pour Claude » (🏭 Fournisseurs, « Où j'en suis », et en haut de « Pour Claude : N fichiers ») : un texte
+`KYLOE:` (deflate-raw, base64) copié dans le presse-papiers, rien d'enregistré dans le téléphone (ou, au choix, un seul fichier
+`kylo-essentiel-pour-claude`), sans aucune photo — fiches, modèles avec l'état de leur photo (là / perdue / aucune), produits vus,
+achats, contrats et paiements (sans la photo du reçu), factures. « Pour Claude : N fichiers » dit la taille du plus gros fichier et
+« Enregistrer dans Fichiers » (au lieu de « choisissez Claude », qui ouvre une nouvelle conversation à chaque partie). Fichiers
+`1241-plusieurs-fichiers.html`, `construire-1.24.1.py` (part de la 1.24.0). Tests : `test-plusieurs-fichiers-1241.js`, plus les suites
+1.24.0 à 1.16.0 rejouées, `test-maj-1241.js`. Rien de retiré.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

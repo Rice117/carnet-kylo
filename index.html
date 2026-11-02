@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.24.0';
+window.KYLO_APPLICATION = '1.24.1';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -29415,6 +29415,209 @@ trPhotosImport = async function (imp) {
   return n;
 };
 window.KYLO_FACTURE = '1.24.0';
+</script>
+<style>
+/* ===================== Carnet 1.24.1 — plusieurs fichiers de Claude d'un coup (ou son zip) ; l'essentiel pour Claude en un seul petit fichier (Riche, 03/11/2026, 3 h 08) ===================== */
+.ml-etat{border:2px solid var(--bleu, #1d4ed8);border-radius:12px;padding:8px 10px;margin:0 0 8px;font-size:16px;font-weight:800;line-height:1.4;background:var(--bleu-pale, #eff6ff)}
+html[data-theme="sombre"] .ml-etat{background:transparent}
+.ml-l{font-size:15px;line-height:1.45;padding:6px 0;border-bottom:1px solid #e2e8f0}
+.ml-l b{font-size:16px}
+</style>
+<script>
+// ===================== Carnet 1.24.1 =====================
+// Riche, 03/11 à 2 h 54 et 3 h 08 : les gros fichiers de Claude restent noirs à l'ouverture ; coupés en morceaux, il faut les
+// ajouter un par un ; et « Envoyer à Claude » fait 24 fichiers qu'il faut partager un par un (« je ne sais pas quelle solution »).
+//   1. « 📄 Choisir le(s) fichier(s) de Claude » : PLUSIEURS fichiers d'un coup, ou le zip de Claude tel quel (sans l'ouvrir) ;
+//      ils passent un par un, dans l'ordre de leur nom (1, 2, … 10), par le même chemin qu'à la main (aperçu, puis « Ajouter »).
+//   2. « 📤 L'essentiel pour Claude » : UN petit fichier, sans les photos : fiches, modèles (avec « photo là / perdue / aucune »),
+//      achats, paiements, contrats, factures.
+//   3. « Pour Claude : N fichiers » dit la vraie taille du plus gros fichier (il disait « moins de 16 Mo » pour 19 Mo).
+function mlTri(a, b) { return String(a).localeCompare(String(b), 'fr', { numeric: true, sensitivity: 'base' }); }
+// Lire un zip dans le téléphone (sans Internet) : la table des fichiers à la fin, puis chaque fichier, décompressé à la demande.
+async function mlZipEntrees(fichier) {
+  const buf = new Uint8Array(await fichier.arrayBuffer()), dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  let e = -1; for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  if (e < 0) throw new Error('Ce zip est illisible (abîmé ou incomplet).');
+  const n = dv.getUint16(e + 10, true), dec = new TextDecoder('utf-8'), L = [];
+  let p = dv.getUint32(e + 16, true);
+  for (let k = 0; k < n && p + 46 <= buf.length; k++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const meth = dv.getUint16(p + 10, true), csz = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), loc = dv.getUint32(p + 42, true);
+    L.push({ chemin: dec.decode(buf.subarray(p + 46, p + 46 + nl)), meth, csz, loc }); p += 46 + nl + xl + cl;
+  }
+  return L.filter(x => !x.chemin.endsWith('/') && !/(^|\/)(__MACOSX|\._)/.test(x.chemin)).map(x => ({ nom: x.chemin.split('/').pop(), lire: async () => {
+    const q = x.loc; if (dv.getUint32(q, true) !== 0x04034b50) throw new Error('zip abîmé');
+    const debut = q + 30 + dv.getUint16(q + 26, true) + dv.getUint16(q + 28, true), d = buf.subarray(debut, debut + x.csz);
+    if (x.meth === 0) return dec.decode(d);
+    if (x.meth !== 8) throw new Error('zip : compression inconnue');
+    if (typeof DecompressionStream !== 'function') throw new Error('Ce téléphone ne sait pas ouvrir un zip : choisis les fichiers .json eux-mêmes.');
+    return await new Response(new Blob([d]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+  } }));
+}
+function mlAttendre(cond, ms) {
+  return new Promise(ok => { const t0 = Date.now(); const tour = () => { let v = false; try { v = cond(); } catch (e) { v = false; } if (v) return ok(true); if (Date.now() - t0 > ms) return ok(false); setTimeout(tour, 120); }; tour(); });
+}
+let mlEnCours = false;
+async function mlAjouterPlusieurs(fichiers) {
+  if (mlEnCours) return; mlEnCours = true;
+  const liste = [], res = [];
+  try {
+    for (const f of fichiers) {
+      if (/\.zip$/i.test(f.name) || /zip/.test(f.type || '')) (await mlZipEntrees(f)).filter(e => /\.(json|txt)$/i.test(e.nom)).forEach(e => liste.push(e));
+      else liste.push({ nom: f.name, lire: () => f.text() });
+    }
+  } catch (e) { mlEnCours = false; avertir('⚠ ' + (e && e.message || e), 8000); return; }
+  liste.sort((a, b) => mlTri(a.nom, b.nom));
+  const aAjouter = liste.length;
+  for (let i = 0; i < liste.length; i++) {
+    const x = liste[i]; let texte = '', imp = null;
+    try { texte = await x.lire(); } catch (e) { res.push({ nom: x.nom, etat: 'illisible', detail: e && e.message || '' }); continue; }
+    try { imp = ctValider(await ctDecoder(texte)); } catch (e) { res.push({ nom: x.nom, etat: 'laisse' }); continue; }   // LISEZ-MOI, résultats : laissés
+    // Le même chemin qu'à la main : la boîte « 🤖 Ajouter ce que Claude a lu », l'aperçu, puis « ✅ Ajouter au carnet ».
+    fermerBoite(); ctBoiteImport();
+    const d = document.getElementById('contenuBoite'), t = document.getElementById('ct_code');
+    if (d) d.insertAdjacentHTML('afterbegin', `<div class="ml-etat">📦 Fichier ${i + 1} sur ${aAjouter} : ${E(x.nom)}</div>`);
+    if (!t) { res.push({ nom: x.nom, etat: 'erreur', detail: 'boîte fermée' }); continue; }
+    if (texte.length > 20000) { trFichierImport = texte; t.value = '📄 ' + x.nom + ' (' + Math.round(texte.length / 1024) + ' Ko)'; t.dataset.fichier = '1'; }
+    else { trFichierImport = ''; t.value = texte; delete t.dataset.fichier; }
+    try { await ctApercuImport(); } catch (e) {}
+    const pret = await mlAttendre(() => { const b = document.getElementById('ct_bouton_import'); return b && !b.disabled && ctImportEnCours; }, 90000);
+    if (!pret) { res.push({ nom: x.nom, etat: 'refuse', detail: String((document.getElementById('ct_apercu_import') || {}).innerText || '').slice(0, 200) }); continue; }
+    try { await ctAppliquerImport(); res.push({ nom: x.nom, etat: 'ajoute', titre: imp.titre || '' }); }
+    catch (e) { res.push({ nom: x.nom, etat: 'erreur', detail: e && e.message || '' }); }
+    texte = ''; imp = null;
+  }
+  mlEnCours = false; window.KYLO_DERNIER_LOT = res;
+  const ok = res.filter(r => r.etat === 'ajoute').length, pb = res.filter(r => /refuse|erreur|illisible/.test(r.etat));
+  setTimeout(() => {
+    mkBoite(`<div class="mk-dlg"><h3>${pb.length ? '⚠' : '✅'} ${ok} fichier${ok > 1 ? 's' : ''} de Claude ajouté${ok > 1 ? 's' : ''}</h3>
+      ${res.map(r => `<div class="ml-l">${r.etat === 'ajoute' ? '✅' : r.etat === 'laisse' ? '—' : '⚠'} <b>${E(r.nom)}</b>${r.etat === 'laisse' ? ' : pas un fichier pour le carnet (laissé)'
+        : r.etat === 'ajoute' ? (r.titre ? '<br>' + E(r.titre) : '') : '<br>' + E(r.detail || r.etat)}</div>`).join('')}
+      <p class="px-aide">Ajouter de nouveau les mêmes fichiers ne double rien. Pour garder de la place : supprime ces fichiers dans Fichiers (et dans « Suppressions récentes ») — le carnet a tout gardé.</p>
+      <div class="mk-boutons"><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+  }, 900);
+}
+const mlLireAvant = ctLireFichierImport;
+ctLireFichierImport = function (input) {
+  const F = input && input.files ? [...input.files] : [];
+  if (F.length > 1 || (F.length === 1 && (/\.zip$/i.test(F[0].name) || /zip/.test(F[0].type || '')))) { input.value = ''; mlAjouterPlusieurs(F); return; }
+  return mlLireAvant.apply(this, arguments);
+};
+const mlBoiteAvant = ctBoiteImport;
+ctBoiteImport = function () {
+  const r = mlBoiteAvant.apply(this, arguments);
+  try {
+    const i = document.getElementById('ct_fichier_import'), lab = document.querySelector('label[for="ct_fichier_import"]');
+    if (i) { i.multiple = true; i.setAttribute('accept', '.json,.txt,.zip,application/json,text/plain,application/zip'); }
+    if (lab) lab.textContent = '📄 Ou choisir le(s) fichier(s) de Claude — plusieurs d\'un coup, ou son zip';
+    if (lab && !document.getElementById('ml_place')) lab.insertAdjacentHTML('afterend', '<p class="px-aide" id="ml_place">Après l\'ajout, tu peux supprimer le fichier dans Fichiers (et dans « Suppressions récentes ») : le carnet a tout gardé, photos comprises.</p>');
+  } catch (e) {}
+  return r;
+};
+
+// ---------- 2. 📤 L'essentiel pour Claude : un seul petit fichier, sans les photos ----------
+async function mlEssentielDonnees() {
+    let cles = new Set(); try { cles = new Set(await ctOp('readonly', s => s.getAllKeys())); } catch (e) {}
+    const etatPhoto = (doc) => !doc ? 'aucune' : (cles.has(doc) || cles.has(doc + '~m') ? 'la' : 'perdue');
+    const n = (v) => num(v) || 0;
+    const F = fournisseursListe().map(f => {
+      const x = {}; CL_CHAMPS_ENVOI.forEach(k => { if (f[k] !== undefined && f[k] !== '' && f[k] !== null) x[k] = f[k]; });
+      ['ids_claude', 'ville', 'yiwu', 'societe_cn', 'code_avant'].forEach(k => { if (f[k]) x[k] = f[k]; });
+      const D = ctDocs(f); x.docs = { cartes: D.filter(d => d.type === 'carte').length, pages: D.filter(d => d.type !== 'carte').length, perdues: D.filter(d => d.id && etatPhoto(d.id) === 'perdue').length };
+      x.produits_catalogue = ctProduits(f).map(p => { const q = { ref: p.ref || '', categorie: p.categorie || '', photo: etatPhoto(p.photo_doc) };
+        if (n(p.prix)) Object.assign(q, { prix: n(p.prix), devise: p.devise || '', moq: n(p.moq) });
+        if (p.interesse) q.interesse = true; if (n(p.colisage)) q.colisage = n(p.colisage); if (n(p.dim_l)) q.carton = [n(p.dim_l), n(p.dim_la), n(p.dim_h)];
+        if (p.source) q.source = p.source; if (p.page) q.page = p.page; return q; });
+      x.produits_vus = mkOffresDe(f).map(({ c, o }) => ({ cle: 'o:' + o.id, article: c.article || '', modele: o.modele || '', prix: n(o.prix), devise: o.devise || '', moq: n(o.moq),
+        achete: !!o.achat_id, photo: o.photo_doc ? etatPhoto(o.photo_doc) : (o.photo ? 'la' : 'aucune'), note: o.note || '' }));
+      const k = f.contrat;
+      if (k) x.contrat = { no: k.no || '', date: k.date || '', etapes: k.etapes || {}, acompte: k.acompte, acompte_mode: k.acompte_mode || '', acompte_cny: k.acompte_cny || 0, livraison: k.livraison || '',
+        versions: Array.isArray(k.versions) ? k.versions.length : 0,
+        paiements: (Array.isArray(k.paiements) ? k.paiements : []).map(p => ({ quoi: p.quoi, montant: p.montant, devise: p.devise, cny: p.cny, mode: p.mode, le: p.le, note: p.note || '', recu: !!p.recu })) };
+      if (f.facture) x.facture = { no: f.facture.no || '', envoyee_le: f.facture.envoyee_le || '', total: f.facture.total || 0 };
+      return x;
+    });
+    const achats = (C.achats || []).map(a => ({ id: a.id, nom: a.nom || '', reference: a.reference || '', fournisseur_id: a.fournisseur_id || '', fournisseur: a.fournisseur || '',
+      quantite: n(a.quantite), prix_unitaire: n(a.prix_unitaire), devise: deviseDe(a), qte_carton: n(a.qte_carton), code_barres: a.code_barres || '', taille: a.taille || '',
+      photo: !!(a.photo || a.photo_doc), note: a.note || '', paye_sur_place: a.paye_sur_place || null }));
+    const sortie = { format: 'kylo-essentiel-pour-claude', version: 1, le: mkMaintenant(), application: window.KYLO_APPLICATION,
+      voyage: { titre: (C.voyage || {}).titre || '', fin: (C.voyage || {}).fin || '', taux: (C.voyage || {}).taux || {} },
+      photos_dans_le_telephone: [...cles].filter(c => !/~m$/.test(c)).length,
+      fournisseurs: F, achats, acomptes: Array.isArray(C.acomptes) ? C.acomptes : [],
+      choix_claude: typeof cxDecisionsPourClaude === 'function' ? cxDecisionsPourClaude() : [] };
+    return sortie;
+}
+async function mlEssentiel(bouton) {
+  const etiquette = bouton ? bouton.textContent : '';
+  if (bouton) { bouton.disabled = true; bouton.textContent = '⏳ Préparation…'; }
+  try {
+    const sortie = await mlEssentielDonnees(), F = sortie.fournisseurs, achats = sortie.achats;
+    const blob = new Blob([JSON.stringify(sortie, null, 1)], { type: 'application/json' });
+    window.KYLO_DERNIER_ESSENTIEL = { taille: blob.size, fournisseurs: F.length, achats: achats.length };
+    const nom = 'KYLO-essentiel-pour-Claude-' + rgJour() + '.json';   // le jour du téléphone (pas celui de Londres)
+    await remettreFichier(blob, nom);
+    avertir('📤 ' + nom + ' : ' + clMo(blob.size) + ', ' + F.length + ' fournisseurs, ' + achats.length + ' achats, sans les photos.\nEnregistre-le dans Fichiers, puis dans la conversation avec Claude : + → Fichiers.', 9000);
+  } catch (e) { avertir('⚠ Le fichier n\'a pas pu être préparé : ' + (e && e.message || e), 7000); }
+  if (bouton) { bouton.disabled = false; bouton.textContent = etiquette || '📤 L\'essentiel pour Claude (1 petit fichier)'; }
+}
+// Riche, 3 h 18 : « ça remplit le téléphone… déposer dans Fichiers, l'envoyer, c'est compliqué ». L'essentiel se COPIE et se colle
+// dans la conversation avec Claude : rien n'est enregistré dans le téléphone. Deux temps (préparer, puis copier) : sur iPhone, la copie
+// doit se faire au moment même du toucher.
+// Sous 1 Mo, en Ko (« 0 Mo » faisait croire que c'était vide).
+function mlTaille(n) { return n < 1e6 ? Math.max(1, Math.round(n / 1024)) + ' Ko' : clMo(n); }
+function mlB64(o) { let t = ''; for (let i = 0; i < o.length; i += 0x8000) t += String.fromCharCode.apply(null, o.subarray(i, i + 0x8000)); return btoa(t); }
+let mlEssPret = '';
+async function mlEssentielPreparer(bouton) {
+  const etiquette = bouton ? bouton.textContent : '';
+  if (bouton) { bouton.disabled = true; bouton.textContent = '⏳ Préparation…'; }
+  try {
+    const sortie = await mlEssentielDonnees(), brut = new TextEncoder().encode(JSON.stringify(sortie));
+    if (typeof CompressionStream === 'function') mlEssPret = 'KYLOE:' + mlB64(new Uint8Array(await new Response(new Blob([brut]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer()));
+    else mlEssPret = 'KYLOE1:' + mlB64(brut);
+    window.KYLO_DERNIER_ESSENTIEL = { taille: brut.length, texte: mlEssPret.length, fournisseurs: sortie.fournisseurs.length, achats: sortie.achats.length };
+    mkBoite(`<div class="mk-dlg"><h3>📋 L'essentiel pour Claude</h3>
+      <div class="f3-info">Prêt : ${sortie.fournisseurs.length} fournisseurs, ${sortie.achats.length} achats, tes paiements — <b>${E(mlTaille(mlEssPret.length))}</b> de texte, sans aucune photo.</div>
+      <button class="b vert" style="min-height:56px;font-size:17px" onclick="mlCopierEss()">📋 Copier pour Claude</button>
+      <ol class="mk-etapes"><li>Touche <b>📋 Copier pour Claude</b>.</li><li>Dans LA conversation avec Claude : appui long dans la case du message → <b>Coller</b> → envoyer.</li></ol>
+      <p class="px-aide">Rien n'est enregistré dans le téléphone (pas de fichier dans Fichiers).</p>
+      <div class="mk-boutons"><button class="b contour" onclick="mlEssentiel(this)">📤 En fichier plutôt</button><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+  } catch (e) { avertir('⚠ L\'essentiel n\'a pas pu être préparé : ' + (e && e.message || e), 7000); }
+  if (bouton && document.body.contains(bouton)) { bouton.disabled = false; bouton.textContent = etiquette; }
+}
+function mlCopierEss() {
+  const t = mlEssPret; if (!t) return;
+  const fini = () => avertir('📋 Copié (' + mlTaille(t.length) + '). Dans la conversation avec Claude : appui long dans la case → Coller → envoyer.', 8000);
+  const secours = () => { const z = document.createElement('textarea'); z.value = t; z.setAttribute('readonly', ''); z.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+    (document.querySelector('dialog[open]') || document.body).appendChild(z); z.select(); try { z.setSelectionRange(0, t.length); } catch (e) {}
+    let ok = false; try { ok = document.execCommand('copy'); } catch (e) {} z.remove(); if (ok) fini(); else avertir('⚠ La copie n\'a pas marché : prends « 📤 En fichier plutôt ».', 8000); };
+  try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t).then(fini, secours); return; } } catch (e) {}
+  secours();
+}
+const ML_BOUTON_ESSENTIEL = '<button class="b vert" onclick="mlEssentielPreparer(this)">📋 L\'essentiel pour Claude — à coller (rien dans Fichiers)</button>';
+const mlSuiviAvant = fsSuiviHtml;
+fsSuiviHtml = function () {
+  const h = mlSuiviAvant.apply(this, arguments);
+  return h.replace('<button class="b contour" onclick="fsEnvoyerAClaude(this)">', ML_BOUTON_ESSENTIEL + '\n      <button class="b contour" onclick="fsEnvoyerAClaude(this)">');
+};
+// « Pour Claude : N fichiers » : la vraie taille, et l'essentiel d'abord.
+const mlMontrerAvant = clMontrerEnvoi;
+clMontrerEnvoi = function () {
+  const r = mlMontrerAvant.apply(this, arguments);
+  try {
+    const d = document.getElementById('contenuBoite'), P = clEnvoi && clEnvoi.parties; if (!d || !P) return r;
+    const max = Math.max(...P.map(p => p.taille)), p = [...d.querySelectorAll('p')].find(x => /moins de 16 Mo/.test(x.textContent));
+    if (p) p.innerHTML = p.innerHTML.replace('Chaque fichier fait moins de 16 Mo.', 'Le plus gros fichier fait ' + E(clMo(max)) + '.');
+    // « choisissez Claude » ouvrait une NOUVELLE conversation à chaque partie : on dit d'enregistrer, puis de les joindre ensemble.
+    const li = d.querySelectorAll('ol.mk-etapes li');
+    if (li[0]) li[0].innerHTML = 'Touchez <b>Partie 1</b> → <b>« Enregistrer dans Fichiers »</b> (dossier KYLO). Pas « Claude » : il ouvre une nouvelle conversation à chaque fois.';
+    if (li[2]) li[2].innerHTML = 'Dans LA conversation avec Claude : bouton <b>+</b> → <b>Fichiers</b> → KYLO → choisissez les parties (plusieurs d\'un coup si le téléphone le permet).';
+    const h3 = d.querySelector('h3');
+    if (h3 && !document.getElementById('ml_ess')) h3.insertAdjacentHTML('afterend', `<div class="f3-info" id="ml_ess">Pour que Claude voie tes fiches, tes achats, tes paiements et les photos qui manquent, <b>l'essentiel suffit</b> (à copier-coller, rien dans Fichiers) : ${ML_BOUTON_ESSENTIEL}
+      Les parties ci-dessous servent seulement s'il doit relire les photos (cartes, pages). Pour les mettre dans la MÊME conversation : « Enregistrer dans Fichiers », puis dans la conversation : + → Fichiers.</div>`);
+  } catch (e) {}
+  return r;
+};
+window.KYLO_PLUSIEURS_FICHIERS = '1.24.1';
 </script>
 
 

@@ -407,6 +407,21 @@ désormais). Fichiers `suivi-1.23.0-choix-achats.html`, `construire-1.23.0.py` (
 plus les suites 1.22.0, 1.21.0, 1.20.0, 1.19.0, 1.18.0, 1.17.0 et 1.16.0 rejouées, `test-maj-1230.js`, réserve. Rien de retiré.
 ⚠ Même remarque pour `KYLO-Achats.html`.
 
+Version 1.24.0 — 03/11/2026 : **La facture avant le contrat ; l'acompte vraiment payé ; payé et reste à payer ; la liste pour le
+guide**. 🛒 Achats : sous chaque fournisseur, « 🧾 Facture à lui envoyer » (quantité × prix = total, un produit sans prix est écrit
+« prix à confirmer » hors du total) en image A4 chinois-français-anglais avec la photo de chaque produit, ou en texte pour WeChat ;
+ouvrir la facture ne crée pas de contrat (`f.facture` : n°, envoyée le, total, lignes). « 💵 Paiements » monte juste dessous.
+L'acompte du contrat peut être « ce que j'ai déjà payé » (`contrat.acompte_mode = 'paye'`, posé tout seul quand un acompte est noté
+avant l'envoi du contrat), « un montant » (`acompte_cny`) ou le pourcentage d'avant : l'article 5 et la section « en bref » écrivent
+le montant, la date et le moyen de paiement, puis le reste ; un contrat déjà envoyé garde sa règle. Avant le contrat, la case
+« Montant » de 💵 Paiements reste vide (plus de 30 % proposé). En haut de 🛒 Achats : commandé, payé, reste à payer, « à laisser au
+guide » ; la fenêtre « 📋 » montre chaque fournisseur, tous les paiements par date et par moyen, et fait la liste pour le guide
+(image ou texte : boutique, téléphone, reste à payer, case de signature). 🧭 À faire : « D'abord lui envoyer la facture », puis
+« noter l'acompte payé », avant « Lui envoyer son contrat ». Un fichier de Claude ajouté de nouveau remet la photo d'un modèle quand
+elle n'est plus dans le téléphone (une photo présente n'est jamais remplacée). Fichiers `1240-facture-paiements.html`,
+`construire-1.24.0.py` (part de la 1.23.0). Tests : `test-facture-paiements-1240.js`, `test-photos-reprises-1240.js`, plus les
+suites 1.23.0 à 1.16.0 rejouées. Rien de retiré.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

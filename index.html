@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.23.0';
+window.KYLO_APPLICATION = '1.24.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -28874,6 +28874,547 @@ ctApercuImport = async function () {
   } catch (e) { console.warn('1.23 aperçu', e); }
 };
 window.KYLO_CHOIX_SYNCHRO = '1.23.0';
+</script>
+<style>
+/* ===================== Carnet 1.24.0 — la facture avant le contrat ; l'acompte vraiment payé ; payé et reste à payer ; l'argent du guide (Riche, 03/11/2026, 1 h 09) ===================== */
+.fp-carte{border:2px solid var(--vert, #15803d);border-radius:14px;padding:10px 12px;margin:0 0 10px;background:var(--carte);font-size:16px;line-height:1.45}
+.fp-carte h2{font-size:19px;margin:0 0 6px}
+.fp-chiffres{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:6px 0}
+.fp-chiffres div{border-radius:10px;background:var(--bleu-pale, #eff6ff);padding:6px 8px;font-size:14px;line-height:1.3}
+.fp-chiffres b{display:block;font-size:18px}
+.fp-chiffres .fp-reste b{color:var(--rouge, #b91c1c)}
+.fp-guide{font-size:17px;font-weight:800;margin:8px 0}
+.fp-paye{font-size:15px;font-weight:700;margin-top:4px}
+.fp-l{display:flex;gap:10px;align-items:center;border-bottom:1px solid #e2e8f0;padding:8px 0;font-size:15px;line-height:1.4}
+.fp-l img,.fp-l .fp-ph{width:64px;height:64px;object-fit:contain;border-radius:8px;background:#fff;flex:none}
+.fp-l .fp-ph{display:flex;align-items:center;justify-content:center;font-size:28px;background:transparent}
+.fp-l .c{flex:1;min-width:0}
+.fp-l .m{text-align:right;font-weight:800;white-space:nowrap}
+.fp-total{font-size:17px;font-weight:900;margin:10px 0 4px}
+.fp-apercu img{width:100%;border:1px solid #cbd5e1;border-radius:8px;margin:6px 0}
+.fp-ac{border:2px solid var(--bleu, #1d4ed8);border-radius:12px;padding:8px 10px;margin:10px 0;font-size:15px;line-height:1.45}
+.fp-ac label{display:flex;gap:8px;align-items:flex-start;min-height:44px;padding:6px 0;font-size:16px;font-weight:400}
+.fp-ac input[type=radio]{width:24px;height:24px;flex:none;margin-top:2px}
+.fp-ac input.fp-mt{width:130px;font-size:16px;min-height:44px;display:inline-block}
+.fp-four{border-bottom:1px solid #e2e8f0;padding:8px 0;font-size:15px;line-height:1.45}
+.fp-four .fp-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.fp-four .fp-btns .b{width:auto;flex:1 1 40%;min-height:48px;font-size:15px}
+.fp-pay{font-size:15px;padding:6px 0;border-bottom:1px dashed #e2e8f0;line-height:1.4}
+html[data-theme="sombre"] .fp-chiffres div{background:transparent;border:1px solid #475569}
+html[data-theme="sombre"] .fp-l img{background:#fff}
+</style>
+<script>
+// ===================== Carnet 1.24.0 =====================
+// Riche, 03/11 à 1 h 09, à Yiwu : « avant de faire le contrat je dois faire sortir d'abord la facture… le prix, le montant, la
+// quantité… pour que la personne [vérifie]… le carnet m'envoie directement faire signer le contrat » ; « ma banque refuse…
+// je paye le montant minimum qu'il faut pour le fournisseur… le contrat indique 30 % » ; « il faut ajouter la façon dont ça a été
+// payé » ; « ce que j'ai payé au fournisseur et ce que je dois… l'argent que je dois laisser au guide pour payer les fournisseurs
+// lorsqu'il vient livrer mes commandes ».
+// Ce module enveloppe les fonctions existantes (rien n'est retiré) :
+//   1. 🧾 la facture d'un fournisseur (quantité × prix = total), en image pour WeChat, AVANT le contrat — sans créer de contrat ;
+//   2. l'acompte du contrat = ce qui est VRAIMENT payé (ou un montant), plus forcément 30 % ;
+//   3. 💵 payé et reste à payer en haut de 🛒 Achats ; 📋 la liste pour le guide ; tous les paiements, par date et par moyen.
+const FP_MODES_CN = { alipay: '支付宝', wechat: '微信支付', especes: '现金', virement: '银行转账' };
+const FP_MODES_EN = { alipay: 'Alipay', wechat: 'WeChat Pay', especes: 'cash', virement: 'bank transfer' };
+const FP_MODES_FR = { alipay: 'Alipay', wechat: 'WeChat Pay', especes: 'espèces', virement: 'virement' };
+function fpJourFr(j) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(j || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] : String(j || ''); }
+
+// ---------- 0. Les chiffres ----------
+// La facture prend TOUS ses achats avec une quantité ; ceux sans prix sont écrits « prix à confirmer », hors du total.
+function fpLignes(f) { return (C.achats || []).filter(a => f && a.fournisseur_id === f.id && num(a.quantite) > 0); }
+// Le total des lignes d'aujourd'hui en ¥ (le même calcul que le contrat), sans passer par l'avenant (pas de boucle).
+function fpTotalLignes(f) { return rgLignes(f).reduce((s, a) => s + f3Ligne(a).montant, 0); }
+function fpAcomptes(k) { return (k && Array.isArray(k.paiements) ? k.paiements : []).filter(p => p && p.quoi === 'acompte'); }
+function fpAcPaye(k) { return fpAcomptes(k).reduce((s, p) => s + rgCny(p), 0); }
+function fpFDe(k) {
+  if (!k) return null;
+  const meme = (f) => f && f.contrat && (f.contrat === k || (k.no && f.contrat.no === k.no));
+  if (k.fid) { const f = mkFournisseur(k.fid); if (meme(f)) return f; }
+  return fournisseursListe().find(meme) || null;
+}
+function fpEnvoye(k) { const e = (k && k.etapes) || {}; return !!(e.envoye || e.signe || e.accepte || (k && Array.isArray(k.versions) && k.versions.length)); }
+// L'acompte écrit dans le contrat : 'paye' = ce qu'il a déjà payé ; 'montant' = un montant en ¥ ; 'pct' = un pourcentage (comme avant).
+function fpAcMode(k) {
+  if (!k) return 'pct';
+  const m = k.acompte_mode;
+  if (m === 'paye') return fpAcPaye(k) > 0.004 ? 'paye' : 'pct';
+  if (m === 'montant') return num(k.acompte_cny) > 0 ? 'montant' : 'pct';
+  if (m === 'pct') return 'pct';
+  return !fpEnvoye(k) && fpAcPaye(k) > 0.004 ? 'paye' : 'pct';
+}
+function fpAcMontant(k) { const m = fpAcMode(k); return m === 'paye' ? fpAcPaye(k) : m === 'montant' ? Math.max(0, num(k.acompte_cny)) : 0; }
+function fpPayeListe(P, langue) {
+  const M = langue === 'cn' ? FP_MODES_CN : langue === 'en' ? FP_MODES_EN : FP_MODES_FR;
+  return P.map(p => (langue === 'fr' ? fpJourFr(p.le) : p.le) + (langue === 'cn' ? ' ' : ', ') + (M[p.mode] || p.mode || '') + (langue === 'cn' ? ' ' : ', ')
+    + (langue === 'fr' ? nf(rgCny(p), 2) + ' ¥' : f3Y(rgCny(p)))).join(langue === 'cn' ? '，' : '; ');
+}
+
+// ---------- 1. Le contrat : il sait à quel fournisseur il est ; l'acompte payé avant lui est gardé ----------
+const fpContratAvant = ctrContrat;
+ctrContrat = function (f) {
+  const k = fpContratAvant.apply(this, arguments);
+  if (f && f.id && k.fid !== f.id) k.fid = f.id;
+  // Payé AVANT que le contrat parte : le contrat écrira ce montant (la règle est gardée pour que la version envoyée ne change pas).
+  if (!k.acompte_mode && !fpEnvoye(k) && fpAcPaye(k) > 0.004) k.acompte_mode = 'paye';
+  return k;
+};
+const fpAcAvant = f3Ac;
+f3Ac = function (k) {
+  const m = fpAcMode(k); if (m === 'pct') return fpAcAvant.apply(this, arguments);
+  const f = fpFDe(k), tot = f ? fpTotalLignes(f) : 0, mt = fpAcMontant(k);
+  if (!(tot > 0) || !(mt > 0)) return fpAcAvant.apply(this, arguments);
+  return Math.round(Math.min(100, mt / tot * 100) * 10000) / 10000;
+};
+// Article 5 : « L'acheteur a déjà payé un acompte de X ¥ (date, Alipay)… Le reste, Y ¥, après un contrôle conforme. »
+const fpTextesAvant = ctrTextes;
+ctrTextes = function (f, k, langue) {
+  const r = fpTextesAvant.apply(this, arguments);
+  try {
+    const m = fpAcMode(k), mt = fpAcMontant(k), art5 = r && r.T && r.T.articles && r.T.articles[4];
+    if (m !== 'pct' && mt > 0 && art5 && Array.isArray(art5.p) && art5.p.length >= 2) {
+      const total = num(r.total), reste = Math.max(0, total - mt), pct = total > 0 ? rgPt(mt / total * 100, 1) : '', pctFr = total > 0 ? nf(mt / total * 100, 1) : '';
+      const yf = (n) => nf(n, 2) + ' ¥';
+      if (m === 'paye') {
+        const P = fpAcomptes(k);
+        art5.p[0] = { cn: '买方已支付预付款 ' + f3Y(mt) + '（' + fpPayeListe(P, 'cn') + '）' + (pct ? '，占总金额的 ' + pct + '%' : '') + '。卖方确认已收到。',
+          en: 'The Buyer has already paid an advance payment of ' + f3Y(mt) + ' (' + fpPayeListe(P, 'en') + ')' + (pct ? ', i.e. ' + pct + '% of the total amount' : '') + '. The Seller confirms receipt.',
+          fr: 'L\'acheteur a déjà payé un acompte de ' + yf(mt) + ' (' + fpPayeListe(P, 'fr') + ')' + (pctFr ? ', soit ' + pctFr + ' % du total' : '') + '. Le vendeur confirme l\'avoir reçu.' };
+      } else {
+        art5.p[0] = { cn: '合同签字盖章后，买方支付预付款 ' + f3Y(mt) + (pct ? '（总金额的 ' + pct + '%）' : '') + '。',
+          en: 'After signature and company seal, the Buyer pays an advance payment of ' + f3Y(mt) + (pct ? ' (' + pct + '% of the total amount)' : '') + '.',
+          fr: 'Après signature et cachet, l\'acheteur paie un acompte de ' + yf(mt) + (pctFr ? ' (' + pctFr + ' % du total)' : '') + '.' };
+      }
+      art5.p[1] = { cn: '余款 ' + f3Y(reste) + ' 在验货合格后、发货前支付。', en: 'The balance of ' + f3Y(reste) + ' is paid after the goods pass inspection, before shipment.',
+        fr: 'Le reste, ' + yf(reste) + ', est payé après un contrôle conforme, avant l\'expédition.' };
+    }
+  } catch (e) { console.warn('1.24 contrat', e); }
+  return r;
+};
+// Section 6 « en bref » : la puce de l'acompte dit le montant.
+const fpPucesAvant = f3PucesHtml;
+f3PucesHtml = function (k) {
+  const h = fpPucesAvant.apply(this, arguments), m = fpAcMode(k), mt = fpAcMontant(k);
+  if (m === 'pct' || !(mt > 0)) return h;
+  const f = fpFDe(k), tot = f ? fpTotalLignes(f) : 0;
+  const t = (m === 'paye' ? '<b>Acompte déjà payé : ' + E(rgY(mt)) + '</b> (' + E(fpAcomptes(k).map(p => mkJour(p.le) + ' ' + (FP_MODES_FR[p.mode] || p.mode || '')).join(', ')) + ')'
+    : '<b>Acompte de ' + E(rgY(mt)) + '</b> après signature') + ', <b>le reste' + (tot > 0 ? ' (' + E(rgY(Math.max(0, tot - mt))) + ')' : '') + ' après un contrôle conforme</b>';
+  return h.replace(/<b>[^<]*% d'acompte<\/b> après signature, <b>le reste après un contrôle conforme<\/b>/, t);
+};
+// Dans 📝 Contrat d'achat, section 4 : choisir ce que le contrat écrit pour l'acompte.
+function fpAcBlocHtml(f, k) {
+  const m = fpAcMode(k), paye = fpAcPaye(k), tot = fpTotalLignes(f), P = fpAcomptes(k);
+  return `<div class="fp-ac" id="fp_ac"><b>L'acompte écrit dans le contrat</b>
+    <label><input type="radio" name="fp_ac" value="paye" ${m === 'paye' ? 'checked' : ''} ${paye > 0.004 ? '' : 'disabled'} onchange="fpAcChoisir('paye')">
+      <span>💵 <b>Ce que j'ai déjà payé</b> : ${paye > 0.004 ? '<b>' + E(rgY(paye)) + '</b> (' + E(P.map(p => mkJour(p.le) + ' ' + (FP_MODES_FR[p.mode] || p.mode || '')).join(', ')) + ')' + (tot > 0 ? ' — le reste : <b>' + E(rgY(Math.max(0, tot - paye))) + '</b>' : '') : 'rien de noté — notez d\'abord le paiement (💵 Paiements)'}</span></label>
+    <label><input type="radio" name="fp_ac" value="montant" ${m === 'montant' ? 'checked' : ''} onchange="fpAcChoisir('montant')">
+      <span>Un montant : <input class="fp-mt" id="fp_ac_mt" inputmode="decimal" value="${num(k.acompte_cny) > 0 ? E(rgPt(k.acompte_cny, 2)) : ''}" placeholder="ex : 500" onclick="event.stopPropagation()" onchange="fpAcMontantTape(this.value)"> ¥</span></label>
+    <label><input type="radio" name="fp_ac" value="pct" ${m === 'pct' ? 'checked' : ''} onchange="fpAcChoisir('pct')"><span>Un pourcentage du total (la case « Acompte (%) »)</span></label>
+    <p class="px-aide">Ta banque refuse les gros montants ? Paie le minimum qu'il accepte (Alipay, espèces…), note-le dans 💵 Paiements, puis choisis « Ce que j'ai déjà payé » : le contrat écrit ce montant et le reste, pas 30 %.</p></div>`;
+}
+let fpAcOccupe = false;
+function fpAcBloc() {
+  const f = mkFournisseur(ctrFid), d = document.getElementById('contenuBoite'); if (!f || !d || fpAcOccupe) return;
+  const acI = document.getElementById('ctr_k_ac'); if (!acI) return;
+  fpAcOccupe = true;
+  try {
+    const old = document.getElementById('fp_ac');
+    // une case du bloc a le doigt : la lâcher AVANT de refaire le bloc (sinon « change » au moment où elle disparaît)
+    if (old && old.contains(document.activeElement)) document.activeElement.blur();
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+  } finally { fpAcOccupe = false; }
+  const k = ctrContrat(f);
+  const g = acI.closest('.ctr-g') || acI.parentElement; g.insertAdjacentHTML('afterend', fpAcBlocHtml(f, k));
+  if (acI.parentElement) acI.parentElement.style.display = fpAcMode(k) === 'pct' ? '' : 'none';
+}
+function fpAcRafraichir() { f3Redessiner(() => { fpAcBloc(); try { f3RafraichirContrat(); } catch (e) { console.warn('1.24', e); } }); }
+function fpAcChoisir(m) {
+  const f = mkFournisseur(ctrFid); if (!f) return;
+  try { ctrGarderChamps(); } catch (e) {}
+  const k = ctrContrat(f);
+  if (m === 'montant') { const v = pxNombre((document.getElementById('fp_ac_mt') || {}).value || ''); if (v > 0) k.acompte_cny = Math.round(v * 100) / 100; }
+  k.acompte_mode = m; sauverLocal(); fpAcRafraichir();
+  if (m === 'montant' && !(num(k.acompte_cny) > 0)) { const i = document.getElementById('fp_ac_mt'); if (i) i.focus(); avertir('Tapez le montant de l\'acompte en ¥.'); }
+}
+function fpAcMontantTape(v) {
+  const f = mkFournisseur(ctrFid); if (!f) return;
+  const k = ctrContrat(f), n = pxNombre(v);
+  const avant = num(k.acompte_cny);
+  k.acompte_cny = n > 0 ? Math.round(n * 100) / 100 : 0; if (n > 0) k.acompte_mode = 'montant';
+  sauverLocal();
+  if (avant !== num(k.acompte_cny) || n > 0) setTimeout(fpAcRafraichir, 0);
+}
+const fpCtrDessinerAvant = ctrDessiner;
+ctrDessiner = function () {
+  const r = fpCtrDessinerAvant.apply(this, arguments);
+  try {
+    fpAcBloc();
+    const f = mkFournisseur(ctrFid), d = document.getElementById('contenuBoite'), h3 = d && d.querySelector('h3');
+    if (f && h3 && !document.getElementById('fp_ctr_fact') && fpLignes(f).length) {
+      const fa = f.facture || {};
+      h3.insertAdjacentHTML('afterend', `<div class="f3-info" id="fp_ctr_fact">🧾 ${fa.envoyee_le ? 'Facture envoyée le ' + E(mkJour(fa.envoyee_le)) + '.' : 'Pas encore de facture envoyée : envoyez-la d\'abord, il vérifie les quantités et les prix.'}
+        <button type="button" class="b contour" onclick="fpBoite('${f.id}')">🧾 Sa facture</button></div>`);
+    }
+  } catch (e) { console.warn('1.24 acompte', e); }
+  return r;
+};
+
+// ---------- 2. 💵 Paiements : avant le contrat, on note ce qui est VRAIMENT payé ----------
+const fpRgBoiteAvant = rgBoite;
+rgBoite = function (fid, quoi) {
+  const r = fpRgBoiteAvant.apply(this, arguments);
+  try {
+    const f = mkFournisseur(fid);
+    if (f && f.contrat && rgNouveau && !fpEnvoye(f.contrat)) {
+      if (!quoi) rgNouveau.quoi = 'acompte';
+      // Pas de 30 % déjà tapé dans la case : le montant se tape (le minimum qu'il accepte, ce que la banque laisse passer).
+      if (rgNouveau.quoi === 'acompte') { rgNouveau.montant = 0; rgDessiner(); }
+    }
+  } catch (e) { console.warn('1.24 paiements', e); }
+  return r;
+};
+const fpRgDessinerAvant = rgDessiner;
+rgDessiner = function () {
+  const r = fpRgDessinerAvant.apply(this, arguments);
+  try {
+    const f = mkFournisseur(rgF), d = document.getElementById('contenuBoite'); if (!f || !d) return r;
+    const s = rgEtat(f, true), k = s.k, m = fpAcMode(k), z = d.querySelector('.rg-chiffres'), n = rgLignes(f).length;
+    if (z && s.total > 0 && (m !== 'pct' || !fpEnvoye(k))) {
+      z.innerHTML = 'Commande chez lui : <b>' + E(rgY(s.total)) + '</b> (' + n + ' produit' + (n > 1 ? 's' : '') + ')' + (k.no ? ' · ' + E(k.no) : '') + '<br>'
+        + (m === 'paye' ? 'Acompte du contrat = <b>ce que tu as déjà payé : ' + E(rgY(fpAcPaye(k))) + '</b>'
+          : m === 'montant' ? 'Acompte du contrat : <b>' + E(rgY(fpAcMontant(k))) + '</b>'
+          : 'Acompte : <b>le montant qu\'il accepte</b> (pas forcément ' + E(nf(s.ac)) + ' %). Le contrat écrira ce que tu as vraiment payé.');
+    }
+    const bt = d.querySelector('.mk-boutons');
+    if (bt && !document.getElementById('fp_rg_fact') && fpLignes(f).length) bt.insertAdjacentHTML('beforeend', `<button class="b contour" id="fp_rg_fact" onclick="fpBoite('${f.id}')">🧾 Sa facture</button>`);
+    const t = [...d.querySelectorAll('.px-titre')].find(x => /Noter un paiement/.test(x.textContent));
+    if (t && !document.getElementById('fp_rg_aide')) t.insertAdjacentHTML('afterend', '<p class="px-aide" id="fp_rg_aide">Tapez le montant VRAIMENT payé (même petit), le moyen (Alipay, espèces…) et le jour. Avec la photo, vous le retrouvez dans 🛒 Achats → « 💵 Payé et reste à payer ».</p>');
+  } catch (e) { console.warn('1.24 paiements', e); }
+  return r;
+};
+// L'aide « Acompte à payer : 30 % » (1.18.0) ne s'écrit plus avant le contrat : le montant est celui qu'il accepte.
+const fpAideAvant = f3AideMontant;
+f3AideMontant = function () {
+  const r = fpAideAvant.apply(this, arguments);
+  try {
+    const f = mkFournisseur(rgF), d = document.getElementById('contenuBoite');
+    if (!f || !d || !f.contrat || fpEnvoye(f.contrat) || !rgNouveau || rgNouveau.quoi !== 'acompte') return r;
+    [...d.querySelectorAll('p.px-aide')].forEach(x => { if (/^Acompte à payer/.test(x.textContent.trim())) x.remove(); });
+    const m = document.getElementById('rg_montant'); if (m) m.placeholder = 'ex : 500';
+  } catch (e) {}
+  return r;
+};
+const fpRgAvisAvant = rgAvis;
+rgAvis = function () {
+  const r = fpRgAvisAvant.apply(this, arguments);
+  try {
+    const f = mkFournisseur(rgF), z = document.getElementById('rg_avis'); if (!f || !z || !f.contrat || fpEnvoye(f.contrat)) return r;
+    [...z.children].forEach(x => { if (/L'acompte se paie après la signature/.test(x.textContent)) x.textContent = 'Avant le contrat : notez ce que vous avez vraiment payé. Le contrat l\'écrira comme « acompte déjà payé », avec le reste à payer.'; });
+  } catch (e) {}
+  return r;
+};
+
+// ---------- 3. 🧾 La facture (quantité × prix = total), à lui envoyer AVANT le contrat ----------
+let fpFid = '';
+function fpProduitDe(f, a) {
+  const k = ctCleRef(a.reference); if (!k) return null;
+  return ctProduits(f).find(p => ctCleRef(p.ref) === k) || null;
+}
+function fpNoFacture(f) {
+  const fa = f.facture && typeof f.facture === 'object' ? f.facture : {};
+  return fa.no || 'PI-' + rgJour().replace(/-/g, '') + '-' + (f.code || 'F');
+}
+function fpChiffres(f) {
+  const L = fpLignes(f), avec = L.filter(a => num(a.prix_unitaire) > 0), sans = L.filter(a => !(num(a.prix_unitaire) > 0));
+  const total = avec.reduce((s, a) => s + f3Ligne(a).montant, 0), s = rgEtat(f), P = rgPaiements(s.k).filter(p => p.quoi !== 'autre');
+  // « payeEstime » : une étape « acompte / solde payé » cochée à la main sans montant compte comme payée (comme 💵 Paiements).
+  const paye = num(s.payeEstime) || num(s.paye);
+  return { L, avec, sans, total, paye: s.paye, reste: Math.max(0, total - paye - num(s.avoir) - num(s.penalite)), P, s };
+}
+function fpLigneHtml(f, a, i) {
+  const l = f3Ligne(a), p = a.photo ? '' : fpProduitDe(f, a), ph = a.photo ? `<img src="${E(a.photo)}" alt="">` : p && p.photo_doc ? `<img class="ct-mini" data-doc="${E(p.photo_doc)}" alt="">` : '<div class="fp-ph">📦</div>';
+  const cn = f3NomCn(a);
+  return `<div class="fp-l">${ph}<div class="c"><b>${i + 1}. ${E(String(a.nom || 'Sans nom').split(' — ')[0])}</b>${a.reference ? ' · ' + E(a.reference) : ''}${cn ? '<br>' + E(cn) : ''}
+    <br>${E(nf(l.q))} × ${l.p > 0 ? E(nf(l.p, 2) + ' ' + mkSym(l.d)) + (l.etranger ? ' (= ' + E(rgY(l.pu)) + ')' : '') : '<b style="color:var(--rouge)">prix à confirmer</b>'}</div>
+    <div class="m">${l.p > 0 ? E(rgY(l.montant)) : '—'}</div></div>`;
+}
+function fpBoite(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  fpFid = fid;
+  const c = fpChiffres(f), fa = f.facture || {};
+  mkBoite(`<div class="mk-dlg"><h3>🧾 Facture — ${E(mkNomFournisseur(f))}</h3>
+    <p class="px-aide">D'abord la facture : il vérifie chaque quantité et chaque prix. Après son accord : l'acompte (le montant qu'il accepte), puis le contrat, qui écrira ce que tu as vraiment payé.</p>
+    ${fa.envoyee_le ? `<div class="f3-info">📤 Facture ${E(fa.no || '')} envoyée le ${E(mkJour(fa.envoyee_le))}${num(fa.total) > 0 && Math.abs(num(fa.total) - c.total) > 0.5 ? ' (' + E(rgY(num(fa.total))) + ' → aujourd\'hui ' + E(rgY(c.total)) + ' : renvoyez-la)' : ''}.</div>` : ''}
+    ${c.L.length ? c.L.map((a, i) => fpLigneHtml(f, a, i)).join('') : '<div class="ctr-attention">Pas encore d\'achat chez lui : ajoutez ses produits dans 🛒 Achats (« 🛒 Ajouter / enlever des produits chez lui »).</div>'}
+    ${c.sans.length ? `<div class="ctr-attention">⚠ ${c.sans.length} produit${c.sans.length > 1 ? 's' : ''} sans prix : écrit${c.sans.length > 1 ? 's' : ''} « prix à confirmer », pas dans le total. Touchez le produit dans 🛒 Achats pour mettre le prix.</div>` : ''}
+    <div class="fp-total">Total : ${E(rgY(c.total))} ≈ ${E(gnfStrict(enGnf(c.total, 'CNY')))}</div>
+    ${c.paye > 0.004 ? `<div class="fp-paye">Déjà payé : ${E(rgY(c.paye))} (${E(c.P.map(p => mkJour(p.le) + ' ' + (FP_MODES_FR[p.mode] || p.mode || '')).join(', '))}) · reste à payer : <b>${E(rgY(c.reste))}</b></div>` : ''}
+    <div class="fp-apercu" id="fp_apercu"></div>
+    <div class="mk-boutons">${c.avec.length ? `<button class="b vert" onclick="fpEnvoyer()">📤 Envoyer la facture (image) → WeChat</button>
+      <button class="b contour" onclick="fpCopier()">📋 Copier le texte (chinois + français)</button>` : ''}
+      <button class="b contour" onclick="rgBoite('${f.id}')">💵 Noter ce que j'ai payé</button>
+      <button class="b contour" onclick="ctrBoite('${f.id}')">📝 Puis son contrat</button>
+      <button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+  try { ctRemplirMinis(); } catch (e) {}
+}
+// Le texte pour WeChat : chinois d'abord, puis français.
+function fpTexte(f) {
+  const c = fpChiffres(f), no = fpNoFacture(f);
+  const cn = ['您好！这是我的订单（形式发票 ' + no + '），请核对每个产品的数量和价格：'], fr = ['Bonjour ! Voici ma commande (facture ' + no + '). Merci de vérifier la quantité et le prix de chaque produit :'];
+  c.L.forEach((a, i) => {
+    const l = f3Ligne(a), nom = String(a.nom || '').split(' — ')[0], ncn = f3NomCn(a), ref = a.reference ? a.reference + ' ' : '';
+    cn.push((i + 1) + '. ' + ref + (ncn || nom) + ' — ' + rgPt(l.q, 2) + ' × ' + (l.p > 0 ? f3Y(l.pu) + ' = ' + f3Y(l.montant) : '价格待确认'));
+    fr.push((i + 1) + '. ' + ref + nom + ' — ' + nf(l.q) + ' × ' + (l.p > 0 ? nf(l.pu, 2) + ' ¥ = ' + nf(l.montant, 2) + ' ¥' : 'prix à confirmer'));
+  });
+  cn.push('合计：' + f3Y(c.total) + '（人民币' + ctrMajuscules(Math.round(c.total * 100) / 100) + '）'); fr.push('Total : ' + nf(c.total, 2) + ' ¥');
+  if (c.paye > 0.004) { cn.push('已付：' + f3Y(c.paye) + '（' + fpPayeListe(c.P, 'cn') + '）', '未付：' + f3Y(c.reste)); fr.push('Déjà payé : ' + nf(c.paye, 2) + ' ¥ (' + fpPayeListe(c.P, 'fr') + ')', 'Reste à payer : ' + nf(c.reste, 2) + ' ¥'); }
+  cn.push('确认后我们签合同。谢谢！'); fr.push('Après votre accord, nous signons le contrat. Merci !');
+  return cn.join('\n') + '\n\n' + fr.join('\n');
+}
+function fpCopier() {
+  const f = mkFournisseur(fpFid); if (!f) return;
+  mkCopier(fpTexte(f), 'Facture copiée (chinois + français). Collez-la dans WeChat.' + (typeof vwMot === 'function' && vwMot(f) ? ' Cherchez « ' + vwMot(f) + ' ».' : ''));
+  fpMarquerEnvoyee(f, 'texte');
+}
+function fpMarquerEnvoyee(f, comment) {
+  const c = fpChiffres(f);
+  f.facture = Object.assign({}, f.facture || {}, { no: fpNoFacture(f), envoyee_le: mkMaintenant(), comment, total: Math.round(c.total * 100) / 100,
+    lignes: c.L.map(a => { const l = f3Ligne(a); return { id: a.id, ref: a.reference || '', nom: String(a.nom || ''), q: l.q, pu: l.p, d: l.d }; }) });
+  sauverLocal();
+}
+function fpChargerImage(src) {
+  return new Promise(ok => { if (!src) return ok(null); const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; });
+}
+async function fpPhotoDe(f, a) {
+  if (a.photo) return fpChargerImage(a.photo);
+  const p = fpProduitDe(f, a); if (!p || !p.photo_doc) return null;
+  let src = null; try { src = await ctLire(p.photo_doc + '~m'); if (!src) src = await ctLire(p.photo_doc); } catch (e) { src = null; }
+  return fpChargerImage(src);
+}
+// Une page A4 (1240 × 1754) : en-tête, vendeur, acheteur ; tableau avec la photo de chaque produit ; total, payé, reste ; accord.
+function fpEntete(pages, titreCn, titreFr, infos) {
+  const W = CTR_W, H = CTR_H, M = 60, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); pages.push(c);
+  g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.fillStyle = '#0d3f85'; g.fillRect(0, 0, W, 14);
+  g.textAlign = 'center'; g.fillStyle = '#16233a'; g.font = 'bold 46px ' + CTR_POLICE; g.fillText(titreCn, W / 2, 78);
+  g.font = 'bold 28px ' + CTR_POLICE; g.fillText(titreFr, W / 2, 118); g.textAlign = 'left';
+  let y = 166;
+  infos.forEach(([a, b]) => { g.font = 'bold 21px ' + CTR_POLICE; g.fillStyle = '#16233a'; g.fillText(a, M, y); g.font = '21px ' + CTR_POLICE;
+    const L = ctrLignes(g, String(b || ''), W - 2 * M - 300).slice(0, 2); L.forEach((l, i) => g.fillText(l, M + 300, y + i * 28)); y += Math.max(1, L.length) * 28 + 18; });
+  return { g, y: y + 4 };
+}
+function fpPied(pages, no) {
+  pages.forEach((c, i) => { const h = c.getContext('2d'); h.font = '18px ' + CTR_POLICE; h.fillStyle = '#5a6b85'; h.textAlign = 'left'; h.fillText(no + ' · ' + (i + 1) + '/' + pages.length + ' · KYLO EURGUINE', 60, CTR_H - 40); });
+}
+async function fpPages(f) {
+  const c = fpChiffres(f), no = fpNoFacture(f), a0 = ctrAcheteur(), W = CTR_W, H = CTR_H, M = 60, pages = [];
+  const vend = [f.societe_cn || f.societe || '', f.contact || '', f.mobile || f.tel || '', f.allee || f.adresse || ''].map(x => String(x).trim()).filter(Boolean).join(' — ') || mkNomFournisseur(f);
+  const infos = [['单号 / Facture n°', no + '    日期 Date : ' + rgJour()], ['卖方 / Vendeur', (f.code ? f.code + ' · ' : '') + vend],
+    ['买方 / Acheteur', [a0.societe, a0.representant, a0.tel].filter(x => String(x || '').trim()).join(' — ')]];
+  const COLS = [56, 136, 170, 330, 120, 150, 158], TETES = [['序号', 'N°'], ['图片', 'Photo'], ['货号', 'Réf.'], ['品名', 'Désignation'], ['数量', 'Quantité'], ['单价', 'Prix unitaire'], ['金额', 'Montant']];
+  const HL = 128, L2 = W - 2 * M;
+  const photos = await Promise.all(c.L.map(a => fpPhotoDe(f, a)));
+  let p = fpEntete(pages, '订单确认 · 形式发票', 'FACTURE PROFORMA — PROFORMA INVOICE', infos), g = p.g, y = p.y;
+  const tete = () => { g.lineWidth = 2; g.strokeStyle = '#9fb3d1'; g.fillStyle = '#e8effb'; g.fillRect(M, y, L2, 64); g.strokeRect(M, y, L2, 64); let x = M; g.fillStyle = '#16233a';
+    TETES.forEach((e, i) => { g.font = 'bold 19px ' + CTR_POLICE; g.fillText(e[0], x + 8, y + 27); g.font = '16px ' + CTR_POLICE; g.fillText(e[1], x + 8, y + 51); x += COLS[i]; }); y += 64; };
+  tete();
+  for (let i = 0; i < c.L.length; i++) {
+    if (y + HL > H - 110) { p = fpEntete(pages, '订单确认 · 形式发票', 'FACTURE PROFORMA — PROFORMA INVOICE (suite)', infos.slice(0, 1)); g = p.g; y = p.y; tete(); }
+    const a = c.L[i], l = f3Ligne(a), im = photos[i]; g.strokeStyle = '#9fb3d1'; g.lineWidth = 2; g.strokeRect(M, y, L2, HL);
+    let x = M; const cel = [String(i + 1), '', a.reference || '—', String(a.nom || '').split(' — ')[0] + (f3NomCn(a) ? '\n' + f3NomCn(a) : ''), f3Pt(l.q, 0),
+      l.p > 0 ? f3Pt(l.pu, 2) + ' ¥' + (l.etranger ? '\n(= ' + f3Pt(l.p, 2) + ' ' + l.d + ')' : '') : '价格待确认\nprix à confirmer', l.p > 0 ? f3Pt(l.montant, 2) + ' ¥' : '—'];
+    cel.forEach((t, j) => {
+      if (j) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + HL); g.stroke(); }
+      if (j === 1) { if (im) { const s = Math.min((COLS[1] - 16) / im.width, (HL - 16) / im.height), w = im.width * s, h = im.height * s; g.drawImage(im, x + (COLS[1] - w) / 2, y + (HL - h) / 2, w, h); } else { g.font = '40px ' + CTR_POLICE; g.fillText('📦', x + 42, y + 78); } }
+      else { g.fillStyle = j === 6 || j === 4 ? '#0d3f85' : '#16233a'; let yy = y + 32;
+        String(t).split('\n').forEach((morceau, mi) => { g.font = (j === 6 || (j === 3 && mi === 0) ? 'bold ' : '') + (mi ? '17px ' : '19px ') + CTR_POLICE;
+          ctrLignes(g, morceau, COLS[j] - 14).slice(0, j === 3 ? 2 : 2).forEach(ll => { if (yy < y + HL - 6) g.fillText(ll, x + 8, yy); yy += 26; }); }); }
+      x += COLS[j];
+    });
+    y += HL;
+  }
+  const tot = [['合计 Total : ' + f3Pt(c.total, 2) + ' ¥  （人民币' + ctrMajuscules(Math.round(c.total * 100) / 100) + '）', true]];
+  if (c.sans.length) tot.unshift(['另有 ' + c.sans.length + ' 个产品价格待确认，未计入合计 · ' + c.sans.length + ' produit(s) : prix à confirmer, pas dans le total', false]);
+  if (c.paye > 0.004) { tot.push(['已付 Déjà payé : ' + f3Pt(c.paye, 2) + ' ¥  （' + fpPayeListe(c.P, 'cn') + '）', false]); tot.push(['未付 Reste à payer : ' + f3Pt(c.reste, 2) + ' ¥', true]); }
+  const besoin = tot.length * 54 + 330;
+  if (y + besoin > H - 80) { p = fpEntete(pages, '订单确认 · 形式发票', 'FACTURE PROFORMA — PROFORMA INVOICE (suite)', infos.slice(0, 1)); g = p.g; y = p.y; }
+  tot.forEach(([t, fort]) => { g.fillStyle = fort ? '#e8effb' : '#f3f6fb'; g.fillRect(M, y, L2, 54); g.strokeStyle = '#9fb3d1'; g.strokeRect(M, y, L2, 54); g.fillStyle = '#16233a';
+    g.font = (fort ? 'bold 22px ' : '19px ') + CTR_POLICE; g.fillText(ctrLignes(g, t, L2 - 20)[0] || '', M + 10, y + 35); y += 54; });
+  y += 44; g.fillStyle = '#16233a';
+  ['请核对每个产品的数量和价格。如有错误，请告诉我们。确认后再签合同。', 'Merci de vérifier la quantité et le prix de chaque produit. Après votre accord, nous signons le contrat.',
+    'Please check the quantity and price of each item. Once confirmed, we sign the contract.'].forEach((t, i) => { g.font = (i ? '19px ' : 'bold 21px ') + CTR_POLICE; ctrLignes(g, t, L2).forEach(l => { g.fillText(l, M, y); y += 30; }); y += 6; });
+  y += 20; g.strokeStyle = '#16233a'; g.lineWidth = 2; g.strokeRect(W - M - 560, y, 560, 150);
+  g.font = 'bold 21px ' + CTR_POLICE; g.fillText('卖方确认 — Accord du vendeur', W - M - 545, y + 36); g.font = '19px ' + CTR_POLICE; g.fillText('签字 Signature : ____________', W - M - 545, y + 86); g.fillText('日期 Date : ____________', W - M - 545, y + 128);
+  fpPied(pages, no);
+  return pages;
+}
+function fpBlobJpeg(c) { const u = c.toDataURL('image/jpeg', 0.9), b = atob(u.split(',')[1]), o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return { w: c.width, h: c.height, octets: o }; }
+async function fpEnvoyer() {
+  const f = mkFournisseur(fpFid); if (!f) return;
+  const z = document.getElementById('fp_apercu'); if (z) z.innerHTML = '<p class="px-aide">⏳ La facture se prépare…</p>';
+  try {
+    const pages = await fpPages(f), no = fpNoFacture(f);
+    if (z) z.innerHTML = pages.map((c, i) => `<img src="${c.toDataURL('image/jpeg', 0.6)}" alt="Facture page ${i + 1}" onclick="mkApercu(this.src, 'Facture ${i + 1}')">`).join('');
+    const j = pages.map(fpBlobJpeg);
+    const voie = pages.length === 1 ? await remettreFichier(new Blob([j[0].octets], { type: 'image/jpeg' }), 'Facture-形式发票-' + no + '.jpg')
+      : await remettreFichier(ctrPdf(j), 'Facture-形式发票-' + no + '.pdf');
+    if (voie === 'partage' || voie === 'enregistrement' || voie === 'onglet') { fpMarquerEnvoyee(f, pages.length === 1 ? 'image' : 'pdf'); fpBoite(f.id); const z2 = document.getElementById('fp_apercu'); if (z2) z2.innerHTML = pages.map((c, i) => `<img src="${c.toDataURL('image/jpeg', 0.6)}" alt="Facture page ${i + 1}" onclick="mkApercu(this.src, 'Facture ${i + 1}')">`).join(''); }
+  } catch (e) { if (z) z.innerHTML = '<div class="ctr-attention">La facture n\'a pas pu être préparée : ' + E(e.message || e) + '</div>'; }
+}
+
+// ---------- 4. 💵 Payé et reste à payer ; 📋 la liste pour le guide ; tous les paiements ----------
+function fpFournisseursAchats() { return fournisseursListe().filter(f => fpLignes(f).length); }
+function fpBilan() {
+  const F = fpFournisseursAchats().map(f => { const c = fpChiffres(f); return { f, c, total: c.total, paye: c.paye, reste: c.reste }; });
+  const T = F.reduce((t, x) => ({ total: t.total + x.total, paye: t.paye + x.paye, reste: t.reste + x.reste }), { total: 0, paye: 0, reste: 0 });
+  return { F, T, sansPrix: F.reduce((n, x) => n + x.c.sans.length, 0) };
+}
+function fpCarteHtml() {
+  let b; try { b = fpBilan(); } catch (e) { return ''; }
+  if (!b.F.length) return '';
+  return `<div class="fp-carte" id="fp_carte"><h2>💵 Payé et reste à payer</h2>
+    <div class="fp-chiffres"><div>Commandé<b>${E(rgY(b.T.total))}</b></div><div>Payé<b>${E(rgY(b.T.paye))}</b></div><div class="fp-reste">Reste à payer<b>${E(rgY(b.T.reste))}</b></div></div>
+    <div class="fp-guide">À laisser au guide pour payer à la livraison : ${E(rgY(b.T.reste))} ≈ ${E(gnfStrict(enGnf(b.T.reste, 'CNY')))}</div>
+    ${b.sansPrix ? `<div class="px-aide">⚠ ${b.sansPrix} produit${b.sansPrix > 1 ? 's' : ''} sans prix : pas compté${b.sansPrix > 1 ? 's' : ''}.</div>` : ''}
+    <button type="button" class="b vert" onclick="fgBoite()">📋 Chaque fournisseur · tous mes paiements · liste pour le guide</button></div>`;
+}
+function fgPaiements() {
+  const L = [];
+  fpFournisseursAchats().forEach(f => { const k = f.contrat; (k && Array.isArray(k.paiements) ? k.paiements : []).forEach(p => L.push({ f, p })); });
+  return L.sort((a, b) => String(b.p.le || '').localeCompare(String(a.p.le || '')));
+}
+function fgBoite() {
+  const b = fpBilan(), P = fgPaiements();
+  mkBoite(`<div class="mk-dlg"><h3>💵 Payé et reste à payer</h3>
+    <div class="fp-chiffres"><div>Commandé<b>${E(rgY(b.T.total))}</b></div><div>Payé<b>${E(rgY(b.T.paye))}</b></div><div class="fp-reste">Reste<b>${E(rgY(b.T.reste))}</b></div></div>
+    <div class="fp-guide">À laisser au guide : ${E(rgY(b.T.reste))} ≈ ${E(gnfStrict(enGnf(b.T.reste, 'CNY')))}</div>
+    <div class="mk-boutons"><button class="b vert" onclick="fgEnvoyer()">📤 La liste pour le guide (image) → WeChat</button>
+      <button class="b contour" onclick="fgCopier()">📋 Copier la liste (chinois + français)</button></div>
+    <div class="px-titre">Chaque fournisseur (${b.F.length})</div>
+    ${b.F.map(x => `<div class="fp-four"><b>${E(mkNomFournisseur(x.f))}</b>${x.f.allee ? '<br><small>' + E(x.f.allee) + '</small>' : ''}<br>
+      ${x.c.L.length} produit${x.c.L.length > 1 ? 's' : ''} · commandé ${E(rgY(x.total))} · payé ${E(rgY(x.paye))} · reste <b>${E(rgY(x.reste))}</b>${x.c.sans.length ? ' · ⚠ ' + x.c.sans.length + ' sans prix' : ''}
+      ${x.c.P.length ? '<br><small>' + E(x.c.P.map(p => mkJour(p.le) + ' ' + (FP_MODES_FR[p.mode] || p.mode || '') + ' ' + rgY(rgCny(p))).join(' · ')) + '</small>' : ''}
+      <div class="fp-btns"><button class="b contour" onclick="fpBoite('${x.f.id}')">🧾 Facture</button><button class="b contour" onclick="rgBoite('${x.f.id}')">💵 Paiements</button></div></div>`).join('')}
+    <div class="px-titre">Tous mes paiements (${P.length}), du plus récent</div>
+    ${P.length ? P.map(({ f, p }) => `<div class="fp-pay"><b>${E(fpJourFr(p.le))}</b> · ${E(mkNomFournisseur(f))}<br>${E(rgY(rgCny(p)))} — ${E(RG_QUOI[p.quoi] || p.quoi || '')} · ${E(RG_MODES[p.mode] || p.mode || '')}${p.recu ? ' · 🧾 reçu en photo' : ' · sans reçu'}${p.note ? '<br>' + E(p.note) : ''}</div>`).join('')
+      : '<p class="px-aide">Aucun paiement noté. Pour en noter un : 💵 Paiements, sous le fournisseur.</p>'}
+    <div class="fp-apercu" id="fg_apercu"></div>
+    <div class="mk-boutons"><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+}
+function fgListe() { return fpBilan().F.filter(x => x.reste > 0.5 || x.c.sans.length); }
+function fgTexte() {
+  const b = fpBilan(), L = fgListe(), cn = ['交货付款清单（' + rgJour() + '）：先清点箱数、检查产品，合格后再付款，并请供应商签收据。'], fr = ['Liste pour le guide (' + fpJourFr(rgJour()) + ') : compter les cartons et vérifier les produits AVANT de payer ; demander un reçu signé.'];
+  L.forEach((x, i) => {
+    const qui = (x.f.code ? x.f.code + ' ' : '') + (x.f.societe_cn || x.f.societe || x.f.nom || ''), ou = [x.f.allee, x.f.mobile || x.f.tel].filter(Boolean).join(' · ');
+    cn.push((i + 1) + '. ' + qui + (ou ? '（' + ou + '）' : '') + '：合计 ' + f3Y(x.total) + '，已付 ' + f3Y(x.paye) + '，到货应付 ' + f3Y(x.reste) + (x.c.sans.length ? '（另有 ' + x.c.sans.length + ' 个产品价格待确认）' : ''));
+    fr.push((i + 1) + '. ' + qui + (ou ? ' (' + ou + ')' : '') + ' : total ' + nf(x.total, 2) + ' ¥, payé ' + nf(x.paye, 2) + ' ¥, à payer à la livraison ' + nf(x.reste, 2) + ' ¥' + (x.c.sans.length ? ' (+ ' + x.c.sans.length + ' produit(s) au prix à confirmer)' : ''));
+  });
+  cn.push('合计应付：' + f3Y(b.T.reste)); fr.push('Total à payer : ' + nf(b.T.reste, 2) + ' ¥');
+  return cn.join('\n') + '\n\n' + fr.join('\n');
+}
+function fgCopier() { mkCopier(fgTexte(), 'Liste copiée (chinois + français) : collez-la dans WeChat pour le guide.'); }
+async function fgPages() {
+  const b = fpBilan(), L = fgListe(), W = CTR_W, H = CTR_H, M = 60, pages = [], no = 'KYLO-' + rgJour().replace(/-/g, '');
+  const infos = [['日期 / Date', rgJour()], ['给 / Pour (le guide)', '________________________'], ['买方 / Acheteur', [ctrAcheteur().societe, ctrAcheteur().representant].filter(x => String(x || '').trim()).join(' — ')]];
+  const COLS = [56, 430, 150, 150, 170, 164], TETES = [['序号', 'N°'], ['供应商 · 地址 · 电话', 'Fournisseur · boutique · téléphone'], ['合计', 'Total'], ['已付', 'Déjà payé'], ['到货应付', 'À payer'], ['签收', 'Reçu (signature)']];
+  const HL = 150, L2 = W - 2 * M;
+  let p = fpEntete(pages, '交货付款清单', 'LISTE POUR LE GUIDE — PAYER À LA LIVRAISON', infos), g = p.g, y = p.y;
+  const tete = () => { g.lineWidth = 2; g.strokeStyle = '#9fb3d1'; g.fillStyle = '#e8effb'; g.fillRect(M, y, L2, 64); g.strokeRect(M, y, L2, 64); let x = M; g.fillStyle = '#16233a';
+    TETES.forEach((e, i) => { g.font = 'bold 19px ' + CTR_POLICE; g.fillText(e[0], x + 8, y + 27); g.font = '15px ' + CTR_POLICE; ctrLignes(g, e[1], COLS[i] - 12).slice(0, 1).forEach(l => g.fillText(l, x + 8, y + 51)); x += COLS[i]; }); y += 64; };
+  tete();
+  L.forEach((xx, i) => {
+    if (y + HL > H - 330) { p = fpEntete(pages, '交货付款清单', 'LISTE POUR LE GUIDE (suite)', infos.slice(0, 1)); g = p.g; y = p.y; tete(); }
+    g.strokeStyle = '#9fb3d1'; g.lineWidth = 2; g.strokeRect(M, y, L2, HL);
+    const f = xx.f, qui = (f.code ? f.code + ' · ' : '') + (f.societe_cn || f.societe || f.nom || ''), ou = [f.allee || f.adresse, f.mobile || f.tel].map(z => String(z || '').trim()).filter(Boolean).join(' · ');
+    const cel = [String(i + 1), qui + '\n' + ou + '\n' + xx.c.L.length + ' 个产品 produits' + (xx.c.sans.length ? ' · ' + xx.c.sans.length + ' 价格待确认 prix à confirmer' : ''), f3Pt(xx.total, 2) + ' ¥', f3Pt(xx.paye, 2) + ' ¥', f3Pt(xx.reste, 2) + ' ¥', ''];
+    let x = M;
+    cel.forEach((t, j) => { if (j) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + HL); g.stroke(); }
+      let yy = y + 32; String(t).split('\n').forEach((m, mi) => { g.font = (j === 4 || (j === 1 && mi === 0) ? 'bold ' : '') + (mi ? '17px ' : '20px ') + CTR_POLICE; g.fillStyle = j === 4 ? '#b91c1c' : '#16233a';
+        ctrLignes(g, m, COLS[j] - 14).slice(0, j === 1 && mi === 1 ? 2 : 1).forEach(l => { if (yy < y + HL - 4) g.fillText(l, x + 8, yy); yy += 28; }); });
+      x += COLS[j]; });
+    y += HL;
+  });
+  g.fillStyle = '#e8effb'; g.fillRect(M, y, L2, 58); g.strokeStyle = '#9fb3d1'; g.strokeRect(M, y, L2, 58); g.fillStyle = '#16233a'; g.font = 'bold 23px ' + CTR_POLICE;
+  g.fillText('合计应付 Total à payer : ' + f3Pt(b.T.reste, 2) + ' ¥  （人民币' + ctrMajuscules(Math.round(b.T.reste * 100) / 100) + '）', M + 10, y + 38); y += 100;
+  ['先清点箱数、检查产品，合格后再付款。每次付款请供应商签收据，并拍照发给我。', 'Compter les cartons et vérifier les produits AVANT de payer. À chaque paiement : un reçu signé par le fournisseur, en photo, envoyé à Riche.',
+    '已收到现金 Argent reçu du guide : ________________ ¥      签字 Signature : ________________'].forEach((t, i) => { g.font = (i === 0 ? 'bold 21px ' : '20px ') + CTR_POLICE; g.fillStyle = '#16233a'; ctrLignes(g, t, L2).forEach(l => { g.fillText(l, M, y); y += 32; }); y += 14; });
+  fpPied(pages, no);
+  return pages;
+}
+async function fgEnvoyer() {
+  const z = document.getElementById('fg_apercu'); if (z) z.innerHTML = '<p class="px-aide">⏳ La liste se prépare…</p>';
+  try {
+    const pages = await fgPages(), j = pages.map(fpBlobJpeg), no = rgJour().replace(/-/g, '');
+    if (z) z.innerHTML = pages.map((c, i) => `<img src="${c.toDataURL('image/jpeg', 0.6)}" alt="Liste page ${i + 1}" onclick="mkApercu(this.src, 'Liste ${i + 1}')">`).join('');
+    if (pages.length === 1) await remettreFichier(new Blob([j[0].octets], { type: 'image/jpeg' }), 'Liste-guide-交货付款清单-' + no + '.jpg');
+    else await remettreFichier(ctrPdf(j), 'Liste-guide-交货付款清单-' + no + '.pdf');
+  } catch (e) { if (z) z.innerHTML = '<div class="ctr-attention">La liste n\'a pas pu être préparée : ' + E(e.message || e) + '</div>'; }
+}
+
+// ---------- 5. Dans 🛒 Achats : la carte en haut ; sous chaque fournisseur, 🧾 Facture et 💵 Paiements en premier ----------
+const fpEcranAchatsAvant = ecranAchats;
+ecranAchats = function () {
+  const h = fpEcranAchatsAvant.apply(this, arguments), carte = fpCarteHtml(); if (!carte) return h;
+  const m = /<button type="button" class="b pi-entree[^"]*"[^>]*>[\s\S]*?<\/button>/.exec(h);
+  return m ? h.slice(0, m.index + m[0].length) + carte + h.slice(m.index + m[0].length) : carte + h;
+};
+const fpGroupesAvant = haGroupesHtml;
+haGroupesHtml = function () {
+  let h = fpGroupesAvant.apply(this, arguments);
+  try {
+    h = h.replace(/<div class="ha-g-btns"><button class="b vert" onclick="haProduits\('([^']+)'\)">/g, (m0, fid) => {
+      const f = mkFournisseur(fid); if (!f || !fpLignes(f).length) return m0;
+      const c = fpChiffres(f), fa = f.facture || {};
+      return `<div class="fp-paye">💵 Payé ${E(rgY(c.paye))} · reste à payer <b>${E(rgY(c.reste))}</b>${fa.envoyee_le ? ' · 🧾 facture envoyée le ' + E(mkJour(fa.envoyee_le)) : ''}</div>`
+        + `<div class="ha-g-btns"><button class="b vert" onclick="fpBoite('${fid}')">🧾 Facture à lui envoyer (${E(rgY(c.total))})</button><!--fp-pay:${fid}--><button class="b vert" onclick="haProduits('${fid}')">`;
+    });
+    // le bouton 💵 Paiements (1.17.0) monte juste sous 🧾 Facture, en vert
+    h = h.replace(/<!--fp-pay:([^>]+?)-->([\s\S]*?)<button class="b contour" onclick="rgBoite\('\1'\)">([^<]*)<\/button>/g,
+      (m0, fid, entre, texte) => `<button class="b vert" onclick="rgBoite('${fid}')">${texte}</button>` + entre);
+    h = h.replace(/<!--fp-pay:[^>]+?-->/g, '');
+  } catch (e) { console.warn('1.24 achats', e); }
+  return h;
+};
+// 🧭 À faire maintenant : la facture et l'acompte payé AVANT le contrat.
+const fpPiAvant = piLignes;
+piLignes = function () {
+  const L = fpPiAvant.apply(this, arguments);
+  try {
+    for (let i = L.length - 1; i >= 0; i--) {
+      const x = L[i], m = /^ctrBoite\('([^']+)'\)$/.exec(x.action || ''); if (!m || !/^Lui envoyer son contrat/.test(x.titre || '')) continue;
+      const f = mkFournisseur(m[1]); if (!f) continue;
+      const k = f.contrat, fa = f.facture || {}, paye = k ? fpAcPaye(k) : 0, tot = fpTotalLignes(f);
+      if (!fa.envoyee_le && !(paye > 0.004)) L.splice(i, 0, { niv: x.niv, qui: x.qui, ic: '🧾', titre: 'D\'abord lui envoyer la facture (' + rgY(tot) + ')', detail: 'Quantité × prix = total : il vérifie. Ensuite l\'acompte (le montant qu\'il accepte), puis le contrat.', bouton: '🧾 Sa facture', action: `fpBoite('${f.id}')` });
+      else if (!(paye > 0.004)) L.splice(i, 0, { niv: x.niv, qui: x.qui, ic: '💵', titre: 'Facture envoyée le ' + mkJour(fa.envoyee_le) + ' : noter l\'acompte payé', detail: 'Le montant que tu as pu payer (Alipay, espèces…), avec la photo. Le contrat l\'écrira.', bouton: '💵 Noter le paiement', action: `rgBoite('${f.id}','acompte')` });
+      else x.detail = 'Acompte déjà payé : ' + rgY(paye) + ' — le contrat l\'écrit. ' + (x.detail || '');
+    }
+  } catch (e) { console.warn('1.24 à faire', e); }
+  return L;
+};
+// ---------- 6. Les photos perdues reviennent quand le fichier de Claude est ajouté de nouveau ----------
+// Riche, 03/11 : « des catalogues que j'ai remontés n'ont pas de photos, et pourtant ils avaient des photos ». Avant, un modèle
+// qui avait une photo NOTÉE (photo_doc) gardait ce numéro même si la photo n'était plus dans le téléphone (« photo restée sur un
+// autre appareil », mémoire vidée) : ajouter de nouveau le fichier ne la remettait pas. Maintenant, si la photo n'est plus là,
+// celle du fichier prend sa place. Une photo qui est là n'est jamais remplacée.
+const fpPhotosImportAvant = trPhotosImport;
+trPhotosImport = async function (imp) {
+  let reprises = 0;
+  try {
+    for (const x of (imp && imp.fournisseurs) || []) {
+      const f = ctTrouverFournisseur(x); if (!f) continue;
+      for (const xp of x.produits || []) {
+        if (!(typeof xp.photo === 'string' && xp.photo.startsWith('data:image'))) continue;
+        const k = ctCleRef(xp.ref), deja = k ? ctProduits(f).find(p => ctCleRef(p.ref) === k) : null;
+        if (!deja || !deja.photo_doc) continue;
+        let v = null; try { v = await ctLire(deja.photo_doc); if (!v) v = await ctLire(deja.photo_doc + '~m'); } catch (e) { v = null; }
+        if (!v) { deja.photo_doc_perdue = deja.photo_doc; deja.photo_doc = ''; reprises++; }
+      }
+    }
+  } catch (e) { console.warn('1.24 photos', e); }
+  window.KYLO_PHOTOS_REPRISES = reprises;
+  const n = await fpPhotosImportAvant.apply(this, arguments);
+  if (reprises) setTimeout(() => avertir('📷 ' + reprises + ' photo' + (reprises > 1 ? 's' : '') + ' qui n\'étai' + (reprises > 1 ? 'ent' : 't') + ' plus dans le téléphone : remise' + (reprises > 1 ? 's' : '') + ' depuis le fichier.', 7000), 2500);
+  return n;
+};
+window.KYLO_FACTURE = '1.24.0';
 </script>
 
 

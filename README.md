@@ -434,6 +434,16 @@ achats, contrats et paiements (sans la photo du reçu), factures. « Pour Claude
 `1241-plusieurs-fichiers.html`, `construire-1.24.1.py` (part de la 1.24.0). Tests : `test-plusieurs-fichiers-1241.js`, plus les suites
 1.24.0 à 1.16.0 rejouées, `test-maj-1241.js`. Rien de retiré.
 
+Version 1.24.2 — 04/11/2026 : **Le carnet reste rapide avec beaucoup de catalogues**. Mesuré sur une copie au volume d'un vrai
+carnet (195 fournisseurs, 11 476 modèles), téléphone simulé : (1) l'enregistrement après chaque geste ne refait plus le texte des
+modèles qui n'ont pas changé — `rpTexteCarnet()` remplace `JSON.stringify(C, kyloAlleger)` dans `kyloGarderCarnet` (une ligne) et
+donne le MÊME texte, caractère pour caractère (chaque case de chaque modèle comparée à sa copie ; un objet, un tableau ou une
+image dans un modèle → texte refait ou chemin d'avant) ; le carnet le vérifie lui-même au 1er enregistrement puis tous les 40, et
+reprend l'ancienne façon s'il voyait une différence ; (2) 🏭 Fournisseurs et Comparer : `content-visibility: auto` sur les fiches,
+chaque fiche garde sa hauteur pour que la liste ne saute pas quand elle se redessine ; (3) 📊 Catalogues : la famille d'une
+catégorie est cherchée une seule fois. Rien de ce qui est gardé ne change. Fichiers `1242-rapide.html`, `construire-1.24.2.py`
+(part de la 1.24.1). Tests : `test-rapide-1242.js`, plus les suites 1.24.1 à 1.16.0 rejouées, `test-maj-1242.js`. Rien de retiré.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

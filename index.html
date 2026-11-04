@@ -708,7 +708,7 @@ function kyloGarderCarnet() {
   // Le numero vient de CET appareil (memoire et reserve lues a l'ouverture), jamais d'un fichier.
   kyloRang = kyloRangSur(kyloRang) + 1;
   C.rang_enregistrement = kyloRang;
-  try { texte = JSON.stringify(C, kyloAlleger); } catch (e) { kyloMemoire('perdu'); return false; }
+  try { texte = typeof rpTexteCarnet === 'function' ? rpTexteCarnet() : JSON.stringify(C, kyloAlleger); } catch (e) { kyloMemoire('perdu'); return false; }
   try {
     localStorage.setItem(CLE, texte);
   } catch (e) {
@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.24.1';
+window.KYLO_APPLICATION = '1.24.2';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -29618,6 +29618,145 @@ clMontrerEnvoi = function () {
   return r;
 };
 window.KYLO_PLUSIEURS_FICHIERS = '1.24.1';
+</script>
+<script>
+// ====================================================================================================================
+// 1.24.2 — 04/11/2026 : le carnet reste rapide avec beaucoup de catalogues.
+// Riche, 04/11 à Yiwu : « Carnet est devenu très lent. » Mesuré sur une copie au volume de son carnet (195 fournisseurs,
+// 11 476 modèles de catalogues, téléphone simulé) :
+//   1. après CHAQUE geste, tout le carnet était réécrit (3,5 millions de caractères), et 95 % de ce texte, ce sont les
+//      modèles des catalogues… qui n'avaient pas changé ;
+//   2. 🏭 Fournisseurs construisait d'un coup 5 900 éléments (151 écrans de haut), à chaque fois qu'il se redessinait ;
+//   3. 📊 Catalogues cherchait la famille de chacun de ses modèles à chaque affichage.
+// Rien ne change dans ce qui est gardé : le texte écrit dans le téléphone est le MÊME, caractère pour caractère, et le carnet
+// le vérifie lui-même (au 1er enregistrement, puis tous les 40) ; s'il trouvait une différence, il reprend l'ancienne façon.
+// ====================================================================================================================
+
+// ---------- 1. L'enregistrement : le texte des modèles qui n'ont pas changé est repris tel quel ----------
+// Avant : JSON.stringify(C, kyloAlleger) — tout le carnet, avec une fonction appelée sur CHAQUE case de chaque modèle.
+// Maintenant : le carnet sans les modèles (petit) + pour chaque fournisseur le texte de ses modèles, refait seulement si l'un
+// d'eux a changé. « A changé » : chaque case de chaque modèle est comparée à sa copie (===) — une case qui contient un objet
+// ou un tableau compte toujours comme changée (texte refait), une photo « data:image » dans un modèle aussi (chemin d'avant).
+const RP_TROU = '\u0000kylo-rp\u0000', RP_TROU_JSON = JSON.stringify(RP_TROU);
+const RP_CACHE = new WeakMap();                 // tableau des modèles → { refs, copies, ns, json }
+const RP_VERIF_TOUS = 40;
+let rpCompte = 0, rpCoupe = false;
+window.KYLO_RAPIDE = { verifs: 0, ecarts: 0, refaits: 0, repris: 0, coupe: false };
+function rpRemplacant(cle, v) { return typeof asRemplacant === 'function' ? asRemplacant.call(this, cle, v) : v; }
+// La même chose que kyloAlleger fait pour UN modèle (les cases vides en moins, la liste « ~ »).
+function rpAlleger(p) {
+  if (!p || typeof p !== 'object' || ('~' in p)) return p;
+  const vide = rpVide || (rpVide = kyloProduitVide()), cles = rpCles || (rpCles = Object.keys(vide));
+  const r = {}; let m = 0;
+  for (const k in p) { const i = cles.indexOf(k); if (i >= 0 && p[k] === vide[k]) { m |= (1 << i); continue; } r[k] = p[k]; }
+  if (m) r['~'] = m;
+  return r;
+}
+let rpVide = null, rpCles = null;
+function rpCopie(p) { const c = {}; let n = 0; for (const k in p) { c[k] = p[k]; n++; } return [c, n]; }
+function rpPareil(p, c, n) {
+  let k2 = 0;
+  for (const k in p) { const v = p[k]; if (v !== null && typeof v === 'object') return false; if (v !== c[k]) return false; k2++; }
+  return k2 === n;
+}
+function rpModelesJson(arr) {
+  const c = RP_CACHE.get(arr);
+  if (c && c.refs.length === arr.length) {
+    let pareil = true;
+    for (let i = 0; i < arr.length; i++) {
+      const p = arr[i];
+      if (p !== c.refs[i]) { pareil = false; break; }
+      if (p && typeof p === 'object' && !rpPareil(p, c.copies[i], c.ns[i])) { pareil = false; break; }
+    }
+    if (pareil) { window.KYLO_RAPIDE.repris++; return c.json; }
+  }
+  window.KYLO_RAPIDE.refaits++;
+  const allege = arr.map(rpAlleger);
+  let json = JSON.stringify(allege);
+  if (json.indexOf('data:image') >= 0) {               // une image dans un modèle : comme avant (elle part dans la réserve des photos)
+    RP_CACHE.delete(arr);
+    return JSON.stringify(allege, rpRemplacant);
+  }
+  const copies = new Array(arr.length), ns = new Array(arr.length);
+  for (let i = 0; i < arr.length; i++) { const p = arr[i]; if (p && typeof p === 'object') { const [x, n] = rpCopie(p); copies[i] = x; ns[i] = n; } }
+  RP_CACHE.set(arr, { refs: arr.slice(), copies, ns, json });
+  return json;
+}
+function rpUnFournisseur(f) {
+  if (!f || typeof f !== 'object' || !Array.isArray(f.produits) || !f.produits.length) { const t = JSON.stringify(f, rpRemplacant); return t === undefined ? 'null' : t; }
+  const t = JSON.stringify(Object.assign({}, f, { produits: RP_TROU }), rpRemplacant);
+  const i = t.indexOf(RP_TROU_JSON);
+  if (i < 0 || t.lastIndexOf(RP_TROU_JSON) !== i) throw new Error('trou introuvable');
+  return t.slice(0, i) + rpModelesJson(f.produits) + t.slice(i + RP_TROU_JSON.length);
+}
+function rpTexteRapide() {
+  if (!Array.isArray(C.fournisseurs)) return JSON.stringify(C, kyloAlleger);
+  const morceaux = C.fournisseurs.map(rpUnFournisseur);
+  const t = JSON.stringify(Object.assign({}, C, { fournisseurs: RP_TROU }), rpRemplacant);
+  const cle = '"fournisseurs":' + RP_TROU_JSON, i = t.indexOf(cle);
+  if (i < 0 || t.lastIndexOf(cle) !== i) throw new Error('trou des fournisseurs introuvable');
+  return t.slice(0, i) + '"fournisseurs":[' + morceaux.join(',') + ']' + t.slice(i + cle.length);
+}
+// Appelée par kyloGarderCarnet à la place de JSON.stringify(C, kyloAlleger).
+function rpTexteCarnet() {
+  if (rpCoupe) return JSON.stringify(C, kyloAlleger);
+  let t;
+  try { t = rpTexteRapide(); } catch (e) { return JSON.stringify(C, kyloAlleger); }
+  rpCompte++;
+  if (rpCompte === 1 || rpCompte % RP_VERIF_TOUS === 0) {          // le carnet se vérifie lui-même
+    const ancien = JSON.stringify(C, kyloAlleger);
+    window.KYLO_RAPIDE.verifs++;
+    if (ancien !== t) { rpCoupe = true; window.KYLO_RAPIDE.ecarts++; window.KYLO_RAPIDE.coupe = true; return ancien; }
+  }
+  return t;
+}
+
+// ---------- 2. 🏭 Fournisseurs : les fiches loin de l'écran ne sont pas dessinées tant qu'on n'y arrive pas ----------
+// (content-visibility). Pour que la liste ne saute pas quand elle se redessine, chaque fiche garde la hauteur qu'elle avait.
+const RP_HAUTEURS = new Map();
+// La hauteur gardée est celle du CONTENU (sans la marge intérieure ni le bord : contain-intrinsic-size les rajoute).
+function rpNoterHauteurs() {
+  const L = document.querySelectorAll('#ecran .mk-fiche[id^="mkf-"]'); if (!L.length) return;
+  const cs = getComputedStyle(L[0]), px = (v) => parseFloat(v) || 0;
+  const bord = px(cs.paddingTop) + px(cs.paddingBottom) + px(cs.borderTopWidth) + px(cs.borderBottomWidth);
+  L.forEach(el => { const h = el.offsetHeight - bord; if (h > 0) RP_HAUTEURS.set(el.id.slice(4), h); });
+}
+const rpCarteAvant = mkCarteFournisseurHtml;
+mkCarteFournisseurHtml = function (f) {
+  const h = rpCarteAvant.apply(this, arguments);
+  const haut = f && RP_HAUTEURS.get(f.id); if (!haut) return h;
+  const tete = '<div class="mk-fiche" id="mkf-' + f.id + '"';
+  return h.startsWith(tete) && h.charAt(tete.length) === '>'
+    ? tete + ' style="contain-intrinsic-size:auto ' + Math.round(haut) + 'px"' + h.slice(tete.length) : h;
+};
+const rpDessinerAvant = dessiner;
+dessiner = function () {
+  try { if (ongletActif === 'rencontres') rpNoterHauteurs(); } catch (e) {}
+  const r = rpDessinerAvant.apply(this, arguments);
+  try { const z = document.getElementById('ecran'); if (z) z.dataset.ecran = ongletActif || ''; } catch (e) {}
+  return r;
+};
+const rpChercherAvant = mkChercher;
+mkChercher = function () { try { rpNoterHauteurs(); } catch (e) {} return rpChercherAvant.apply(this, arguments); };
+(function () {
+  const st = document.createElement('style');
+  st.textContent = '#ecran .mk-fiche{content-visibility:auto;contain-intrinsic-size:auto 360px}'
+    + '#ecran[data-ecran="comparer"]>.carte{content-visibility:auto;contain-intrinsic-size:auto 640px}';
+  document.head.appendChild(st);
+})();
+
+// ---------- 3. 📊 Catalogues : la famille d'une catégorie est cherchée une seule fois ----------
+const RP_FAMILLES = new Map(); let rpFamillesN = -1;
+const rpFamilleAvant = ctFamille;
+ctFamille = function (cat) {
+  if (CT_FAMILLES.length !== rpFamillesN) { RP_FAMILLES.clear(); rpFamillesN = CT_FAMILLES.length; }
+  const k = cat === null || cat === undefined ? '\u0000' : typeof cat + ':' + String(cat);
+  if (RP_FAMILLES.has(k)) return RP_FAMILLES.get(k);
+  const r = rpFamilleAvant.apply(this, arguments);
+  RP_FAMILLES.set(k, r);
+  return r;
+};
+window.KYLO_RAPIDE_VERSION = '1.24.2';
 </script>
 
 

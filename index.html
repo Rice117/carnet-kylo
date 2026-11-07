@@ -30035,7 +30035,7 @@ html[data-theme="sombre"] .wxf-liste-badge{color:#a5d6a7}
 // Ce que le téléphone permet : WeChat n'ouvre pas une discussion précise depuis une autre application. Le carnet fait
 // donc le maximum possible : il COPIE le nom WeChat du fournisseur, OUVRE WeChat, et il ne reste qu'à coller dans 🔍.
 // Deux nouvelles cases sur chaque fiche :
-//   f.wechat_pseudo      : son nom tel qu'il s'affiche dans WeChat (ex. « Louie », « 吴月仙13777541887 »)
+//   f.wechat_pseudo      : son nom tel qu'il s'affiche dans WeChat (ex. « Louie », « 小王 13800000000 »)
 //   f.fichiers_recus[]   : { nom, type ('catalogue' | 'prix' | 'photos' | 'autre'), le, ou } — ce qu'il a envoyé,
 //                          rangé sur l'ordinateur dans « 10 - FOURNISSEURS CHINE \ <son dossier> ».
 window.KYLO_WECHAT_FICHE = '1.26.0';
@@ -30044,7 +30044,7 @@ const WXF_DOSSIER_PC = '10 - FOURNISSEURS CHINE';   // sur l'ordinateur : MES PR
 // La liste des noms WeChat trouvés par Claude (nom WeChat par code du carnet ou par téléphone, fichiers reçus) n'est PAS
 // dans cette page (elle est publique sur Internet) : Riche la reçoit à part et la COLLE une fois dans le carnet
 // (🏭 Fournisseurs → « 📋 Coller la liste WeChat de Claude »). Format : { "codes": { "F84": { "pseudo": "...", "fichiers": [["prix","nom","07/11"]] } },
-// "tels": { "13777541887": { ... } } }. Appliquée sur les fiches sans nom WeChat ; jamais écrasé si Riche l'a déjà noté.
+// "tels": { "13800000000": { ... } } }. Appliquée sur les fiches sans nom WeChat ; jamais écrasé si Riche l'a déjà noté.
 let WXF_TABLE = {}, WXF_PAR_TEL = {};
 function wxfPseudo(f) { return f ? String(f.wechat_pseudo || '').trim() : ''; }
 function wxfRecus(f) { if (!Array.isArray(f.fichiers_recus)) f.fichiers_recus = []; return f.fichiers_recus; }
@@ -30133,7 +30133,7 @@ function wxfOuvrir(fid) {
 function wxfBoiteNom(fid) {
   const f = mkFournisseur(fid); if (!f) return;
   boite(`<div class="wxf-dlg"><h3 style="font-size:19px;margin:0 0 6px">💬 Son nom dans WeChat</h3>
-    <p class="aide">Le nom exactement comme il s'affiche dans la liste des discussions WeChat (ex. « Louie », « 吴月仙13777541887 »).
+    <p class="aide">Le nom exactement comme il s'affiche dans la liste des discussions WeChat (ex. « Louie », « 小王 13800000000 »).
     Dans WeChat : ouvrez sa discussion → appui long sur son nom en haut → Copier ; puis collez ici.</p>
     <label for="wxf_nom">Nom WeChat de ${E(mkNomFournisseur(f))}</label>
     <input id="wxf_nom" value="${E(wxfPseudo(f))}" placeholder="collez son nom WeChat ici" autocomplete="off">

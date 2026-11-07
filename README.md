@@ -473,3 +473,4 @@ Internet. Elle ne touche pas au carnet (aucun fichier du carnet modifié).
 Traduction parlée (micro direct dans Safari), mode Réunion, phrases prêtes, fiches fournisseurs par QR code,
 calcul des prix. Fabriqué par `build.js` du projet Interprète : ne pas modifier à la main.
 Son propre service worker (portée `interprete/`) ; ne touche à aucun fichier du carnet.
+- **1.26.0 (07/11/2026)** — 💬 Son nom dans WeChat sur chaque fiche (bouton « Ouvrir sa discussion WeChat » : copie le nom, ouvre WeChat, coller dans 🔍) + 📎 « Ce qu'il a envoyé » (catalogue, prix, photos), compté dans « Où j'en suis » et 📣 Relances groupées ; « 📋 Coller la liste WeChat de Claude » (la liste reste hors de cette page). Preuve : `tests/test-carnet-1260.py` (45 contrôles).

@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.25.0';
+window.KYLO_APPLICATION = '1.26.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -29998,6 +29998,279 @@ ecranRencontres = function () {
   return i < 0 ? b + h : h.slice(0, i) + b + h.slice(i);
 };
 </script>
+
+<style>
+/* ===================== 1.26.0 — 07/11/2026 : 💬 Son nom dans WeChat + 📎 ce qu'il a envoyé ===================== */
+.wxf-bloc{border:2px solid #2e7d32;border-radius:14px;padding:12px;margin:10px 0;background:var(--carte)}
+html[data-theme="sombre"] .wxf-bloc{border-color:#4caf50}
+.wxf-titre{font-size:17px;font-weight:900;color:var(--noir);margin:0 0 6px}
+.wxf-nom{font-size:17px;line-height:1.45;color:var(--noir);margin:0 0 8px;word-break:break-all}
+.wxf-nom b{font-size:18px;background:#e8f5e9;color:#1b5e20;padding:2px 8px;border-radius:8px}
+html[data-theme="sombre"] .wxf-nom b{background:#1b5e20;color:#c8e6c9}
+.wxf-nom .vide{color:#b26a00;font-weight:700}
+.wxf-boutons{display:grid;gap:8px;grid-template-columns:1fr 1fr}
+.wxf-boutons .b{margin:0;min-height:52px;font-size:16px}
+.wxf-boutons .b.large{grid-column:1/-1;min-height:58px;font-size:17px}
+.wxf-recus{margin-top:10px;border-top:1px solid var(--lisiere);padding-top:8px}
+.wxf-recus ul{list-style:none;margin:0 0 8px;padding:0}
+.wxf-recus li{font-size:16px;line-height:1.45;color:var(--noir);padding:6px 0;border-bottom:1px dashed var(--lisiere);display:flex;gap:8px;align-items:flex-start}
+.wxf-recus li .ico{font-size:20px}
+.wxf-recus li small{display:block;font-size:15px;color:var(--texte-note)}
+.wxf-recus .aucun{font-size:15px;color:var(--texte-note);margin:0 0 8px}
+.wxf-dlg label{display:block;font-size:16px;font-weight:700;margin:10px 0 4px;color:var(--noir)}
+.wxf-dlg input,.wxf-dlg select{width:100%;box-sizing:border-box;font-size:17px;min-height:48px;padding:8px 10px;border:1.5px solid var(--lisiere);border-radius:10px;background:var(--carte);color:var(--noir)}
+.wxf-dlg .aide{font-size:15px;line-height:1.5;color:var(--texte-note);margin:6px 0 0}
+.wxf-dlg .choix{display:flex;flex-wrap:wrap;gap:6px}
+.wxf-dlg .choix button{font-size:15px;min-height:42px;padding:6px 12px;border-radius:999px;border:1.5px solid var(--lisiere);background:var(--carte);color:var(--noir)}
+.wxf-dlg .choix button.on{background:#2e7d32;color:#fff;border-color:#2e7d32}
+.wxf-liste-badge{font-size:15px;color:#1b5e20;font-weight:700}
+html[data-theme="sombre"] .wxf-liste-badge{color:#a5d6a7}
+.b.wxf-ouvrir-liste{grid-column:1/-1;min-height:52px;font-size:16px;background:#2e7d32;color:#fff}
+</style>
+<script>
+// ===================== 1.26.0 — 07/11/2026 : 💬 Son nom dans WeChat + 📎 ce qu'il a envoyé =====================
+// Riche, 07/11/2026 au matin : « tu fais lire le même nom de fournisseur sur le carnet de voyage au nom du fournisseur
+// sur WeChat : on clique sur le nom du fournisseur sur le carnet, directement ça nous ramène sur son WeChat » ; et
+// « les réponses [fichiers] : tu les traites comme les autres dans le carnet, fournisseur par fournisseur ».
+// Ce que le téléphone permet : WeChat n'ouvre pas une discussion précise depuis une autre application. Le carnet fait
+// donc le maximum possible : il COPIE le nom WeChat du fournisseur, OUVRE WeChat, et il ne reste qu'à coller dans 🔍.
+// Deux nouvelles cases sur chaque fiche :
+//   f.wechat_pseudo      : son nom tel qu'il s'affiche dans WeChat (ex. « Louie », « 吴月仙13777541887 »)
+//   f.fichiers_recus[]   : { nom, type ('catalogue' | 'prix' | 'photos' | 'autre'), le, ou } — ce qu'il a envoyé,
+//                          rangé sur l'ordinateur dans « 10 - FOURNISSEURS CHINE \ <son dossier> ».
+window.KYLO_WECHAT_FICHE = '1.26.0';
+const WXF_TYPES = [['catalogue', '📖 Catalogue'], ['prix', '💰 Liste de prix'], ['photos', '🖼️ Photos'], ['autre', '📎 Autre']];
+const WXF_DOSSIER_PC = '10 - FOURNISSEURS CHINE';   // sur l'ordinateur : MES PROJETS \\ NOUVEAU DOSSIER 18-09 \\ 10 - FOURNISSEURS CHINE
+// La liste des noms WeChat trouvés par Claude (nom WeChat par code du carnet ou par téléphone, fichiers reçus) n'est PAS
+// dans cette page (elle est publique sur Internet) : Riche la reçoit à part et la COLLE une fois dans le carnet
+// (🏭 Fournisseurs → « 📋 Coller la liste WeChat de Claude »). Format : { "codes": { "F84": { "pseudo": "...", "fichiers": [["prix","nom","07/11"]] } },
+// "tels": { "13777541887": { ... } } }. Appliquée sur les fiches sans nom WeChat ; jamais écrasé si Riche l'a déjà noté.
+let WXF_TABLE = {}, WXF_PAR_TEL = {};
+function wxfPseudo(f) { return f ? String(f.wechat_pseudo || '').trim() : ''; }
+function wxfRecus(f) { if (!Array.isArray(f.fichiers_recus)) f.fichiers_recus = []; return f.fichiers_recus; }
+function wxfTel11(f) {
+  for (const k of ['mobile', 'tel', 'whatsapp', 'tel_fixe']) {
+    const d = String((f && f[k]) || '').replace(/\D/g, '').replace(/^0086/, '').replace(/^86(?=1\d{10}$)/, '');
+    if (/^1[3-9]\d{9}$/.test(d)) return d;
+  }
+  return '';
+}
+function wxfAjouterRecu(f, type, nom, le, ou) {
+  const L = wxfRecus(f);
+  if (L.some(x => normaliserNom(x.nom || '') === normaliserNom(nom))) return false;
+  L.push({ nom, type: type || 'autre', le: le || mkMaintenant(), ou: ou || '' });
+  return true;
+}
+function wxfAppliquerTable(codes, tels) {
+  codes = codes || WXF_TABLE; tels = tels || WXF_PAR_TEL;
+  let n = 0;
+  mkFournisseurs().forEach(f => {
+    const t = codes[String(f.code || '').toUpperCase()] || tels[wxfTel11(f)];
+    if (!t) return;
+    if (!wxfPseudo(f) && t.pseudo) { f.wechat_pseudo = t.pseudo; f.wechat_pseudo_source = 'claude-07-11'; n++; }
+    (t.fichiers || []).forEach(([type, nom, jour]) => {
+      const le = jour ? '2026-' + jour.split('/')[1] + '-' + jour.split('/')[0] + 'T08:00:00.000Z' : mkMaintenant();
+      if (wxfAjouterRecu(f, type, nom, le, 'PC : ' + WXF_DOSSIER_PC)) n++;
+    });
+  });
+  if (n) sauverLocal();
+  return n;
+}
+function wxfBoiteImport() {
+  boite(`<div class="wxf-dlg"><h3 style="font-size:19px;margin:0 0 6px">📋 Coller la liste WeChat de Claude</h3>
+    <p class="aide">Claude vous envoie une liste (texte qui commence par <b>{</b>) : les noms WeChat de vos fournisseurs et les fichiers
+    qu'ils ont envoyés. Collez-la ici : chaque fiche reçoit son nom WeChat (sans écraser ceux que vous avez déjà notés).</p>
+    <label for="wxf_json">La liste</label>
+    <textarea id="wxf_json" rows="6" style="width:100%;box-sizing:border-box;font-size:15px;border:1.5px solid var(--lisiere);border-radius:10px;padding:8px;background:var(--carte);color:var(--noir)" placeholder='{"codes":{"F84":{"pseudo":"Louie"}},"tels":{}}'></textarea>
+    <div class="mk-deux" style="margin-top:12px">
+      <button type="button" class="b vert" style="min-height:52px;font-size:16px" onclick="wxfImporter()">✅ Appliquer</button>
+      <button type="button" class="b gris" style="min-height:52px;font-size:16px" onclick="fermerBoite()">Annuler</button>
+    </div></div>`);
+  setTimeout(() => { const i = document.getElementById('wxf_json'); if (i) i.focus(); }, 80);
+}
+function wxfImporter(texte) {
+  const i = document.getElementById('wxf_json');
+  const t = String(texte !== undefined ? texte : (i ? i.value : '')).trim();
+  let o = null;
+  try { o = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1)); } catch (e) { avertir('Cette liste n\'est pas lisible : recopiez-la entièrement, du premier { au dernier }.', 7000); return 0; }
+  const n = wxfAppliquerTable(o.codes || {}, o.tels || {});
+  fermerBoite(); dessiner();
+  avertir(n ? '✅ ' + n + ' information(s) WeChat ajoutée(s) sur les fiches.' : 'Rien de nouveau : les fiches avaient déjà tout (ou aucun code / téléphone ne correspond).', 6000);
+  return n;
+}
+// ---------- ce que le carnet copie / cherche dans WeChat : d'abord son vrai nom WeChat ----------
+if (typeof vwMot === 'function') {
+  const vwMotAvant = vwMot;
+  vwMot = function (f) { const p = wxfPseudo(f); return p || vwMotAvant.apply(this, arguments); };
+}
+if (typeof vwNomme === 'function') {
+  const vwNommeAvant = vwNomme;
+  vwNomme = function (f) { return !!wxfPseudo(f) || vwNommeAvant.apply(this, arguments); };
+}
+if (typeof wxAjoute === 'function') {
+  const wxAjouteAvant = wxAjoute;
+  wxAjoute = function (f, e) { return !!wxfPseudo(f) || wxAjouteAvant.apply(this, arguments); };
+}
+// Catalogue / prix reçus (notés ici) comptent dans « Où j'en suis » et dans 📣 Relances groupées.
+if (typeof fsEtapes === 'function') {
+  const fsEtapesAvant = fsEtapes;
+  fsEtapes = function (f) {
+    const e = fsEtapesAvant.apply(this, arguments);
+    const R = Array.isArray(f.fichiers_recus) ? f.fichiers_recus : [];
+    if (R.some(x => x.type === 'catalogue' || x.type === 'photos')) e.cata = true;
+    if (R.some(x => x.type === 'prix')) e.prix = true;
+    return e;
+  };
+}
+// ---------- ouvrir sa discussion : copier son nom WeChat, ouvrir WeChat, coller dans 🔍 ----------
+function wxfOuvrir(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const p = wxfPseudo(f);
+  if (!p) { wxfBoiteNom(fid); return; }
+  mkCopier(p, 'Nom copié : dans WeChat, touchez 🔍 en haut, collez, et sa discussion s\'ouvre.');
+  setTimeout(() => ctAller('weixin://'), 700);
+}
+function wxfBoiteNom(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  boite(`<div class="wxf-dlg"><h3 style="font-size:19px;margin:0 0 6px">💬 Son nom dans WeChat</h3>
+    <p class="aide">Le nom exactement comme il s'affiche dans la liste des discussions WeChat (ex. « Louie », « 吴月仙13777541887 »).
+    Dans WeChat : ouvrez sa discussion → appui long sur son nom en haut → Copier ; puis collez ici.</p>
+    <label for="wxf_nom">Nom WeChat de ${E(mkNomFournisseur(f))}</label>
+    <input id="wxf_nom" value="${E(wxfPseudo(f))}" placeholder="collez son nom WeChat ici" autocomplete="off">
+    <div class="mk-deux" style="margin-top:12px">
+      <button type="button" class="b vert" style="min-height:52px;font-size:16px" onclick="wxfEnregistrerNom('${f.id}')">✅ Enregistrer</button>
+      <button type="button" class="b gris" style="min-height:52px;font-size:16px" onclick="fermerBoite()">Annuler</button>
+    </div></div>`);
+  setTimeout(() => { const i = document.getElementById('wxf_nom'); if (i) i.focus(); }, 80);
+}
+function wxfEnregistrerNom(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const i = document.getElementById('wxf_nom');
+  const v = i ? String(i.value || '').trim() : '';
+  f.wechat_pseudo = v; if (v) delete f.wechat_pseudo_source;
+  sauverLocal(); fermerBoite(); dessiner();
+  avertir(v ? '✅ Noté : dans WeChat, ' + mkNomFournisseur(f) + ' s\'appelle « ' + v + ' ».' : 'Nom WeChat effacé.');
+}
+// ---------- noter un fichier reçu ----------
+let wxfType = 'prix';
+function wxfBoiteRecu(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  wxfType = 'prix';
+  boite(`<div class="wxf-dlg"><h3 style="font-size:19px;margin:0 0 6px">📎 Il a envoyé un fichier</h3>
+    <p class="aide">Notez ce que ${E(mkNomFournisseur(f))} a envoyé sur WeChat. Le fichier lui-même reste dans WeChat
+    (et sur l'ordinateur, dans MES PROJETS → NOUVEAU DOSSIER 18-09 → ${E(WXF_DOSSIER_PC)} → son dossier).</p>
+    <label>C'est quoi ?</label>
+    <div class="choix" id="wxf_choix">${WXF_TYPES.map(([k, t]) => `<button type="button" class="${k === wxfType ? 'on' : ''}" data-t="${k}" onclick="wxfChoisirType('${k}')">${t}</button>`).join('')}</div>
+    <label for="wxf_fnom">Nom du fichier (ou quelques mots)</label>
+    <input id="wxf_fnom" placeholder="ex. 报价单.xlsx, catalogue PDF, photos de coques" autocomplete="off">
+    <div class="mk-deux" style="margin-top:12px">
+      <button type="button" class="b vert" style="min-height:52px;font-size:16px" onclick="wxfEnregistrerRecu('${f.id}')">✅ Enregistrer</button>
+      <button type="button" class="b gris" style="min-height:52px;font-size:16px" onclick="fermerBoite()">Annuler</button>
+    </div></div>`);
+  setTimeout(() => { const i = document.getElementById('wxf_fnom'); if (i) i.focus(); }, 80);
+}
+function wxfChoisirType(k) {
+  wxfType = k;
+  document.querySelectorAll('#wxf_choix button').forEach(b => b.classList.toggle('on', b.dataset.t === k));
+}
+function wxfEnregistrerRecu(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const i = document.getElementById('wxf_fnom');
+  const nom = i ? String(i.value || '').trim() : '';
+  if (!nom) { avertir('Écrivez au moins quelques mots sur le fichier.'); return; }
+  wxfAjouterRecu(f, wxfType, nom, mkMaintenant(), 'WeChat');
+  sauverLocal(); fermerBoite(); dessiner();
+  avertir('✅ Noté : ' + (WXF_TYPES.find(x => x[0] === wxfType) || ['', 'fichier'])[1] + ' reçu de ' + mkNomFournisseur(f) + '.');
+}
+function wxfSupprimerRecu(fid, i) {
+  const f = mkFournisseur(fid); if (!f) return;
+  if (!confirmerEnDeuxTemps('wxf-sup-' + fid + '-' + i, 'Appuyez encore une fois pour retirer cette ligne.')) return;
+  wxfRecus(f).splice(i, 1); sauverLocal(); dessiner();
+}
+// ---------- le bloc sur la fiche ----------
+function wxfIcone(t) { return t === 'catalogue' ? '📖' : t === 'prix' ? '💰' : t === 'photos' ? '🖼️' : '📎'; }
+function wxfBlocHtml(f) {
+  const p = wxfPseudo(f);
+  const R = wxfRecus(f).slice().sort((a, b) => String(b.le || '').localeCompare(String(a.le || '')));
+  const anciens = Array.isArray(f.fichiers) ? f.fichiers : [];
+  return `<div class="wxf-bloc">
+    <p class="wxf-titre">💬 Dans WeChat</p>
+    <p class="wxf-nom">${p ? `Il s'appelle <b>${E(p)}</b>` : '<span class="vide">Son nom WeChat n\'est pas encore noté.</span>'}</p>
+    <div class="wxf-boutons">
+      <button type="button" class="b wechat large" onclick="wxfOuvrir('${f.id}')">${p ? '💬 Ouvrir sa discussion WeChat' : '💬 Noter son nom WeChat'}</button>
+      ${p ? `<button type="button" class="b contour" onclick="mkCopier(${E(JSON.stringify(p))}, 'Nom copié.')">📋 Copier son nom</button>
+      <button type="button" class="b gris" onclick="wxfBoiteNom('${f.id}')">✏️ Changer</button>` : ''}
+    </div>
+    ${p ? '<p class="wxf-recus aucun" style="border:0;padding:0;margin:8px 0 0;font-size:15px;color:var(--texte-note)">Le bouton copie son nom et ouvre WeChat : touchez 🔍 en haut de WeChat, collez, sa discussion s\'ouvre.</p>' : ''}
+    <div class="wxf-recus">
+      <p class="wxf-titre">📎 Ce qu'il a envoyé (${R.length + anciens.length})</p>
+      ${R.length || anciens.length ? `<ul>${R.map((x, i) => `<li><span class="ico">${wxfIcone(x.type)}</span><span style="flex:1">${E(x.nom)}<small>${E((WXF_TYPES.find(t => t[0] === x.type) || ['', 'Autre'])[1])} · ${mkJour(x.le) || '—'}${x.ou ? ' · ' + E(x.ou) : ''}</small></span>
+          <button type="button" class="b gris" style="min-height:40px;width:auto;flex:0 0 auto;font-size:15px;padding:4px 12px;margin:0" onclick="wxfSupprimerRecu('${f.id}',${i})">✕</button></li>`).join('')}
+        ${anciens.map(x => `<li><span class="ico">${x.type === 'pdf' ? '📕' : '📗'}</span><span style="flex:1">${E(x.nom || '')}<small>Rangé dans le carnet · ${mkJour(x.le) || '—'}</small></span></li>`).join('')}</ul>`
+        : '<p class="aucun">Rien de noté pour l\'instant.</p>'}
+      <button type="button" class="b contour" style="min-height:50px;font-size:16px;margin:0" onclick="wxfBoiteRecu('${f.id}')">➕ Il a envoyé un fichier (catalogue, prix, photos)</button>
+    </div>
+  </div>`;
+}
+if (typeof ecranDossier === 'function') {
+  const ecranDossierAvant = ecranDossier;
+  ecranDossier = function () {
+    const h = ecranDossierAvant.apply(this, arguments);
+    const f = mkFournisseur(ctDossier); if (!f) return h;
+    const i = h.indexOf('<div class="ct-liens">');
+    return i < 0 ? h : h.slice(0, i) + wxfBlocHtml(f) + h.slice(i);
+  };
+}
+// ---------- dans la liste des fournisseurs : son nom WeChat et le bouton ----------
+if (typeof mkCarteFournisseurHtml === 'function') {
+  const mkCarteAvant = mkCarteFournisseurHtml;
+  mkCarteFournisseurHtml = function (f) {
+    let h = mkCarteAvant.apply(this, arguments);
+    const p = wxfPseudo(f); if (!p) return h;
+    const nR = wxfRecus(f).length;
+    h = h.replace('<span class="mk-att">pas de WeChat</span>', '💬 WeChat ' + E(p));
+    h = h.replace('<div class="mk-actions">', `<div class="det wxf-liste-badge">💬 Dans WeChat : ${E(p)}${nR ? ' · 📎 ' + nR + ' fichier' + (nR > 1 ? 's' : '') + ' reçu' + (nR > 1 ? 's' : '') : ''}</div><div class="mk-actions">
+      <button type="button" class="b wxf-ouvrir-liste" onclick="wxfOuvrir('${f.id}')">💬 Ouvrir sa discussion WeChat</button>`);
+    return h;
+  };
+}
+// La recherche 🔎 de la liste trouve aussi par son nom WeChat.
+if (typeof mkListeFournisseursHtml === 'function') {
+  const mkListeAvant = mkListeFournisseursHtml;
+  mkListeFournisseursHtml = function () {
+    const h = mkListeAvant.apply(this, arguments);
+    const q = normaliserNom(mkCherche || ''); if (!q) return h;
+    const extra = mkFournisseursRecents().filter(f => normaliserNom(wxfPseudo(f)).includes(q) && !h.includes('id="mkf-' + f.id + '"'));
+    if (!extra.length) return h;
+    const cartes = extra.map(mkCarteFournisseurHtml).join('');
+    return (h.includes('class="mk-fiche"') ? h : '') + cartes;
+  };
+}
+// Dans « À qui envoyez-vous ? » : montrer son nom WeChat et proposer de le copier.
+if (typeof trAQui === 'function') {
+  const trAQuiAvant = trAQui;
+  trAQui = function (f, suite) {
+    trAQuiAvant.apply(this, arguments);
+    const p = wxfPseudo(f); if (!p) return;
+    const z = document.getElementById('tr_aqui'); if (!z) return;
+    const e = z.querySelector('.etape');
+    if (e) e.innerHTML = `Dans WeChat il s'appelle <b>${E(p)}</b>.<br>Touchez <b>🔍</b> en haut de WeChat, collez son nom → sa discussion s'ouvre. Puis appui long dans la case → <b>Coller</b> → Envoyer.`;
+    const u = z.querySelector('.une-fois'); if (u) u.remove();
+    const ok = z.querySelector('#tr_aqui_ok');
+    if (ok) { ok.textContent = '✅ C\'est bien lui — copier le message et ouvrir WeChat'; }
+  };
+}
+if (typeof ecranRencontres === 'function') {
+  const wxfRencontresAvant = ecranRencontres;
+  ecranRencontres = function () {
+    const h = wxfRencontresAvant.apply(this, arguments);
+    const b = `<button type="button" class="b contour wxf-import" style="min-height:50px;font-size:16px;margin:0 0 10px;width:100%" onclick="wxfBoiteImport()">📋 Coller la liste WeChat de Claude (noms WeChat + fichiers reçus)</button>`;
+    const i = h.indexOf('<button type="button" class="b jn-entree"');
+    return i < 0 ? h + b : h.slice(0, i) + b + h.slice(i);
+  };
+}
+</script>
+
 
 
 

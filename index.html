@@ -30260,6 +30260,24 @@ if (typeof trAQui === 'function') {
     if (ok) { ok.textContent = '✅ C\'est bien lui — copier le message et ouvrir WeChat'; }
   };
 }
+// Le fichier de Claude (« 🤖 Ajouter ce que Claude a lu ») peut aussi porter, pour chaque fournisseur, son nom WeChat
+// (wechat_pseudo) et ce qu'il a envoyé (fichiers_recus) : un seul fichier remplit tout. Jamais écrasé si déjà noté.
+if (typeof ctFusion === 'function') {
+  const ctFusionAvant = ctFusion;
+  ctFusion = function (imp, appliquer) {
+    const bilan = ctFusionAvant.apply(this, arguments);
+    if (appliquer && imp && Array.isArray(imp.fournisseurs)) {
+      let n = 0;
+      imp.fournisseurs.forEach((x, i) => {
+        const b = bilan[i], f = b && b.id ? mkFournisseur(b.id) : null; if (!f || !x) return;
+        if (x.wechat_pseudo && !wxfPseudo(f)) { f.wechat_pseudo = String(x.wechat_pseudo).trim(); n++; }
+        (Array.isArray(x.fichiers_recus) ? x.fichiers_recus : []).forEach(r => { if (r && r.nom && wxfAjouterRecu(f, r.type, String(r.nom), r.le, r.ou)) n++; });
+      });
+      if (n) sauverLocal();
+    }
+    return bilan;
+  };
+}
 if (typeof ecranRencontres === 'function') {
   const wxfRencontresAvant = ecranRencontres;
   ecranRencontres = function () {

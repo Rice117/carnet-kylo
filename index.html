@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.24.2';
+window.KYLO_APPLICATION = '1.25.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -29758,6 +29758,247 @@ ctFamille = function (cat) {
 };
 window.KYLO_RAPIDE_VERSION = '1.24.2';
 </script>
+
+<style>
+/* ===================== 1.25.0 — 07/11/2026 : 📣 Relances groupées ===================== */
+.b.rg-entree{display:block;width:100%;min-height:62px;margin:0 0 10px;background:#7a3e00;color:#fff;font-size:17px;font-weight:800;text-align:left;padding:10px 14px;border-radius:14px}
+.b.rg-entree small{display:block;font-size:15px;font-weight:500;opacity:.95;margin-top:2px}
+html[data-theme="sombre"] .b.rg-entree{background:#8a4a08}
+.rg-dlg{max-width:760px}
+.rg-aide{font-size:15px;line-height:1.5;color:var(--texte-note);margin:4px 0 10px}
+.rg-filtres{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.rg-filtres button{font-size:15px;min-height:40px;padding:6px 12px;border-radius:999px;border:1.5px solid var(--lisiere);background:var(--carte);color:var(--noir)}
+.rg-filtres button.on{background:var(--bleu);color:#fff;border-color:var(--bleu)}
+.rg-groupe{border:2px solid var(--lisiere);border-radius:14px;margin:0 0 12px;background:var(--carte)}
+.rg-groupe>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:18px;font-weight:900;color:var(--noir);min-height:52px;padding:8px 12px}
+.rg-groupe>summary::-webkit-details-marker{display:none}
+.rg-groupe>summary .rg-n{margin-left:auto;border-radius:999px;padding:4px 14px;font-size:16px;color:#fff;background:var(--bleu)}
+.rg-groupe.rouge{border-color:#c62828}.rg-groupe.rouge>summary .rg-n{background:#c62828}
+.rg-groupe.orange{border-color:#e07b00}.rg-groupe.orange>summary .rg-n{background:#e07b00}
+.rg-groupe.bleu{border-color:var(--bleu)}
+.rg-groupe.vert{border-color:var(--vert)}.rg-groupe.vert>summary .rg-n{background:var(--vert)}
+.rg-groupe.gris{border-color:var(--lisiere)}.rg-groupe.gris>summary .rg-n{background:#777}
+.rg-quoi{font-size:15px;line-height:1.5;color:var(--texte-note);padding:0 12px 8px}
+.rg-l{border-top:1px solid var(--lisiere);padding:10px 12px;display:grid;gap:8px}
+.rg-qui{font-size:17px;line-height:1.35;color:var(--noir)}
+.rg-qui .code{font-weight:900;margin-right:6px}
+.rg-qui small{display:block;font-size:15px;color:var(--texte-note);font-weight:500;margin-top:2px}
+.rg-wx{font-size:15px;line-height:1.45;color:var(--noir)}
+.rg-wx b{font-size:16px;background:#fff3cd;color:#5a3a00;padding:1px 6px;border-radius:6px}
+html[data-theme="sombre"] .rg-wx b{background:#5a3a00;color:#ffe9a8}
+.rg-boutons{display:flex;flex-wrap:wrap;gap:8px}
+.rg-boutons .b{min-height:46px;font-size:16px;padding:8px 14px;margin:0}
+.rg-msg{width:100%;box-sizing:border-box;font-size:15px;line-height:1.45;min-height:150px;margin-top:6px}
+.rg-msg-r{font-size:15px;color:var(--texte-note);cursor:pointer;min-height:40px;display:flex;align-items:center}
+.rg-fait{font-size:15px;color:var(--vert);font-weight:700}
+.rg-bilan{font-size:16px;line-height:1.5;color:var(--noir);background:var(--fond-doux,#f3f6fb);border-radius:12px;padding:10px 12px;margin:0 0 10px}
+html[data-theme="sombre"] .rg-bilan{background:#1e2a3a}
+</style>
+<script>
+// ===================== 1.25.0 — 07/11/2026 : 📣 Relances groupées =====================
+// Riche, 07/11/2026 (de retour de Chine, la nuit) : « les fournisseurs qui ont déjà envoyé leur catalogue,
+// tu vérifies s'ils ont envoyé le prix ; ceux qui n'ont pas encore envoyé, tu peux leur envoyer les messages,
+// comme s'ils étaient en train de discuter avec moi ; et tu mets les fournisseurs dans l'ordre dans le carnet ».
+// Ce que ça change : UN SEUL écran, en haut de 🏭 Fournisseurs, qui range tous les fournisseurs par ce qu'il
+// reste à leur dire, dans l'ordre d'urgence, avec pour chacun le message prêt (chinois, puis anglais), le mot à
+// taper dans WeChat pour le retrouver, un bouton « Copier » et un bouton « Envoyé » qui note la date.
+// Fait pour la journée de relances depuis WeChat sur l'ordinateur : copier → coller → envoyé → suivant.
+// Rien de nouveau n'est inventé côté données : on réutilise demande_le / relance_le / catalogue_demande_le ;
+// une seule date s'ajoute, catalogue_relance_le (relance d'un catalogue jamais arrivé).
+window.KYLO_RELANCES = '1.25.0';
+
+const RG_GROUPES = [
+  ['relancer', 'rouge', '🔔', 'À relancer : prix demandés, aucune réponse',
+    'Il a reçu la demande de prix il y a 2 jours ou plus et n\'a rien renvoyé. Un rappel court, poli.'],
+  ['prix', 'orange', '💰', 'Catalogue reçu : ses prix à demander',
+    'Son catalogue est dans le carnet mais sans un seul prix. On lui demande sa liste de prix, à la pièce, pour de petites quantités.'],
+  ['catalogue', 'orange', '📖', 'Rien reçu : catalogue et prix à demander',
+    'Rencontré, mais ni catalogue ni prix. On lui demande les deux d\'un coup : catalogue PDF + prix Excel, à la pièce.'],
+  ['catalogue-relance', 'rouge', '🔔', 'Catalogue demandé, jamais arrivé',
+    'On lui a demandé son catalogue il y a 2 jours ou plus : un rappel.'],
+  ['attente', 'bleu', '⏳', 'En attente (demande partie il y a moins de 2 jours)',
+    'Rien à faire aujourd\'hui : on lui laisse le temps de répondre.'],
+  ['complet', 'vert', '✅', 'Prix reçus : rien à demander',
+    'Ses prix sont dans le carnet. À comparer dans Comparer, pas à relancer.'],
+  ['ecartes', 'gris', '❌', 'Écartés (décision « Non »)',
+    'On ne leur écrit pas.']];
+
+function rgPaliers() {
+  const v = C && C.voyage && Array.isArray(C.voyage.px_paliers) ? C.voyage.px_paliers.filter(q => num(q) > 0).slice(0, 4) : [];
+  return v.length ? v : [20, 50, 100, 200];
+}
+function rgQui(f) { return String(f.contact || '').trim(); }
+function rgMoi() { return ctSignature().split('–')[0].trim() || 'Riche'; }
+function rgLieuCn(f) { return ctLieu(f.lieu_rencontre || 'foire', 'cn'); }
+function rgLieuEn(f) { return ctLieu(f.lieu_rencontre || 'foire', 'en'); }
+// Les prix à la pièce, jamais par carton (Riche, 05/11/2026 : « prix et minimum exigés EN PIÈCES »).
+function rgMessagePrixCatalogue(f) {
+  const qui = rgQui(f), moi = rgMoi(), P = rgPaliers(), sig = ctSignature();
+  const pcn = P.map(q => nf(q) + '件').join(' / '), pen = P.map(q => nf(q) + ' pcs').join(' / ');
+  return [(qui ? qui + ' ' : '') + '您好！',
+    '我是几内亚（西非）KYLO EURGUINE 公司的 ' + moi + '。我们' + rgLieuCn(f) + '见过面，谢谢您的产品目录。',
+    '我已经收到目录了，但还没有价格。麻烦您发一份报价单（Excel），目录里每个型号请注明：',
+    '1. 单价（人民币，按件计算，不按箱）',
+    '2. 最小起订量（按件）',
+    '3. ' + pcn + ' 的价格',
+    '4. 每箱数量和外箱尺寸',
+    '我是第一次下单，先少量试卖，所以需要小数量的价格。谢谢！', '',
+    'Hello' + (trPrenom(qui) ? ' ' + trPrenom(qui) : '') + ',',
+    'This is ' + moi + ' from KYLO EURGUINE (Guinea, West Africa). We met ' + rgLieuEn(f) + ', thank you for your catalogue.',
+    'I have the catalogue but no prices yet. Could you send me your price list (Excel) with, for each model:',
+    '1. Unit price in RMB (per piece, not per carton)',
+    '2. MOQ (in pieces)',
+    '3. Price for ' + pen,
+    '4. Pcs per carton and carton size',
+    'This is my first order, I start with small quantities to test the market, so I need prices for small quantities. Thank you!', sig].join('\n');
+}
+function rgMessageCatalogueEtPrix(f) {
+  const qui = rgQui(f), moi = rgMoi(), P = rgPaliers(), sig = ctSignature();
+  const pcn = P.map(q => nf(q) + '件').join(' / '), pen = P.map(q => nf(q) + ' pcs').join(' / ');
+  return [(qui ? qui + ' ' : '') + '您好！',
+    '我是几内亚（西非）KYLO EURGUINE 公司的 ' + moi + '。我们' + rgLieuCn(f) + '见过面。',
+    '请把你们的产品目录（PDF）和报价单（Excel）发给我。每个型号请注明：',
+    '1. 单价（人民币，按件计算，不按箱）',
+    '2. 最小起订量（按件）',
+    '3. ' + pcn + ' 的价格',
+    '4. 每箱数量和外箱尺寸',
+    '如果同一个产品有不同档次，请每个档次分别报价。我是第一次下单，先少量试卖。谢谢！', '',
+    'Hello' + (trPrenom(qui) ? ' ' + trPrenom(qui) : '') + ',',
+    'This is ' + moi + ' from KYLO EURGUINE (Guinea, West Africa). We met ' + rgLieuEn(f) + '.',
+    'Could you please send me your product catalogue (PDF) and your price list (Excel)? For each model:',
+    '1. Unit price in RMB (per piece, not per carton)',
+    '2. MOQ (in pieces)',
+    '3. Price for ' + pen,
+    '4. Pcs per carton and carton size',
+    'If a product comes in several quality grades, please quote each grade. This is my first order, I start with small quantities. Thank you!', sig].join('\n');
+}
+function rgMessageRelanceCatalogue(f) {
+  const qui = rgQui(f), moi = rgMoi(), sig = ctSignature(), le = f.catalogue_demande_le || mkMaintenant();
+  return [(qui ? qui + ' ' : '') + '您好！我是几内亚 KYLO EURGUINE 的 ' + moi + '。跟进一下我' + ctDateCn(le) + '请您发的产品目录和报价单，麻烦您今天发一下，谢谢！', '',
+    'Hello' + (trPrenom(qui) ? ' ' + trPrenom(qui) : '') + ', this is ' + moi + ' from KYLO EURGUINE (Guinea). I am following up on the catalogue and price list I asked for on '
+    + ctDateEn(le) + '. Could you send them today? Thank you!', '', sig].join('\n');
+}
+// Dans quel groupe est ce fournisseur, et quel message lui va.
+function rgEtat(f) {
+  if (f.decision === 'non') return { g: 'ecartes' };
+  const e = fsEtapes(f);
+  const np = ctNbPrix(f);
+  if (np > 0) return { g: 'complet', detail: np + ' prix dans le carnet' };
+  if (f.demande_le) {
+    const j = ctJoursDepuis(f.relance_le || f.demande_le);
+    if (j !== null && j >= 2) return { g: 'relancer', msg: () => ctMessageRelance(f), cle: 'relance_le',
+      detail: 'Prix demandés le ' + mkJour(f.demande_le) + (f.relance_le ? ', relancé le ' + mkJour(f.relance_le) : '') + ' · ' + j + ' jour(s) sans réponse' };
+    return { g: 'attente', detail: 'Prix demandés le ' + mkJour(f.demande_le) + (f.relance_le ? ', relancé le ' + mkJour(f.relance_le) : '') };
+  }
+  if (e.cata) return { g: 'prix', msg: () => rgMessagePrixCatalogue(f), cle: 'demande_le',
+    detail: ctProduits(f).length ? ctProduits(f).length + ' modèle(s) dans le carnet, aucun prix' : 'Catalogue reçu, aucun prix' };
+  if (f.catalogue_demande_le) {
+    const j = ctJoursDepuis(f.catalogue_relance_le || f.catalogue_demande_le);
+    if (j !== null && j >= 2) return { g: 'catalogue-relance', msg: () => rgMessageRelanceCatalogue(f), cle: 'catalogue_relance_le',
+      detail: 'Catalogue demandé le ' + mkJour(f.catalogue_demande_le) + (f.catalogue_relance_le ? ', relancé le ' + mkJour(f.catalogue_relance_le) : '') + ' · ' + j + ' jour(s) sans réponse' };
+    return { g: 'attente', detail: 'Catalogue demandé le ' + mkJour(f.catalogue_demande_le) };
+  }
+  return { g: 'catalogue', msg: () => rgMessageCatalogueEtPrix(f), cle: 'catalogue_demande_le', detail: 'Ni catalogue ni prix' };
+}
+let rgFiltre = { ville: 'toutes', decision: 'tous' };
+function rgListe() {
+  return mkFournisseurs().filter(f => !ctFournisseurVide(f))
+    .filter(f => rgFiltre.ville === 'toutes' || vlVille(f) === rgFiltre.ville)
+    .filter(f => rgFiltre.decision === 'tous' || f.decision === 'contacter');
+}
+// L'ordre dans un groupe : ✅ à contacter d'abord, puis les plus anciens sans réponse, puis par code.
+function rgTri(a, b) {
+  const d = (f) => f.decision === 'contacter' ? 0 : f.decision === 'voir' ? 1 : 2;
+  if (d(a) !== d(b)) return d(a) - d(b);
+  const t = (f) => String(f.demande_le || f.catalogue_demande_le || f.vu_le || f.le || '');
+  if (t(a) !== t(b)) return t(a) < t(b) ? -1 : 1;
+  return String(a.code || '').localeCompare(String(b.code || ''), 'fr', { numeric: true });
+}
+function rgGroupes() {
+  const G = {}; RG_GROUPES.forEach(([k]) => { G[k] = []; });
+  rgListe().forEach(f => { const e = rgEtat(f); G[e.g].push({ f, e }); });
+  Object.keys(G).forEach(k => G[k].sort((x, y) => rgTri(x.f, y.f)));
+  return G;
+}
+function rgAFaire(G) { return ['relancer', 'prix', 'catalogue', 'catalogue-relance'].reduce((n, k) => n + (G[k] || []).length, 0); }
+function rgEnvoyesAujourdhui() {
+  const jour = mkMaintenant().slice(0, 10);
+  return mkFournisseurs().filter(f => ['demande_le', 'relance_le', 'catalogue_demande_le', 'catalogue_relance_le'].some(k => String(f[k] || '').slice(0, 10) === jour)).length;
+}
+let rgOuverts = {};
+function rgOuvrir(ville, decision) {
+  if (ville !== undefined) rgFiltre.ville = ville;
+  if (decision !== undefined) rgFiltre.decision = decision;
+  const G = rgGroupes(), af = rgAFaire(G), env = rgEnvoyesAujourdhui();
+  const villes = Object.keys(VL_VILLES);
+  const ligne = ({ f, e }) => {
+    const mot = vwMot(f);
+    const souv = (typeof fsSouvenir === 'function') ? fsSouvenir(f) : '';
+    const sans = !(f.wechat || f.wechat_lien || f.qr_photo || f.wechat_nom || f.wechat_renomme);
+    return `<div class="rg-l" data-rg="${E(f.id)}" data-groupe="${E(e.g)}">
+      <div class="rg-qui"><span class="code">${E(f.code || '—')}</span>${E(f.nom || f.societe || '(sans nom)')}${f.contact && !(f.nom || '').includes(trPrenom(f.contact)) ? ' · ' + E(f.contact) : ''} ${vlBadge(f, true)}
+        <small>${E(e.detail || '')}${souv ? ' · ' + E(souv) : ''}</small></div>
+      ${mot ? `<div class="rg-wx">Dans WeChat : 🔍 tapez <b>${E(mot)}</b>${f.wechat_nom ? ' (« ' + E(f.wechat_nom) + ' »)' : ''}</div>`
+        : sans ? '<div class="rg-wx">⚠️ Pas de WeChat noté sur sa fiche : à retrouver autrement (carte, téléphone).</div>'
+        : '<div class="rg-wx">Dans WeChat : cherchez-le par son nom (pas encore renommé avec son code).</div>'}
+      ${e.msg ? `<div class="rg-boutons">
+        <button type="button" class="b" style="background:#1aad19;color:#fff" onclick="rgCopier('${f.id}')">📋 Copier le message</button>
+        <button type="button" class="b vert" onclick="rgEnvoye('${f.id}')">✅ Envoyé — noter la date</button>
+        <button type="button" class="b contour" onclick="ctOuvrirDossier('${f.id}')">📂 Sa fiche</button></div>
+        <details><summary class="rg-msg-r">Voir / modifier le message</summary>
+        <textarea class="rg-msg" id="rg_msg_${E(f.id)}" rows="9">${E(e.msg())}</textarea></details>`
+        : `<div class="rg-boutons"><button type="button" class="b contour" onclick="ctOuvrirDossier('${f.id}')">📂 Sa fiche</button></div>`}
+    </div>`;
+  };
+  const groupes = RG_GROUPES.map(([k, coul, ico, titre, quoi]) => {
+    const L = G[k];
+    const ouvert = rgOuverts[k] !== undefined ? rgOuverts[k] : ['relancer', 'prix', 'catalogue', 'catalogue-relance'].includes(k) && L.length > 0;
+    return `<details class="rg-groupe ${coul}" data-groupe="${k}"${ouvert ? ' open' : ''} ontoggle="rgOuverts['${k}']=this.open">
+      <summary>${ico} ${titre}<span class="rg-n">${L.length}</span></summary>
+      <div class="rg-quoi">${quoi}</div>
+      ${L.length ? L.map(ligne).join('') : '<div class="rg-l"><span class="rg-aide" style="margin:0">Personne.</span></div>'}
+    </details>`;
+  }).join('');
+  mkBoite(`<div class="mk-dlg rg-dlg"><h3>📣 Relances groupées</h3>
+    <div class="rg-bilan"><b>${af}</b> fournisseur(s) à qui écrire aujourd'hui · <b>${env}</b> message(s) notés envoyés aujourd'hui.<br>
+    Pour chacun : copier le message → le coller dans sa discussion WeChat → « Envoyé ». Il passe alors dans « En attente ».</div>
+    <div class="rg-filtres">${[['toutes', '📍 Toutes les villes'], ...villes.map(v => [v, '📍 ' + v])].map(([k, l]) => `<button type="button" class="${rgFiltre.ville === k ? 'on' : ''}" onclick="rgOuvrir('${k}')">${E(l)}</button>`).join('')}</div>
+    <div class="rg-filtres">${[['tous', 'Tous les fournisseurs'], ['contacter', '✅ Seulement « À contacter »']].map(([k, l]) => `<button type="button" class="${rgFiltre.decision === k ? 'on' : ''}" onclick="rgOuvrir(undefined,'${k}')">${E(l)}</button>`).join('')}</div>
+    ${groupes}
+    <div class="mk-boutons"><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+}
+function rgTexteDe(fid) {
+  const f = mkFournisseur(fid); if (!f) return '';
+  const t = document.getElementById('rg_msg_' + fid);
+  if (t && t.value.trim()) return t.value;
+  const e = rgEtat(f);
+  return e.msg ? e.msg() : '';
+}
+function rgCopier(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const t = rgTexteDe(fid); if (!t) { avertir('Rien à envoyer à ' + mkNomFournisseur(f) + '.'); return; }
+  mkCopier(t, 'Message copié pour ' + mkNomFournisseur(f) + '. Dans WeChat : sa discussion → Coller → Envoyer, puis « Envoyé » ici.');
+}
+function rgEnvoye(fid) {
+  const f = mkFournisseur(fid); if (!f) return;
+  const e = rgEtat(f); if (!e.cle) return;
+  f[e.cle] = mkMaintenant();
+  if (e.cle === 'demande_le') { delete f.relance_le; f.px_demande = f.px_demande || { paliers: rgPaliers(), lignes: [], le: f.demande_le, tout_le_catalogue: true }; }
+  sauverLocal();
+  avertir('✅ Noté : ' + mkNomFournisseur(f) + ' — ' + (e.cle === 'relance_le' ? 'relancé' : e.cle === 'catalogue_relance_le' ? 'catalogue relancé' : e.cle === 'demande_le' ? 'prix demandés' : 'catalogue et prix demandés') + ' le ' + mkJour(f[e.cle]) + '.');
+  rgOuvrir();
+}
+// ---------- l'entrée en haut de 🏭 Fournisseurs (juste avant « Ma journée pour Claude ») ----------
+const rgRencontresAvant = ecranRencontres;
+ecranRencontres = function () {
+  const h = rgRencontresAvant.apply(this, arguments);
+  let af = 0; try { af = rgAFaire(rgGroupes()); } catch (e) { af = 0; }
+  const b = `<button type="button" class="b rg-entree" onclick="rgOuvrir()">📣 Relances groupées<small>${af ? af + ' fournisseur' + (af > 1 ? 's' : '') + ' à qui écrire : catalogue, prix ou rappel — message prêt pour chacun' : 'Tous les fournisseurs rangés par ce qu\'il reste à leur dire'}</small></button>`;
+  const i = h.indexOf('<button type="button" class="b jn-entree"');
+  return i < 0 ? b + h : h.slice(0, i) + b + h.slice(i);
+};
+</script>
+
 
 
 

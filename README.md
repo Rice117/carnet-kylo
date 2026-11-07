@@ -444,6 +444,17 @@ chaque fiche garde sa hauteur pour que la liste ne saute pas quand elle se redes
 catégorie est cherchée une seule fois. Rien de ce qui est gardé ne change. Fichiers `1242-rapide.html`, `construire-1.24.2.py`
 (part de la 1.24.1). Tests : `test-rapide-1242.js`, plus les suites 1.24.1 à 1.16.0 rejouées, `test-maj-1242.js`. Rien de retiré.
 
+Version 1.25.0 — 07/11/2026 : **📣 Relances groupées**. En haut de 🏭 Fournisseurs, un seul écran qui range TOUS les
+fournisseurs par ce qu'il reste à leur dire, dans l'ordre d'urgence : 🔔 à relancer (prix demandés, rien reçu depuis 2 jours),
+💰 catalogue reçu sans prix (sa liste de prix à demander), 📖 rien reçu (catalogue + prix à demander), 🔔 catalogue demandé
+jamais arrivé, ⏳ en attente, ✅ prix reçus, ❌ écartés. Pour chacun : le message prêt (chinois d'abord, anglais dessous ; prix
+À LA PIÈCE, petites quantités 20/50/100/200 ou celles du voyage), le mot à taper dans WeChat pour le retrouver, « Copier »
+et « Envoyé — noter la date » (réutilise demande_le / relance_le / catalogue_demande_le ; une seule date neuve :
+catalogue_relance_le). Filtres par ville et « seulement À contacter ». Fait pour la journée de relances depuis WeChat sur
+l'ordinateur. Preuve : tests/test-carnet-1250.py, 45 contrôles, 45 bons (mise à jour 1.24.2 → 1.25.0 sans rien perdre,
+groupes, ordre, messages, filtres, Envoyé, rechargement, presse-papiers, ≥ 14 px, sombre, aucune erreur) ; 2 sabotages
+attrapés. Rien de retiré.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

@@ -455,6 +455,25 @@ l'ordinateur. Preuve : tests/test-carnet-1250.py, 45 contrôles, 45 bons (mise �
 groupes, ordre, messages, filtres, Envoyé, rechargement, presse-papiers, ≥ 14 px, sombre, aucune erreur) ; 2 sabotages
 attrapés. Rien de retiré.
 
+Version 1.27.0 — 08/11/2026 : **Le gros fichier de Claude s'ajoute vite, sans chauffer, et ses catalogues se retrouvent**.
+Riche (07/11) : « les nouveaux catalogues, je les trouve pas dans le carnet, et le carnet chauffe comme un verre chaud ». Mesuré avec le
+vrai fichier du 07/11 (18 fournisseurs, 4 260 modèles, 3 879 photos), téléphone simulé, processeur ralenti ×4 : 1.26.0 = 51 à 63 s de
+calcul à fond (photos rangées une par une : 2 ouvertures de la réserve + la photo redécoupée pour chaque modèle ; et les modèles posés
+seulement après toutes les photos, donc rien n'arrivait si l'écran s'éteignait au milieu) ; 1.27.0 = 1,6 à 1,9 s.
+(1) `trPhotosImport` range les photos par paquets de 150 dans une seule transaction (`t7Ecrire`) ; une photo JPEG déjà petite
+(≤ 110 Ko) sert telle quelle de petite photo ; la couche 1.24.0 « photos perdues remises » est gardée (une seule lecture des clés,
+`t7Cles`) ; la liste ⭐ Choix de Claude garde son chemin d'avant ; (2) `ctCleRef` mémorisée (même résultat) ; (3) l'écran est gardé
+allumé pendant l'ajout (`navigator.wakeLock`), repris s'il revient dans le carnet, relâché à la fin ; un 2e appui sur « Ajouter »
+pendant l'ajout est ignoré ; (4) « 🤖 Derniers ajouts de Claude » en haut de 🏭 Fournisseurs (`C.claude_derniers` : fournisseurs du
+dernier fichier — le dernier fichier en tête —, modèles, prix, photo, « Ouvrir » ; ✕ la ferme, « Revoir » la rouvre ; plusieurs
+fichiers ajoutés à la suite dans les 30 min = une seule liste ; après ✕ ou après 30 min, un nouveau fichier repart à zéro) ;
+(5) une ligne vide du fichier ne décale plus rien (la carte, et le nom WeChat de la 1.26.0 qui pouvait aller sur le fournisseur
+suivant) : ces lignes sont retirées avant la fusion, leur compte reste dans l'aperçu et le message ; (6) l'aperçu d'un gros fichier dit
+« gardez le carnet ouvert et l'écran allumé ». Fichiers `suivi-1.27.0.html`, `construire-1.27.0.py` (part de la 1.26.0).
+Preuve : tests/test-carnet-1270.py, 34 contrôles, 34 bons (ajout par le vrai choix de fichier, photos relues, casse au 4e paquet de
+photos qui laisse quand même tous les modèles et prix, photo perdue remise, ligne vide, cumul, double appui, re-lecture sans doublon),
+plus les 56 contrôles de la 1.26.0 rejoués sur la 1.27.0 ; deux vérifications indépendantes avec sabotages. Rien de retiré.
+
 ## ocr/ — la lecture du texte sans Internet (1.4.0) et des fichiers WeChat (1.5.0)
 
 Fichiers de tesseract.js 5.1.1 et deux langues (anglais, chinois simplifié), sans modification, licence Apache 2.0

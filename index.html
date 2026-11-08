@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.26.0';
+window.KYLO_APPLICATION = '1.27.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -30288,6 +30288,271 @@ if (typeof ecranRencontres === 'function') {
   };
 }
 </script>
+
+<style>
+/* ===================== Carnet 1.27.0 — 07/11/2026 : le gros fichier de Claude s'ajoute vite, et ses catalogues se retrouvent ===================== */
+.t7-carte{border:2px solid var(--bleu);border-radius:14px;background:var(--carte);padding:12px;margin:0 0 14px}
+.t7-carte h2{font-size:19px;margin:0 0 4px;display:flex;gap:8px;align-items:center;justify-content:space-between}
+.t7-carte .t7-total{font-size:15px;line-height:1.45;color:var(--texte-note);margin:0 0 8px}
+.t7-ligne{display:grid;grid-template-columns:60px 1fr auto;gap:10px;align-items:center;width:100%;text-align:left;min-height:64px;padding:8px 10px;margin:6px 0;
+  border:2px solid var(--lisiere);border-radius:12px;background:var(--carte);color:var(--noir);font:inherit;font-size:16px;cursor:pointer}
+.t7-ligne img,.t7-ligne .t7-vide{width:60px;height:60px;object-fit:contain;border-radius:10px;background:var(--bleu-pale);display:flex;align-items:center;justify-content:center;font-size:26px}
+.t7-ligne b{font-size:17px;display:block;line-height:1.3}
+.t7-ligne small{font-size:14px;color:var(--texte-note);line-height:1.35;display:block}
+.t7-ligne .t7-ouvrir{font-size:15px;font-weight:800;color:var(--bleu);white-space:nowrap}
+.t7-fermer{min-width:48px;min-height:44px;font-size:18px;border:2px solid var(--lisiere);border-radius:10px;background:var(--carte);color:var(--noir)}
+.t7-plus{width:100%;min-height:48px;font-size:16px;margin-top:4px}
+.t7-garde{font-size:15px;line-height:1.45;background:var(--bleu-pale);border-radius:10px;padding:8px 10px;margin:6px 0}
+</style>
+<script>
+// =====================================================================================================
+// Carnet 1.27.0 — 07/11/2026 : LE GROS FICHIER DE CLAUDE S'AJOUTE VITE, SANS CHAUFFER, ET SES CATALOGUES SE RETROUVENT
+// Riche (07/11, 19 h 38) : « Les nouveaux catalogues ajoutés, je les trouve pas dans le carnet, et en plus le carnet chauffe
+// comme un verre chaud. »
+// Mesuré avant (Chromium taille téléphone, processeur ralenti ×4, fichier de 4 260 modèles / 3 879 photos) : 50 s de calcul à
+// fond pour l'ajout, dont 35 s pour ranger les photos UNE PAR UNE (2 ouvertures de la réserve + la photo redécoupée, pour chaque
+// modèle). C'est ce qui chauffe ; et si l'écran s'éteint ou s'il passe à une autre application pendant ce temps, l'ajout
+// s'arrête AVANT d'avoir posé les modèles : rien n'arrive dans le carnet.
+// 1.27.0 :
+//   1. les photos se rangent par paquets (une seule ouverture de la réserve pour 150 photos) ; une photo de Claude déjà petite
+//      n'est plus redécoupée ; l'écran reste allumé pendant l'ajout quand le téléphone le permet ;
+//   2. la recherche d'un modèle déjà présent ne recalcule plus sa référence des milliers de fois (même résultat, plus vite) ;
+//   3. « 🤖 Derniers ajouts de Claude » en haut de 🏭 Fournisseurs : les fournisseurs du dernier fichier, avec leurs modèles,
+//      leurs prix et leur photo, et « Ouvrir ». Elle reste jusqu'à ce qu'il la ferme (✕) ; un nouveau fichier la remet ;
+//   4. dans l'aperçu, avant d'ajouter un gros fichier : « gardez le carnet ouvert et l'écran allumé jusqu'au message ✅ ».
+// Rien n'est retiré.
+// =====================================================================================================
+window.KYLO_IMPORT_RAPIDE = '1.27.0';
+const T7_LOT = 150, T7_PETITE = 110000;
+
+// ---------- 2. La référence d'un modèle, calculée une fois ----------
+const t7CleRefAvant = ctCleRef, T7_CLES = new Map();
+ctCleRef = function (ref) {
+  const s = String(ref || '');
+  let k = T7_CLES.get(s);
+  if (k === undefined) { k = t7CleRefAvant(s); if (T7_CLES.size > 50000) T7_CLES.clear(); T7_CLES.set(s, k); }
+  return k;
+};
+
+// ---------- 1. Ranger les photos par paquets ----------
+function t7Ecrire(paires) {
+  return ctOuvrir().then(db => new Promise((ok, ko) => {
+    let tx;
+    try { tx = db.transaction(CT_TABLE, 'readwrite'); const st = tx.objectStore(CT_TABLE); paires.forEach(([k, v]) => st.put(v, k)); }
+    catch (e) { try { db.close(); } catch (e2) {} ko(e); return; }
+    tx.oncomplete = () => { db.close(); ok(paires.length); };
+    tx.onerror = tx.onabort = () => { db.close(); ko(tx.error || new Error('le téléphone refuse de ranger les photos (mémoire pleine ?)')); };
+  }));
+}
+// La petite photo (celle des listes) : une photo JPEG de Claude fait déjà moins de 400 points de large, elle sert telle quelle.
+async function t7Mini(src) {
+  if (src.length <= T7_PETITE && /^data:image\/jpe?g;base64,/i.test(src)) return src;
+  return mkReduire(await trImage(src), 560, 0.74);
+}
+const t7Pause = () => new Promise(r => setTimeout(r, 0));
+// Toutes les clés de la réserve des photos, en une seule lecture (au lieu d'une lecture par modèle).
+function t7Cles() {
+  return ctOuvrir().then(db => new Promise((ok, ko) => {
+    let tx, r;
+    try { tx = db.transaction(CT_TABLE, 'readonly'); r = tx.objectStore(CT_TABLE).getAllKeys(); }
+    catch (e) { try { db.close(); } catch (e2) {} ko(e); return; }
+    tx.oncomplete = () => { db.close(); ok(new Set((r.result || []).map(String))); };
+    tx.onerror = tx.onabort = () => { db.close(); ko(tx.error || new Error('la réserve des photos ne se lit pas')); };
+  }));
+}
+trPhotosImport = async function (imp, suivi) {
+  let n = 0, fait = 0, lot = [], attente = [], reprises = 0;
+  const total = trNbPhotosImport(imp);
+  // 1.24.0 (gardé) : une photo NOTÉE (photo_doc) qui n'est plus dans le téléphone est remise depuis le fichier ;
+  // une photo qui est là n'est jamais remplacée.
+  let presentes = null;
+  try { presentes = await t7Cles(); } catch (e) { presentes = null; console.warn('1.27 photos', e); }
+  const vider = async () => {
+    if (!attente.length) return;
+    await t7Ecrire(lot);
+    attente.forEach(([xp, id]) => { xp.photo_doc = id; delete xp.photo; });
+    n += attente.length; lot = []; attente = [];
+    if (suivi) suivi(fait, total);
+    await t7Pause();                       // le téléphone respire entre deux paquets (l'écran se met à jour)
+  };
+  for (const x of (imp && imp.fournisseurs) || []) {
+    const f = ctTrouverFournisseur(x), deja = new Map();
+    if (f) ctProduits(f).forEach(p => { const k = ctCleRef(p.ref); if (k && !deja.has(k)) deja.set(k, p); });
+    for (const xp of x.produits || []) {
+      if (!(typeof xp.photo === 'string' && xp.photo.startsWith('data:image'))) { delete xp.photo; continue; }
+      const k = ctCleRef(xp.ref), p = k ? deja.get(k) : null;
+      if (p && p.photo_doc && presentes && !presentes.has(String(p.photo_doc)) && !presentes.has(p.photo_doc + '~m')) {
+        p.photo_doc_perdue = p.photo_doc; p.photo_doc = ''; reprises++;
+      }
+      if (p && p.photo_doc) { delete xp.photo; fait++; continue; }
+      let mini;
+      try { mini = await t7Mini(xp.photo); } catch (e) { delete xp.photo; fait++; continue; }
+      const id = idUnique('d');
+      lot.push([id, xp.photo], [id + '~m', mini]); attente.push([xp, id]); fait++;
+      if (attente.length >= T7_LOT) await vider();
+    }
+  }
+  await vider();
+  window.KYLO_PHOTOS_REPRISES = reprises;
+  if (reprises) setTimeout(() => avertir('📷 ' + reprises + ' photo' + (reprises > 1 ? 's' : '') + ' qui n\'étai' + (reprises > 1 ? 'ent' : 't') + ' plus dans le téléphone : remise' + (reprises > 1 ? 's' : '') + ' depuis le fichier.', 7000), 6500);
+  // Les photos de la liste « ⭐ Choix de Claude » (peu nombreuses) : comme avant (1.18.0).
+  for (const x of (imp && imp.choix_claude) || []) {
+    const deja = cxListe().find(c => c.id === String(x.id));
+    if (!(typeof x.photo === 'string' && x.photo.startsWith('data:image')) && CX_PHOTO_URL.test(String(x.photo_url || ''))) {
+      if (deja && deja.photo_doc) { x.photo_doc = deja.photo_doc; continue; }
+      x.photo = await cxUrlEnPhoto(x.photo_url);
+      if (!x.photo.startsWith('data:image')) { delete x.photo; continue; }
+    }
+    if (!(typeof x.photo === 'string' && x.photo.startsWith('data:image'))) { delete x.photo; continue; }
+    const id = deja && deja.photo_doc ? deja.photo_doc : 'dcx' + String(x.id).replace(/[^a-z0-9]/gi, '');
+    await ctEcrire(id, x.photo);
+    const mini = mkReduire(await trImage(x.photo), 560, 0.74);
+    await ctEcrire(id + '~m', mini); ctMiniCache[id] = mini;
+    x.photo_doc = id; delete x.photo; n++;
+    if (suivi) suivi(n, n);
+  }
+  return n;
+};
+
+// ---------- 3. Les derniers ajouts de Claude ----------
+// Gardé dans le carnet : { le, titre, ids: [id des fournisseurs], nouveaux: {id: n}, ferme }.
+// Une ligne « vide » du fichier (rien pour reconnaître un fournisseur) est laissée de côté par la 1.22 (f6) : son bilan suit la
+// liste SANS ces lignes. Pour que la ligne n° i du bilan soit bien le fournisseur n° i (carte ci-dessous, et nom WeChat de la
+// 1.26.0 qui sinon pouvait aller sur le fournisseur suivant), ces lignes sont retirées AVANT, et le compte des lignes vides
+// est remis dans ce que dit l'aperçu et le message final.
+function t7SansLignesVides(imp) {
+  try {
+    if (typeof f6Plan !== 'function' || typeof f6EntreeVide !== 'function' || !imp || !Array.isArray(imp.fournisseurs)) return null;
+    if (!imp.fournisseurs.some(x => x && typeof x === 'object' && f6EntreeVide(x))) return null;
+    const { plan } = f6Plan(imp);
+    const garder = imp.fournisseurs.filter(x => { const r = plan.get(x); return r && !r.vide; });
+    if (garder.length === imp.fournisseurs.length) return null;
+    return { imp2: Object.assign({}, imp, { fournisseurs: garder }), vides: imp.fournisseurs.filter(x => !garder.includes(x)) };
+  } catch (e) { return null; }
+}
+const T7_CUMUL_MS = 30 * 60 * 1000;     // plusieurs fichiers ajoutés à la suite (ou un zip) : une seule liste
+const t7FusionAvant = ctFusion;
+ctFusion = function (imp, appliquer) {
+  const sv = t7SansLignesVides(imp), imp2 = sv ? sv.imp2 : imp;
+  const args = Array.prototype.slice.call(arguments); if (sv) args[0] = imp2;
+  const bilan = t7FusionAvant.apply(this, args);
+  if (sv) {
+    const noms = sv.vides.map(x => String((x && (x.code || x.nom)) || '?'));
+    try { if (!appliquer && f6DernierPlan) { f6DernierPlan.vides = noms; if (f6DernierPlan.resume) { f6DernierPlan.resume.vides = noms.length; f6DernierPlan.resume.total = imp.fournisseurs.length; } } } catch (e) {}
+    try { if (appliquer && f6DernierResume) { f6DernierResume.vides = noms.length; f6DernierResume.total = imp.fournisseurs.length; } } catch (e) {}
+  }
+  try {
+    if (appliquer && imp2 && Array.isArray(imp2.fournisseurs)) {
+      const ids = [], nouveaux = {};
+      imp2.fournisseurs.forEach((x, i) => {
+        const b = bilan[i];
+        if (!b || !b.id || !x || !Array.isArray(x.produits) || !x.produits.length) return;
+        if (!ids.includes(b.id)) ids.push(b.id);
+        nouveaux[b.id] = (nouveaux[b.id] || 0) + (b.nouveaux || 0);
+      });
+      if (ids.length) {
+        const k = C.claude_derniers, maintenant = mkMaintenant();
+        // Cumul seulement pour des fichiers ajoutés à la suite, liste encore ouverte (après ✕, un nouveau fichier repart à zéro).
+        const recent = k && !k.ferme && Array.isArray(k.ids) && k.le && (new Date(maintenant) - new Date(k.le)) < T7_CUMUL_MS;
+        if (recent) {
+          ids.forEach(id => { if (!k.ids.includes(id)) k.ids.push(id); });
+          k.nouveaux = k.nouveaux || {};
+          Object.keys(nouveaux).forEach(id => { k.nouveaux[id] = num(k.nouveaux[id]) + nouveaux[id]; });
+          k.le = maintenant; if (imp.titre) k.titre = String(imp.titre); k.dernier = ids;
+        } else C.claude_derniers = { le: maintenant, titre: String(imp.titre || ''), ids, nouveaux, dernier: ids, ferme: false };
+      }
+    }
+  } catch (e) { /* le bilan reste juste */ }
+  return bilan;
+};
+const t7S = (n, un, plusieurs) => E(nf(n, 0)) + ' ' + (n > 1 ? plusieurs : un);
+let t7Tout = false;
+function t7Fermer() { if (C.claude_derniers) { C.claude_derniers.ferme = true; sauverLocal(); } dessiner(); }
+function t7Rouvrir() { if (C.claude_derniers) { C.claude_derniers.ferme = false; sauverLocal(); } dessiner(); }
+function t7Quand(iso) {
+  const d = new Date(iso); if (isNaN(d)) return '';
+  const z = (v) => String(v).padStart(2, '0');
+  return z(d.getDate()) + '/' + z(d.getMonth() + 1) + ' à ' + d.getHours() + ' h ' + z(d.getMinutes());
+}
+function t7Lignes() {
+  const k = C.claude_derniers; if (!k || !Array.isArray(k.ids)) return [];
+  return k.ids.map(id => mkFournisseur(id)).filter(Boolean).map(f => {
+    const ps = ctProduits(f);
+    return { f, n: ps.length, prix: ps.filter(p => num(p.prix) > 0).length, photo: (ps.find(p => p.photo_doc) || {}).photo_doc || '',
+      nouveaux: num(k.nouveaux && k.nouveaux[f.id]), dernier: Array.isArray(k.dernier) && k.dernier.includes(f.id) };
+  }).sort((a, b) => (b.dernier - a.dernier) || (b.n - a.n));     // le fichier ajouté en dernier d'abord, puis les plus gros
+}
+function t7CarteHtml() {
+  const k = C.claude_derniers; if (!k || !Array.isArray(k.ids) || !k.ids.length) return '';
+  const L = t7Lignes(); if (!L.length) return '';
+  if (k.ferme) return `<button type="button" class="b contour t7-plus" style="margin:0 0 12px" onclick="t7Rouvrir()">🤖 Revoir les derniers ajouts de Claude (${t7S(L.length, 'fournisseur', 'fournisseurs')})</button>`;
+  const nM = L.reduce((s, l) => s + l.n, 0), nP = L.reduce((s, l) => s + l.prix, 0), nN = L.reduce((s, l) => s + l.nouveaux, 0);
+  const vus = t7Tout ? L : L.slice(0, 8);
+  return `<div class="t7-carte" id="t7_derniers">
+    <h2><span>🤖 Derniers ajouts de Claude</span><button type="button" class="t7-fermer" aria-label="Fermer cette liste" onclick="t7Fermer()">✕</button></h2>
+    <p class="t7-total">${E(t7Quand(k.le))}${k.titre ? ' · ' + E(k.titre) : ''}<br><b>${t7S(L.length, 'fournisseur', 'fournisseurs')} · ${t7S(nM, 'modèle', 'modèles')} · ${E(nf(nP, 0))} avec un prix</b>${nN && nN !== nM ? ' · ' + t7S(nN, 'nouveau', 'nouveaux') : ''}</p>
+    ${vus.map(l => `<button type="button" class="t7-ligne" onclick="ctOuvrirDossier('${l.f.id}')">
+      ${l.photo ? `<img class="ct-mini" data-doc="${E(l.photo)}" alt="">` : '<span class="t7-vide" aria-hidden="true">🏭</span>'}
+      <span><b>${E(mkNomFournisseur(l.f))}</b><small>${t7S(l.n, 'modèle', 'modèles')} · ${l.prix ? E(nf(l.prix, 0)) + ' prix' : 'prix à demander'}${l.nouveaux && l.nouveaux !== l.n ? ' · ' + t7S(l.nouveaux, 'nouveau', 'nouveaux') : ''}</small></span>
+      <span class="t7-ouvrir">Ouvrir ›</span></button>`).join('')}
+    ${L.length > vus.length ? `<button type="button" class="b gris t7-plus" onclick="t7Tout=true;dessiner()">${L.length - vus.length > 1 ? 'Voir les ' + E(nf(L.length - vus.length, 0)) + ' autres' : 'Voir l\'autre'}</button>` : ''}
+  </div>`;
+}
+if (typeof ecranRencontres === 'function') {
+  const t7RencontresAvant = ecranRencontres;
+  ecranRencontres = function () {
+    const h = t7RencontresAvant.apply(this, arguments);
+    let c = ''; try { c = t7CarteHtml(); } catch (e) { c = ''; }
+    return c + h;
+  };
+}
+
+// ---------- 1 bis. Pendant l'ajout : l'écran reste allumé ----------
+const t7AppliquerAvant = ctAppliquerImport;
+let t7EnCours = false;
+ctAppliquerImport = async function () {
+  const imp = ctImportEnCours;
+  if (t7EnCours) return;                                  // 2e appui pendant l'ajout : ignoré (sinon les photos se rangeaient 2 fois)
+  t7EnCours = true;
+  const bouton = document.getElementById('ct_bouton_import'); if (bouton) bouton.disabled = true;
+  let verrou = null;
+  try { if (imp && navigator.wakeLock && trNbPhotosImport(imp) > 50) verrou = await navigator.wakeLock.request('screen'); } catch (e) { verrou = null; }
+  window.KYLO_IMPORT_ECRAN = verrou ? 'allumé' : 'normal';
+  t7Tout = false;
+  let fini = false;
+  const revenir = async () => {    // il est passé à une autre application puis revenu : l'écran est de nouveau gardé allumé
+    if (fini || document.visibilityState !== 'visible' || !navigator.wakeLock) return;
+    try {
+      const v = await navigator.wakeLock.request('screen');
+      if (fini) { await v.release(); return; }
+      const ancien = verrou; verrou = v;                  // posé AVANT d'attendre : deux retours rapprochés ne perdent aucun verrou
+      if (ancien && ancien !== v) { try { await ancien.release(); } catch (e) {} }
+    } catch (e) {}
+  };
+  if (verrou) document.addEventListener('visibilitychange', revenir);
+  try { return await t7AppliquerAvant.apply(this, arguments); }
+  finally {
+    fini = true; t7EnCours = false; document.removeEventListener('visibilitychange', revenir);
+    try { if (verrou) await verrou.release(); } catch (e) {}
+  }
+};
+
+// ---------- 4. L'aperçu d'un gros fichier ----------
+const t7ApercuAvant = ctApercuImport;
+ctApercuImport = async function () {
+  await t7ApercuAvant.apply(this, arguments);
+  const imp = ctImportEnCours, z = document.getElementById('ct_apercu_import');
+  if (!imp || !z) return;
+  z.querySelectorAll('p').forEach(el => { if (/découpées une par une/.test(el.innerHTML)) el.innerHTML = el.innerHTML.replace('découpées une par une', 'rangées par paquets'); });
+  if (z.querySelector('.t7-garde')) return;
+  const nP = trNbPhotosImport(imp), nM = (imp.fournisseurs || []).reduce((s, x) => s + ((x && x.produits) || []).length, 0);
+  if (nP < 200 && nM < 500) return;
+  z.insertAdjacentHTML('beforeend', `<div class="t7-garde">⏳ Gros fichier (${t7S(nM, 'modèle', 'modèles')}, ${t7S(nP, 'photo', 'photos')}) : l'ajout prend quelques secondes.
+    <b>Gardez le carnet ouvert et l'écran allumé jusqu'au message ✅.</b>
+    Ensuite, les fournisseurs ajoutés sont en haut de 🏭 Fournisseurs (« 🤖 Derniers ajouts de Claude »).</div>`);
+};
+</script>
+
 
 
 

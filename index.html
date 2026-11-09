@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.28.0';
+window.KYLO_APPLICATION = '1.29.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -30672,6 +30672,297 @@ ctAppliquerImport = async function () {
   const t = t8Texte(b); if (t) setTimeout(() => avertir(t, 7000), 6500);
 };
 </script>
+
+<style>
+/* ===================== Carnet 1.29.0 — 09/11/2026 : les fichiers de Claude arrivent par Azuska Z ; le carnet entier part à Azuska Z ===================== */
+.c29-bandeau{position:fixed;left:8px;right:8px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:60;border:2px solid var(--vert, #15803d);border-radius:14px;
+  background:var(--vert-pale, #f0fdf4);padding:12px 14px;font-size:16px;line-height:1.45;box-shadow:0 6px 24px rgba(0,0,0,.18)}
+html[data-theme="sombre"] .c29-bandeau{background:#0f2a1a}
+.c29-bandeau b{font-size:17px}
+.c29-bandeau .c29-bt{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.c29-bandeau .c29-bt button{flex:1 1 140px;min-height:50px;font-size:16px}
+.c29-carte{border-top:2px solid var(--lisiere, #e2e8f0);margin-top:16px;padding-top:12px}
+.c29-carte p{font-size:16px;line-height:1.45}
+.c29-etat{font-size:16px;font-weight:700;margin:8px 0;line-height:1.45}
+.c29-liste{margin:6px 0 0;padding-left:20px;font-size:15px;line-height:1.5}
+</style>
+<script>
+// =====================================================================================================
+// Carnet 1.29.0 — 09/11/2026 : LES FICHIERS DE CLAUDE ARRIVENT PAR AZUSKA Z ; LE CARNET ENTIER PART À AZUSKA Z
+// Riche (09/11, 14 h 12) : « Il ne doit pas être déposé seulement sur l'ordinateur, il doit être déposé sur le carnet de
+// voyage. En même temps, il doit être déposé sur Azuska Z… Il faut qu'on trie ce qu'on a commandé et ce qui n'a pas été
+// commandé. »
+// Avant : Claude posait ses fichiers sur l'ordinateur ; Riche devait se les envoyer sur WeChat, les enregistrer dans
+// Fichiers, puis « Ajouter » dans le carnet. Et pour que Claude voie le carnet : « Enregistrer », puis WeChat.
+// Maintenant, avec l'adresse d'Azuska Z (https://azuska.kyloeurguine.com) et le code d'envoi, tapés UNE fois :
+//   1. 📥 À l'ouverture, le carnet demande à Azuska Z s'il y a des fichiers de Claude nouveaux. S'il y en a, un bandeau
+//      vert dit combien (et leur poids) : « Ajouter au carnet » les télécharge UN PAR UN et les passe par LE MÊME chemin
+//      qu'à la main (aperçu, puis « ✅ Ajouter au carnet » : rien de ce que Riche a écrit n'est effacé, pas de doublon).
+//      Pas de téléchargement sans son geste : un gros fichier fait chauffer le téléphone (Riche, 07/11).
+//   2. 📤 « Envoyer tout le carnet à Azuska Z » : la même copie que « Enregistrer » (la copie du jour), mais au lieu d'un
+//      fichier à partager, elle part par internet en morceaux de 4 Mo. Claude la trouve dans Azuska Z pour le tri.
+// Le code d'envoi protège tout : sans lui, Azuska Z ne donne ni ne reçoit rien.
+// =====================================================================================================
+window.KYLO_BOITE_CLAUDE = '1.29.0';
+const C29_ADRESSE_DEFAUT = 'https://azuska.kyloeurguine.com';
+const C29_MORCEAU = 4 * 1024 * 1024;
+let c29EnCours = false, c29Capture = null, c29BandeauFerme = false;
+
+function c29Adresse() {
+  let a = ''; try { a = localStorage.getItem('kylo_adresse_azuska') || ''; } catch (e) {}
+  a = normaliserAdresse(a || C29_ADRESSE_DEFAUT);
+  // Depuis la page en ligne (https), une vieille adresse du WiFi du magasin (http://192.168…) ne peut pas marcher :
+  // le téléphone la refuse sans rien dire. On prend alors l'adresse internet d'Azuska Z (contrôle C4 du 09/11).
+  if (location.protocol === 'https:' && /^http:/i.test(a)) a = normaliserAdresse(C29_ADRESSE_DEFAUT);
+  return a;
+}
+// Les erreurs du téléphone arrivent en anglais (« Failed to fetch », « Load failed ») : on les dit en français.
+function c29Phrase(e) {
+  const m = String((e && e.message) || e || '');
+  if ((e && e.name === 'TypeError') || /failed to fetch|load failed|networkerror|network request failed/i.test(m))
+    return 'Azuska Z ne répond pas (pas d\'internet sur le téléphone, ou l\'ordinateur éteint)';
+  return m;
+}
+// Une réponse d'Azuska Z (il a répondu « non ») n'est pas un silence (pas d'internet) : on ne dit pas la même chose (contrôle « mots » du 09/11).
+function c29Refus(r, j) { return Object.assign(new Error((j && j.erreur) || ('Azuska Z répond ' + r.status)), { repondu: true, statut: r.status }); }
+function c29Local(m) { return Object.assign(new Error(m), { local: true }); }
+function c29Explication(e) {
+  const p = c29Phrase(e).replace(/[\s.]+$/, '');
+  if (e && e.repondu) return 'Azuska Z a répondu : « ' + p + '. »';
+  const phrase = p.charAt(0).toUpperCase() + p.slice(1) + '.';
+  if (e && e.local) return phrase;
+  return phrase + '\nL\'ordinateur doit être allumé, avec Azuska Z et sa fenêtre internet ouverts.';
+}
+function c29Code() { let c = ''; try { c = localStorage.getItem('kylo_code_azuska') || ''; } catch (e) {} return String(c).trim().toUpperCase(); }
+function c29Recus() { return C.c29_recus || (C.c29_recus = {}); }
+function c29Mo(o) { o = Number(o) || 0; return o < 1048576 ? nf(Math.max(1, Math.round(o / 1024)), 0) + ' Ko' : nf(o / 1048576, 1) + ' Mo'; }
+// Depuis la page en ligne (https), le téléphone n'appelle qu'une adresse https : celle d'internet d'Azuska Z.
+function c29AdresseUtilisable(a) { return !(location.protocol === 'https:' && /^http:/i.test(a)); }
+
+async function c29Liste() {
+  const a = c29Adresse(), code = c29Code();
+  if (!code) throw c29Local('le code d\'envoi d\'Azuska Z n\'est pas encore tapé (onglet « Envoyer au magasin » → « 📡 Par internet avec Azuska Z »)');
+  if (!c29AdresseUtilisable(a)) throw c29Local('depuis la version en ligne du carnet, il faut l\'adresse internet d\'Azuska Z (' + C29_ADRESSE_DEFAUT + ')');
+  const r = await fetch(a + '/api/carnet/fichiers-de-claude', { headers: { 'X-Code-Envoi': code }, cache: 'no-store' });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.ok === false) throw c29Refus(r, j);
+  return Array.isArray(j.fichiers) ? j.fichiers : [];
+}
+async function c29Nouveaux() {
+  const R = c29Recus();
+  return (await c29Liste()).filter(f => f && typeof f.id === 'string' && !R[f.id]);
+}
+
+// ---------- 1. Recevoir les fichiers de Claude ----------
+async function c29Telecharger(f, progres) {
+  const a = c29Adresse(), code = c29Code();
+  const r = await fetch(a + '/api/carnet/fichiers-de-claude?id=' + encodeURIComponent(f.id), { headers: { 'X-Code-Envoi': code }, cache: 'no-store' });
+  if (!r.ok) { const j = await r.json().catch(() => ({})); throw c29Refus(r, j); }
+  if (!r.body || !r.body.getReader) return await r.text();
+  const total = Number(r.headers.get('Content-Length')) || f.taille || 0, lecteur = r.body.getReader(), parts = [];
+  let recu = 0;
+  for (;;) {
+    const { done, value } = await lecteur.read(); if (done) break;
+    parts.push(value); recu += value.byteLength; if (progres) progres(recu, total);
+  }
+  return await new Blob(parts).text();
+}
+async function c29Recevoir() {
+  if (c29EnCours || (typeof mlEnCours !== 'undefined' && mlEnCours)) { avertir('⏳ Un ajout est déjà en cours : attendez le message ✅.', 6000); return; }
+  c29EnCours = true; c29FermerBandeau();
+  const bilan = [];
+  try {
+    let L;
+    try { L = await c29Nouveaux(); } catch (e) { avertir('⚠ ' + c29Explication(e), 10000); return; }
+    if (!L.length) { avertir('✓ Rien de nouveau : tous les fichiers de Claude sont déjà dans le carnet.', 6000); return; }
+    for (let i = 0; i < L.length; i++) {
+      const f = L[i];
+      fermerBoite();
+      boite(`<div class="mk-dlg"><h3>📥 Fichier ${i + 1} sur ${L.length}</h3><p class="c29-etat" id="c29_prog">${E(f.titre || f.nom)} — téléchargement…</p>
+        <p class="px-aide">Gardez le carnet ouvert et l'écran allumé jusqu'au message ✅.</p></div>`);
+      let texte = '';
+      try {
+        texte = await c29Telecharger(f, (n, t) => { const z = document.getElementById('c29_prog'); if (z) z.textContent = (f.titre || f.nom) + ' — ' + c29Mo(n) + (t ? ' sur ' + c29Mo(t) : ''); });
+      } catch (e) { bilan.push({ nom: f.nom, etat: 'erreur', detail: c29Explication(e).replace(/\n/g, ' ') }); continue; }
+      // Le même chemin qu'à la main (Carnet 1.24.1) : aperçu, puis « ✅ Ajouter au carnet ».
+      const fichier = { name: f.nom, type: 'application/json', text: async () => texte };
+      window.KYLO_DERNIER_LOT = null;
+      await mlAjouterPlusieurs([fichier]);
+      const res = (window.KYLO_DERNIER_LOT || [])[0] || { etat: 'erreur', detail: 'pas de réponse de l\'ajout' };
+      texte = '';
+      if (res.etat === 'ajoute' || res.etat === 'laisse') { c29Recus()[f.id] = { nom: f.nom, le: mkMaintenant(), etat: res.etat }; sauverLocal(); }
+      bilan.push({ nom: f.titre || f.nom, etat: res.etat, detail: res.detail || '' });
+      await new Promise(ok => setTimeout(ok, 1300));      // la boîte « ✅ fichier ajouté » de 1.24.1 s'ouvre, puis on passe au suivant
+    }
+  } finally { c29EnCours = false; }
+  const ok = bilan.filter(b => b.etat === 'ajoute').length;
+  fermerBoite();
+  boite(`<div class="mk-dlg"><h3>${ok === bilan.length ? '✅' : '⚠'} ${ok} fichier${ok > 1 ? 's' : ''} de Claude ajouté${ok > 1 ? 's' : ''} sur ${bilan.length}</h3>
+    <ul class="c29-liste">${bilan.map(b => `<li>${b.etat === 'ajoute' ? '✅' : b.etat === 'laisse' ? '—' : '⚠'} ${E(b.nom)}${b.etat === 'ajoute' || b.etat === 'laisse' ? '' : '<br>' + E(b.detail || b.etat)}</li>`).join('')}</ul>
+    <p class="px-aide">Ce qui n'est pas passé sera reproposé à la prochaine ouverture. Les fournisseurs ajoutés sont en haut de 🏭 Fournisseurs.</p>
+    <div class="mk-boutons"><button class="b gris" onclick="fermerBoite();dessiner()">Fermer</button></div></div>`);
+}
+
+// Le bandeau vert, à l'ouverture (seulement si le code est tapé et qu'Azuska Z répond).
+function c29FermerBandeau() { const b = document.getElementById('c29_bandeau'); if (b) b.remove(); }
+function c29PlusTard() { c29BandeauFerme = true; c29FermerBandeau(); }
+async function c29Verifier() {
+  if (c29BandeauFerme || c29EnCours || !c29Code() || !c29AdresseUtilisable(c29Adresse())) return;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+  let L = [];
+  try { L = await c29Nouveaux(); } catch (e) { return; }           // Azuska Z éteint : on ne dérange pas
+  if (!L.length || document.getElementById('c29_bandeau')) return;
+  const poids = L.reduce((s, f) => s + (Number(f.taille) || 0), 0);
+  document.body.insertAdjacentHTML('beforeend', `<div class="c29-bandeau" id="c29_bandeau" role="status">
+    📥 <b>Claude a déposé ${L.length} fichier${L.length > 1 ? 's' : ''} pour ton carnet</b> (${c29Mo(poids)}) :<br>
+    ${L.slice(0, 4).map(f => E(f.titre || f.nom)).join('<br>')}${L.length > 4 ? '<br>…' : ''}
+    <div class="c29-bt"><button class="b vert" onclick="c29Recevoir()">📥 Ajouter au carnet</button><button class="b gris" onclick="c29PlusTard()">Plus tard</button></div></div>`);
+}
+
+// ---------- 2. Envoyer tout le carnet à Azuska Z ----------
+// La copie du jour se fabrique comme pour « Enregistrer » (1.18.0) ; au moment de la remettre, on la garde au lieu de la partager.
+// remettreFichier est écrit PLUS BAS dans la page : on l'enveloppe quand toute la page est lue (sinon il nous écraserait).
+let c29RemettreAvant = null;
+function c29Remettre(blob, nom) {
+  if (c29Capture) { c29Capture.blob = blob; c29Capture.nom = nom; return Promise.resolve('azuska'); }
+  return c29RemettreAvant.apply(this, arguments);
+}
+async function c29Envoyer(blob) {
+  const a = c29Adresse(), code = c29Code();
+  const depot = (crypto.randomUUID ? crypto.randomUUID() : ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)));
+  const n = Math.max(1, Math.ceil(blob.size / C29_MORCEAU));
+  if (n > 30) throw c29Local('la copie fait ' + c29Mo(blob.size) + ' : c\'est trop (120 Mo au plus)');
+  const z = document.getElementById('c29_prog');
+  for (let i = 0; i < n; i++) {
+    const morceau = blob.slice(i * C29_MORCEAU, Math.min(blob.size, (i + 1) * C29_MORCEAU));
+    let essai = 0;
+    for (;;) {
+      try {
+        const r = await fetch(a + '/api/carnet/sauvegarde?depot=' + depot + '&n=' + i, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', 'X-Code-Envoi': code }, body: morceau });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || j.ok === false) throw Object.assign(c29Refus(r, j), { definitif: r.status === 401 || r.status === 413 });
+        break;
+      } catch (e) {
+        if (e.definitif || ++essai >= 3) throw e;
+        await new Promise(ok => setTimeout(ok, 1500 * essai));
+      }
+    }
+    if (z) z.textContent = 'Envoi : ' + (i + 1) + ' / ' + n + ' (' + c29Mo(Math.min(blob.size, (i + 1) * C29_MORCEAU)) + ' sur ' + c29Mo(blob.size) + ')';
+  }
+  const r = await fetch(a + '/api/carnet/sauvegarde?depot=' + depot + '&finir=1&morceaux=' + n, { method: 'POST', headers: { 'X-Code-Envoi': code } });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.ok === false) throw c29Refus(r, j);
+  return j;
+}
+async function c29EnvoyerTout() {
+  if (c29EnCours) return;
+  if (!c29Code()) { avertir('⚠ Tapez d\'abord le code d\'envoi d\'Azuska Z (onglet « Envoyer au magasin » → « 📡 Par internet avec Azuska Z »).', 8000); return; }
+  if (!c29AdresseUtilisable(c29Adresse())) { avertir('⚠ Depuis la version en ligne du carnet, mettez l\'adresse internet d\'Azuska Z : ' + C29_ADRESSE_DEFAUT, 9000); return; }
+  c29EnCours = true;
+  fermerBoite();
+  boite(`<div class="mk-dlg"><h3>📤 Tout le carnet vers Azuska Z</h3><p class="c29-etat" id="c29_prog">Préparation de la copie du jour…</p>
+    <p class="px-aide">Gardez le carnet ouvert et l'écran allumé jusqu'au message ✅.</p></div>`);
+  // « Envoyer tout » n'est pas « Enregistrer » : tant qu'Azuska Z n'a pas répondu « reçu », rien n'est sorti du téléphone.
+  // enregistrerCarnet() note la sauvegarde dès que la copie est fabriquée : on garde l'état d'avant et on le remet si
+  // l'envoi échoue — sinon le rappel 💾 et la garde à la fermeture s'éteindraient pour rien (contrôle C2 du 09/11).
+  const avant = { le: C.enregistre_le, modif: modifieDepuisEnregistrement, dernier: kyloDernierFichier };
+  // La copie doit passer par remettreFichier (où on la garde), jamais par le lecteur de Claude.
+  let capaAvant; try { capaAvant = _capaEnregistrement; _capaEnregistrement = null; } catch (e) {}
+  c29Capture = {};
+  let j = null, err = null, gardee = false;
+  try {
+    await enregistrerCarnet();                          // fabrique la copie du jour
+    const blob = c29Capture && c29Capture.blob;
+    gardee = Boolean(blob);
+    c29Capture = null;
+    if (!blob) throw c29Local('la copie n\'a pas pu être préparée');
+    j = await c29Envoyer(blob);
+  } catch (e) { err = e; } finally {
+    c29Capture = null; c29EnCours = false;
+    try { _capaEnregistrement = capaAvant; } catch (e) {}
+  }
+  if (gardee) {
+    if (err) { C.enregistre_le = avant.le; modifieDepuisEnregistrement = avant.modif; kyloDernierFichier = avant.dernier; }
+    else { C.enregistre_le = new Date().toISOString(); C.c29_envoye_le = C.enregistre_le; modifieDepuisEnregistrement = false; kyloDernierFichier = new Date(); }
+    try { kyloGarderCarnet(); } catch (e) {}
+    try { majEtat(); } catch (e) {}
+  }
+  fermerBoite();
+  boite(`<div class="mk-dlg"><h3>${err ? '⚠ Pas envoyé' : '✅ Carnet reçu par Azuska Z'}</h3>
+    <p style="font-size:16px">${err ? E(c29Explication(err)).replace(/\n/g, '<br>') + '<br>' + (err.repondu || err.local ? '' : 'Réessayez quand internet revient : la copie repartira en entier (quelques secondes). ') + 'Rien n\'est perdu dans le carnet.' : E(j.message || 'Carnet reçu.')}</p>
+    <div class="mk-boutons"><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
+}
+
+// ---------- Les boutons : carte « 📡 Par internet avec Azuska Z », onglet « Envoyer au magasin » ----------
+// L'adresse et le code tapés dans la carte servent aussi aux deux boutons (gardés dès qu'on les change).
+function c29Garder() {
+  try {
+    const a = normaliserAdresse((document.getElementById('adresseAzuska') || {}).value || '');
+    const c = String((document.getElementById('c29_code') || document.getElementById('codeAzuska') || {}).value || '').trim().toUpperCase();
+    if (a) localStorage.setItem('kylo_adresse_azuska', a);
+    if (c) localStorage.setItem('kylo_code_azuska', c);
+    const x = document.getElementById('codeAzuska'); if (x && c) x.value = c;
+  } catch (e) {}
+}
+// La case du code de NOTRE carte (version en ligne) : gardée tout de suite, et le bandeau regarde aussitôt s'il y a des fichiers.
+function c29GarderCode(v) {
+  const c = String(v || '').trim().toUpperCase();
+  try { if (c) localStorage.setItem('kylo_code_azuska', c); } catch (e) {}
+  const x = document.getElementById('codeAzuska'); if (x && c) x.value = c;
+  if (c) { c29BandeauFerme = false; setTimeout(c29Verifier, 300); }
+}
+function c29Boutons() {
+  const fin = document.getElementById('resultatEnvoiAzuska');
+  if (!fin || document.getElementById('c29_carte')) return;
+  const champ = document.getElementById('adresseAzuska');
+  if (champ && !champ.value) champ.value = c29Adresse();
+  if (champ) champ.placeholder = C29_ADRESSE_DEFAUT;
+  ['adresseAzuska', 'codeAzuska'].forEach(id => { const x = document.getElementById(id); if (x) x.addEventListener('change', c29Garder); });
+  // Version en ligne (https) : le module F3 range la carte « 3. Directement vers Azuska Z » dans le volet FERMÉ
+  // « Envoi direct (seulement… sur son WiFi) ». Notre carte se met donc APRÈS ce volet, bien visible, avec sa propre
+  // case pour le code d'envoi (contrôle C1 du 09/11).
+  const volet = fin.closest('details'), champCode = document.getElementById('codeAzuska');
+  const caseCode = !champCode || Boolean(volet);
+  (volet || fin).insertAdjacentHTML('afterend', `<div class="c29-carte" id="c29_carte">
+    <h2 style="margin-top:18px">📡 Par internet avec Azuska Z</h2>
+    <p>Adresse : <b>${E(c29Adresse())}</b>. L'ordinateur doit être allumé, avec Azuska Z ouvert.</p>
+    ${caseCode ? `<label for="c29_code">Code d'envoi d'Azuska Z</label>
+    <input id="c29_code" value="${E(c29Code())}" placeholder="ABC-DEF" autocapitalize="characters" autocomplete="off" style="letter-spacing:.1em" onchange="c29GarderCode(this.value)">
+    <p class="muet">Affiché dans Azuska Z → Métier → Fiches produits. À taper une seule fois.</p>
+    <div style="height:8px"></div>` : ''}
+    <button class="b vert" onclick="c29Garder();c29Recevoir()">📥 Recevoir les fichiers de Claude</button>
+    <div style="height:8px"></div>
+    <button class="b contour" onclick="c29Garder();c29EnvoyerTout()">📤 Envoyer tout le carnet à Azuska Z</button>
+    <p class="muet">« Envoyer tout le carnet » : Claude y trie ce qui a été commandé et prépare la réception au magasin.</p></div>`);
+}
+function c29Installer() {
+  if (c29Installer.fait) return; c29Installer.fait = true;
+  if (typeof remettreFichier === 'function' && remettreFichier !== c29Remettre) { c29RemettreAvant = remettreFichier; remettreFichier = c29Remettre; }
+  // Pendant « Envoyer tout », les avis « 💾 … » d'Enregistrer (« Copie du jour », « Le fichier fait … Mo ») ne doivent pas
+  // s'afficher : aucun fichier ne sort du téléphone. Enregistrer les colle parfois SOUS l'avis déjà affiché : on cherche
+  // donc une ligne qui commence par 💾, pas seulement le début du message (contrôle N10 du 09/11).
+  if (typeof avertir === 'function') { const avertirAvant = avertir; avertir = function (m) { if (c29Capture && /(^|\n)💾/.test(String(m))) return; return avertirAvant.apply(this, arguments); }; }
+  const dessinerAvant = dessiner;
+  dessiner = function () {
+    const r = dessinerAvant.apply(this, arguments);
+    try { c29Boutons(); } catch (e) {}
+    return r;
+  };
+  try { c29Boutons(); } catch (e) {}
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', c29Installer); else c29Installer();
+// À l'ouverture (une fois la réserve lue), puis quand le téléphone retrouve internet.
+window.addEventListener('load', () => {
+  let essais = 0;
+  const attendre = () => {
+    if ((typeof kyloReserveLue !== 'undefined' && !kyloReserveLue) && essais++ < 50) { setTimeout(attendre, 300); return; }
+    setTimeout(c29Verifier, 2500);
+  };
+  attendre();
+});
+window.addEventListener('online', () => setTimeout(c29Verifier, 2000));
+</script>
+
 
 
 <script>

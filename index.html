@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.27.0';
+window.KYLO_APPLICATION = '1.28.0';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -30553,11 +30553,125 @@ ctApercuImport = async function () {
 };
 </script>
 
+<style>
+/* ===================== Carnet 1.28.0 — 09/11/2026 : les dépenses du voyage arrivent par le fichier de Claude ===================== */
+.t8-frais{border:2px solid var(--bleu);border-radius:12px;background:var(--bleu-pale);padding:10px 12px;margin:8px 0;font-size:16px;line-height:1.45}
+.t8-frais b{font-size:17px}
+.t8-frais table{width:100%;border-collapse:collapse;margin-top:6px;font-size:15px}
+.t8-frais td{padding:4px 2px;border-top:1px solid var(--lisiere);vertical-align:top}
+.t8-frais td:last-child{text-align:right;white-space:nowrap;font-weight:700}
+.t8-frais .t8-deja{color:var(--texte-note)}
+</style>
+<script>
+// =====================================================================================================
+// Carnet 1.28.0 — 09/11/2026 : LES DÉPENSES DU VOYAGE ARRIVENT PAR LE FICHIER DE CLAUDE
+// Riche (09/11, 7 h 27) : « on va rajouter ces dépenses-là… pour que je puisse savoir exactement combien j'ai dépensé, combien
+// ça a été mis dans la marchandise et ça fait combien de pourcents. » Ses dépenses s'étaient arrêtées au 18/10 dans l'onglet Frais ;
+// tout le reste (Alipay, espèces, billets) était à retaper à la main, ligne par ligne, depuis les captures.
+// 1.28.0 : le fichier de Claude (📥 « Ajouter ce que Claude a lu », format kylo-import) peut porter « frais » :
+//   frais: [{ cle, libelle, montant, devise, date, etat, mode, repartition, note }]
+//   - chaque ligne va dans l'onglet 💸 Frais, exactement comme une dépense tapée à la main (même champs, même calcul) ;
+//   - « cle » (ex. « alipay:2026-11-03:13:56 ») : une dépense déjà ajoutée par un fichier n'est JAMAIS mise en double, même si le
+//     même fichier est ajouté deux fois ; une dépense que Riche a modifiée ou supprimée depuis n'est pas touchée ni remise ;
+//   - « repartition » : 'valeur' (réparti sur le coût des produits — hôtel, repas, taxi, guide…) ou 'aucune' (hors coût des
+//     produits — le matériel du magasin, qui n'est pas revendu) ; « mode » : 'alipay' / 'especes' / 'carte' / 'virement' ;
+//   - l'aperçu dit, AVANT d'ajouter, combien de dépenses arrivent, le total par devise, et celles déjà présentes ;
+//   - un fichier qui ne porte que des frais va à l'onglet Frais après l'ajout, sans passer par Fournisseurs.
+// Rien n'est retiré : un fichier sans « frais » fait exactement ce qu'il faisait en 1.27.0.
+// (Toutes les fonctions commencent par « t8 » : aucun nom déjà pris dans le carnet.)
+// =====================================================================================================
+window.KYLO_FRAIS_FICHIER = '1.28.0';
+const T8_REPARTITIONS = ['valeur', 'quantite', 'produit', 'aucune'], T8_MODES = ['alipay', 'especes', 'carte', 'virement', 'wechat'];
 
+function t8Lignes(imp) {
+  const L = [];
+  (imp && Array.isArray(imp.frais) ? imp.frais : []).forEach((x, i) => {
+    if (!x || typeof x !== 'object') return;
+    const m = num(x.montant); const lib = String(x.libelle || '').trim();
+    if (!(m > 0) || !lib) return;
+    const cle = String(x.cle || ('fichier:' + lib + ':' + m + ':' + (x.date || '') + ':' + i)).trim();
+    L.push({ cle, libelle: lib, montant: m, devise: String(x.devise || C.voyage.devise || 'CNY').toUpperCase(),
+      date: /^\d{4}-\d{2}-\d{2}$/.test(String(x.date || '')) ? x.date : '',
+      etat: x.etat === 'prevu' ? 'prevu' : 'paye',
+      mode: T8_MODES.includes(String(x.mode || '')) ? x.mode : 'especes',
+      repartition: T8_REPARTITIONS.includes(String(x.repartition || '')) ? x.repartition : 'valeur',
+      note: String(x.note || '').trim(), type: String(x.type || '').trim() });
+  });
+  return L;
+}
+// Les clés déjà vues : les frais présents ET ceux posés par un fichier puis retirés à la main (sa main passe avant le fichier).
+function t8Vues() {
+  const s = new Set();
+  (C.frais || []).forEach(f => { if (f && f.cle_import) s.add(f.cle_import); });
+  (C.t8_retires || []).forEach(k => s.add(k));
+  return s;
+}
+function t8Bilan(imp) {
+  const L = t8Lignes(imp), vues = t8Vues();
+  const nouveaux = L.filter(l => !vues.has(l.cle)), deja = L.length - nouveaux.length;
+  const totaux = {};
+  nouveaux.forEach(l => { totaux[l.devise] = (totaux[l.devise] || 0) + l.montant; });
+  return { L, nouveaux, deja, totaux };
+}
+function t8Ajouter(imp) {
+  const b = t8Bilan(imp);
+  if (!Array.isArray(C.frais)) C.frais = [];
+  b.nouveaux.forEach(l => {
+    C.frais.push({ id: idUnique('f'), libelle: l.libelle, montant: l.montant, devise: l.devise, repartition: l.repartition,
+      produit_id: '', note: l.note, date: l.date, etat: l.etat, mode: l.mode, cle_import: l.cle, origine: 'fichier-claude',
+      ajoute_le: new Date().toISOString().slice(0, 10) });
+  });
+  if (b.nouveaux.length) sauverLocal();
+  return b;
+}
+function t8Texte(b) {
+  const parts = Object.keys(b.totaux).map(d => dev(b.totaux[d], d));
+  return b.nouveaux.length ? ('💸 ' + b.nouveaux.length + ' dépense(s) ajoutée(s) dans Frais' + (parts.length ? ' : ' + parts.join(' + ') : '')
+    + (b.deja ? ' (' + b.deja + ' déjà présente(s), pas remise(s))' : '') + '.')
+    : (b.deja ? '💸 Ces ' + b.deja + ' dépense(s) étaient déjà dans Frais : rien n\'a été remis.' : '');
+}
+// Une dépense venue d'un fichier et supprimée à la main ne revient pas au prochain fichier.
+const t8SupprimerAvant = typeof supprimerFrais === 'function' ? supprimerFrais : null;
+if (t8SupprimerAvant) supprimerFrais = function (idF) {
+  let cle = ''; try { const f = (C.frais || []).find(x => x && x.id === idF); cle = f && f.cle_import ? f.cle_import : ''; } catch (e) {}
+  const r = t8SupprimerAvant.apply(this, arguments);
+  try { if (cle && !(C.frais || []).some(x => x && x.id === idF)) { C.t8_retires = (C.t8_retires || []).concat([cle]).slice(-2000); sauverLocal(); } } catch (e) {}
+  return r;
+};
 
-
-
-
+const t8ApercuAvant = ctApercuImport;
+ctApercuImport = async function () {
+  await t8ApercuAvant.apply(this, arguments);
+  const imp = ctImportEnCours, z = document.getElementById('ct_apercu_import');
+  if (!imp || !z || !t8Lignes(imp).length) return;
+  const b = t8Bilan(imp), vues = t8Vues();
+  const parts = Object.keys(b.totaux).map(d => '<b>' + E(dev(b.totaux[d], d)) + '</b>');
+  const lignes = b.L.slice(0, 60).map(l => `<tr class="${vues.has(l.cle) ? 't8-deja' : ''}"><td>${E(l.libelle)}${l.date ? '<br><span class="muet">' + E(dateFr(l.date)) + (l.repartition === 'aucune' ? ' · hors coût des produits' : '') + '</span>' : ''}${vues.has(l.cle) ? '<br><span class="muet">déjà dans Frais</span>' : ''}</td><td>${E(dev(l.montant, l.devise))}</td></tr>`).join('');
+  z.insertAdjacentHTML('afterbegin', `<div class="t8-frais">💸 <b>${b.nouveaux.length} dépense${b.nouveaux.length > 1 ? 's' : ''} du voyage</b> pour l'onglet Frais${parts.length ? ' — ' + parts.join(' + ') : ''}${b.deja ? `<br><span class="t8-deja">${b.deja} déjà présente${b.deja > 1 ? 's' : ''} : pas remise${b.deja > 1 ? 's' : ''}</span>` : ''}
+    <table>${lignes}${b.L.length > 60 ? `<tr><td colspan="2" class="muet">… et ${b.L.length - 60} autre(s)</td></tr>` : ''}</table></div>`);
+  const bouton = document.getElementById('ct_bouton_import');
+  if (bouton && b.nouveaux.length) bouton.disabled = false;
+  else if (bouton && t8RienDAutre(imp)) bouton.disabled = true;   // tout est déjà là et le fichier ne porte rien d'autre : rien à ajouter
+};
+function t8RienDAutre(imp) {
+  const resteFournisseurs = (imp.fournisseurs || []).some(f => f && (String(f.nom || f.societe || '').trim() || (f.produits || []).length || (f.offres || []).length || (f.achats || []).length));
+  return !resteFournisseurs && !imp.commande && !imp.etude && !(imp.offres || []).length && !imp.marche
+    && !(Array.isArray(imp.blocs) && imp.blocs.length) && !imp.bloc;
+}
+const t8AppliquerAvant = ctAppliquerImport;
+ctAppliquerImport = async function () {
+  const imp = ctImportEnCours;
+  if (!imp || !t8Lignes(imp).length) return t8AppliquerAvant.apply(this, arguments);
+  const b = t8Ajouter(imp);
+  if (t8RienDAutre(imp)) {
+    ctImportEnCours = null; trFichierImport = ''; fermerBoite(); allerA('frais');
+    avertir(t8Texte(b) || '💸 Rien de nouveau à ajouter.', 7000);
+    return;
+  }
+  await t8AppliquerAvant.apply(this, arguments);
+  const t = t8Texte(b); if (t) setTimeout(() => avertir(t, 7000), 6500);
+};
+</script>
 
 
 <script>

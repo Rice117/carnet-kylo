@@ -913,7 +913,7 @@ function kyloIdsSurs(o, profondeur) {
 // 1.1.0 (11/10/2026) : une seule version du carnet (en ligne = fichier du magasin) ; code d'envoi du magasin ;
 // dépenses d'avant le départ (passeport, visa, billets) ; frais « hors coût des produits » ; adresse et code
 // déjà remplis quand le carnet est téléchargé depuis le magasin.
-window.KYLO_APPLICATION = '1.29.0';
+window.KYLO_APPLICATION = '1.29.1';
 var kyloInstallation = null;
 var KYLO_PICTO_PARTAGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); kyloInstallation = e; majCarteApplication(); });
@@ -30827,6 +30827,34 @@ function c29Remettre(blob, nom) {
   if (c29Capture) { c29Capture.blob = blob; c29Capture.nom = nom; return Promise.resolve('azuska'); }
   return c29RemettreAvant.apply(this, arguments);
 }
+// 1.29.1 (11/11) — le vrai carnet de Riche fait 314 Mo à cause des photos : trop pour passer par internet.
+// On fabrique alors une COPIE LÉGÈRE : la même copie, où chaque photo (« data:image… ») est remplacée par du vide.
+// Lecture par tranches de 8 Mo : le téléphone ne charge jamais la copie entière en mémoire une deuxième fois.
+async function c29Alleger(blob) {
+  const TRANCHE = 8 * 1024 * 1024, MARQUE = 'data:image/', dec = new TextDecoder('utf-8'), sorties = [];
+  let reste = '', dansPhoto = false, photos = 0;
+  const z = document.getElementById('c29_prog');
+  for (let pos = 0; pos < blob.size || reste; pos += TRANCHE) {
+    const fin = pos + TRANCHE >= blob.size;
+    let t = reste + (pos < blob.size ? dec.decode(await blob.slice(pos, pos + TRANCHE).arrayBuffer(), { stream: !fin }) : '');
+    reste = '';
+    if (z) z.textContent = 'Copie légère (sans les photos) : ' + c29Mo(Math.min(blob.size, pos + TRANCHE)) + ' sur ' + c29Mo(blob.size);
+    if (dansPhoto) { const q = t.indexOf('"'); if (q < 0) { if (fin) break; continue; } t = t.slice(q); dansPhoto = false; }
+    for (;;) {
+      const i = t.indexOf('"' + MARQUE);
+      if (i < 0) { const garde = fin ? 0 : MARQUE.length + 1; sorties.push(t.slice(0, t.length - garde)); reste = t.slice(t.length - garde); break; }
+      if (i > 0 && t[i - 1] === '\\') { sorties.push(t.slice(0, i + 1)); t = t.slice(i + 1); continue; }   // un guillemet échappé : ce n'est pas le début d'une valeur
+      sorties.push(t.slice(0, i + 1)); photos++;
+      const q = t.indexOf('"', i + 1);
+      if (q < 0) { dansPhoto = true; break; }
+      t = t.slice(q);
+    }
+    if (fin) break;
+  }
+  const leger = new Blob(sorties, { type: 'application/json' });
+  leger.c29Photos = photos;
+  return leger;
+}
 async function c29Envoyer(blob) {
   const a = c29Adresse(), code = c29Code();
   const depot = (crypto.randomUUID ? crypto.randomUUID() : ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)));
@@ -30869,27 +30897,30 @@ async function c29EnvoyerTout() {
   // La copie doit passer par remettreFichier (où on la garde), jamais par le lecteur de Claude.
   let capaAvant; try { capaAvant = _capaEnregistrement; _capaEnregistrement = null; } catch (e) {}
   c29Capture = {};
-  let j = null, err = null, gardee = false;
+  let j = null, err = null, gardee = false, leger = null, gardeeTaille = 0;
   try {
     await enregistrerCarnet();                          // fabrique la copie du jour
     const blob = c29Capture && c29Capture.blob;
-    gardee = Boolean(blob);
+    gardee = Boolean(blob); gardeeTaille = blob ? blob.size : 0;
     c29Capture = null;
     if (!blob) throw c29Local('la copie n\'a pas pu être préparée');
-    j = await c29Envoyer(blob);
+    // Trop gros pour internet (photos) : on envoie la copie légère, sans les photos.
+    if (blob.size > C29_MORCEAU * 30) leger = await c29Alleger(blob);
+    j = await c29Envoyer(leger || blob);
   } catch (e) { err = e; } finally {
     c29Capture = null; c29EnCours = false;
     try { _capaEnregistrement = capaAvant; } catch (e) {}
   }
   if (gardee) {
-    if (err) { C.enregistre_le = avant.le; modifieDepuisEnregistrement = avant.modif; kyloDernierFichier = avant.dernier; }
+    // Une copie SANS photos n'est pas une sauvegarde : le rappel 💾 reste comme avant.
+    if (err || leger) { C.enregistre_le = avant.le; modifieDepuisEnregistrement = avant.modif; kyloDernierFichier = avant.dernier; }
     else { C.enregistre_le = new Date().toISOString(); C.c29_envoye_le = C.enregistre_le; modifieDepuisEnregistrement = false; kyloDernierFichier = new Date(); }
     try { kyloGarderCarnet(); } catch (e) {}
     try { majEtat(); } catch (e) {}
   }
   fermerBoite();
   boite(`<div class="mk-dlg"><h3>${err ? '⚠ Pas envoyé' : '✅ Carnet reçu par Azuska Z'}</h3>
-    <p style="font-size:16px">${err ? E(c29Explication(err)).replace(/\n/g, '<br>') + '<br>' + (err.repondu || err.local ? '' : 'Réessayez quand internet revient : la copie repartira en entier (quelques secondes). ') + 'Rien n\'est perdu dans le carnet.' : E(j.message || 'Carnet reçu.')}</p>
+    <p style="font-size:16px">${err ? E(c29Explication(err)).replace(/\n/g, '<br>') + '<br>' + (err.repondu || err.local ? '' : 'Réessayez quand internet revient : la copie repartira en entier (quelques secondes). ') + 'Rien n\'est perdu dans le carnet.' : E(j.message || 'Carnet reçu.') + (leger ? '<br><b>Envoyé sans les photos</b> (' + leger.c29Photos + ' photo(s) retirée(s) de la copie : avec elles, elle fait ' + c29Mo(gardeeTaille) + ', trop pour internet). Les photos restent dans le carnet. Pensez à « Enregistrer » pour garder une copie complète.' : '')}</p>
     <div class="mk-boutons"><button class="b gris" onclick="fermerBoite()">Fermer</button></div></div>`);
 }
 
